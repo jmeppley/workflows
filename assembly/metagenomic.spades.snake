@@ -1,0 +1,139 @@
+import os, re, sys, glob
+SNAKEMAKE_RULE_DIR='../snakemake-workflows'
+
+OPT_DIR=config['system_paths']['opt_dir']
+BIN_DIR=config['system_paths']['bin_dir']
+sys.path.append("%s/py-metagenomics" % (OPT_DIR))
+from edl.illumina import get_barcodes_and_chemistry
+
+def set_binary_path(binary,paths):
+    if binary not in config['system_paths']:
+        for path in paths:
+            binary_full_path=os.path.join(path,binary)
+            if os.path.exists(binary_full_path):
+                config["system_paths"][binary]=binary_full_path
+                break
+        else:
+            config["system_paths"][binary]=binary
+
+binaries=['miraconvert','seqtk','createPrimerFile.py']
+for binary in binaries:
+    set_binary_path(binary,[BIN_DIR,OPT_DIR])
+
+cleaned_reads='reads.cleaned.fastq'
+
+for i, sample in enumerate(config['inputs']):
+    sample_data=config['inputs'][sample]
+    barcodes,chemistry = get_barcodes_and_chemistry(sample_data['sample_sheet'],
+                                              sample_data['sample_num'])
+    sample_data['barcodes']=' '.join(barcodes)
+    sample_data['primer_template']=glob.glob(OPT_DIR + "/py-metagenomics/primerTemplates/" + chemistry + ".*primers.fasta")[-1] 
+    sample_data['spades_read_file_arguments']=\
+     " --pe%d-1 %s/trimmed_1P.fastq.gz" % (i+1,sample) + \
+     " --pe%d-2 %s/trimmed_2P.fastq.gz" % (i+1,sample) + \
+     " --pe%d-s %s/trimmed_1U.fastq.gz" % (i+1,sample) + \
+     " --pe%d-s %s/trimmed_2U.fastq.gz" % (i+1,sample)
+
+rule all:
+    input:
+        expand("{sample}/reads.raw.fastq",sample=config['inputs'].keys()),
+        expand("{sample}/trimmed_{ext}.fastq.gz",
+                    sample=config['inputs'],
+                    ext=["1P","2P","1U","2U"]),
+        "spades/contigs.fasta"
+
+rule rename_forward_reads:
+    """
+    Rename reads to be based on a "sample" name
+    """
+    input:
+        lambda wildcards: config['inputs'][wildcards.sample]['forward_reads']
+    output:
+        temp("{sample}/R1.renamed.fastq"),
+        temp("{sample}/R1.renamed.fastq.log")
+    shell:
+        "{config[system_paths][miraconvert]} -f fastq -R {wildcards.sample} -S solexa -t fastq {input} {output[0]} > {output[1]}"
+
+rule rename_reverse_reads:
+    """
+    Rename reads to be based on a "sample" name
+    """
+    input:
+        lambda wildcards: config['inputs'][wildcards.sample]['reverse_reads']
+    output:
+        temp("{sample}/R2.renamed.fastq"),
+        temp("{sample}/R2.renamed.fastq.log")
+    shell:
+        "{config[system_paths][miraconvert]} -f fastq -R {wildcards.sample} -S solexa -t fastq {input} {output[0]} > {output[1]}"
+
+rule interleave:
+    """
+    Interleave forward and reverse reads while reanaming
+    """
+    input:
+        "{sample}/R1.renamed.fastq",
+        "{sample}/R2.renamed.fastq"
+    output:
+        "{sample}/reads.raw.fastq"
+    shell:
+        "{config[system_paths][seqtk]} mergepe {input} > {output}"
+
+rule trimming_adapters:
+    """
+    GEnerates fasta file with adapters for trimming
+    """
+    input:
+        lambda wildcards: config['inputs'][wildcards.sample]['sample_sheet']
+    output:
+        "{sample}/adapters.fa"
+    params:
+        barcodes = \
+         lambda wildcards: config["inputs"][wildcards.sample]['barcodes'],
+        primer_template = \
+         lambda wildcards: config["inputs"][wildcards.sample]['primer_template']
+    shell:
+        "{config[system_paths][createPrimerFile.py]} {params.primer_template} {params.barcodes} > {output}"
+
+rule trimmomatic_pe:
+    """Trims given paired-end reads with given parameters"""
+    input:
+        "{sample}/R1.renamed.fastq",
+        "{sample}/R2.renamed.fastq",
+        "{sample}/adapters.fa"
+    output:
+        "{sample}/trimmed_1P.fastq.gz",
+        "{sample}/trimmed_2P.fastq.gz",
+        "{sample}/trimmed_1U.fastq.gz",
+        "{sample}/trimmed_2U.fastq.gz",
+        "{sample}/trimmed.fasta.log"
+    params:
+        trim_params=lambda wildcards: config['trimmomatic_params'] % \
+            ("%s/adapters.fa" % (wildcards.sample))
+    shell:
+        """
+        time java -jar {config[system_paths][trimmomatic_jar]} PE \
+            {input[0]} {input[1]} \
+            {output[0]} {output[2]} {output[1]} {output[3]} \
+            {params.trim_params} 2> {output[4]}
+        """
+
+rule spades_trimmed:
+    """
+    $(CONTIGS_LOCAL): $(R1_FASTQ) $(R2_FASTQ) | $(OUTPUT_DIR)
+        $(SPADES) -m $(SPADES_RAM) -o $(OUTPUT_DIR)/spades --pe1-1 $(R1_FASTQ) --   pe1-2 $(R2_FASTQ) --only-assembler --meta
+    """
+    input:
+        expand(["{sample}/trimmed_1P.fastq.gz",
+                "{sample}/trimmed_2P.fastq.gz",
+                "{sample}/trimmed_1U.fastq.gz",
+                "{sample}/trimmed_2U.fastq.gz"], sample=config['inputs'])
+    output:
+        "spades/contigs.fasta"
+    params:
+        read_file_arguments=" ".join([v['spades_read_file_arguments'] \
+                                      for v in config['inputs'].values()]),
+        ram_limit=config['spades']['ram']
+    shell:
+        """python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades {params.read_file_arguments} --only-assembler --meta
+        python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades --restart-from mc --meta
+        """

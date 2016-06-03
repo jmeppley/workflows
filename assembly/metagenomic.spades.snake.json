@@ -1,0 +1,25 @@
+{
+    "inputs":{
+        "dummy_sample":{
+            "forward_reads":"sample1_r1.fastq",
+            "reverse_reads":"sample1.r2.fastq",
+            "sample_sheet":"SampleSheet.csv",
+            "sample_num":1
+        },
+    }
+
+    "system_paths":
+    {
+        "opt_dir":"/home/jmeppley/apps/opt",
+        "bin_dir":"/home/jmeppley/apps/bin",
+        "trimmomatic_jar":"/home/jmeppley/apps/share/java/trimmomatic.jar",
+        "spades.py":"/home/jmeppley/apps/opt/SPAdes/bin/spades.py",
+    },
+
+    "trimmomatic_params":"ILLUMINACLIP:%s:2:30:10 LEADING:10 TRAILING:10 SLIDINGWINDOW:4:20 MINLEN:50",
+
+    "spades":{
+        "ram":"255",
+    }
+
+}
