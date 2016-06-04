@@ -28,11 +28,6 @@ for i, sample in enumerate(config['inputs']):
                                               sample_data['sample_num'])
     sample_data['barcodes']=' '.join(barcodes)
     sample_data['primer_template']=glob.glob(OPT_DIR + "/py-metagenomics/primerTemplates/" + chemistry + ".*primers.fasta")[-1] 
-    sample_data['spades_read_file_arguments']=\
-     " --pe%d-1 %s/trimmed_1P.fastq.gz" % (i+1,sample) + \
-     " --pe%d-2 %s/trimmed_2P.fastq.gz" % (i+1,sample) + \
-     " --pe%d-s %s/trimmed_1U.fastq.gz" % (i+1,sample) + \
-     " --pe%d-s %s/trimmed_2U.fastq.gz" % (i+1,sample)
 
 rule all:
     input:
@@ -117,23 +112,43 @@ rule trimmomatic_pe:
             {params.trim_params} 2> {output[4]}
         """
 
+rule merge_trimmed:
+    """
+    Mrege the trimmed output of all samples into a single file
+    """
+    input:
+        expand([
+            "{sample}/trimmed_1P.fastq.gz",
+            "{sample}/trimmed_2P.fastq.gz",
+            "{sample}/trimmed_1U.fastq.gz",
+            "{sample}/trimmed_2U.fastq.gz"], sample=config['inputs'])
+    output:
+        "reads.trimmed.paired.fastq.gz",
+        "reads.trimmed.unpaired.fastq.gz"
+    shell:
+        '\n'.join( \
+        ["rm -f {output[0]} {output[1]}",] + \
+        ["{config[system_paths][seqtk]} mergepe \
+          %s/trimmed_1P.fastq.gz %s/trimmed_2P.fastq.gz | \
+          gzip -c >> {output[0]}" % (sample, sample) \
+           for sample in config['inputs']] + \
+        ["gunzip -c %s/trimmed_1U.fastq.gz %s/trimmed_2U.fastq.gz |\
+          gzip -c >> {output[1]}" % (sample, sample) \
+           for sample in config['inputs']]
+               )
+
 rule spades_trimmed:
     """
     $(CONTIGS_LOCAL): $(R1_FASTQ) $(R2_FASTQ) | $(OUTPUT_DIR)
         $(SPADES) -m $(SPADES_RAM) -o $(OUTPUT_DIR)/spades --pe1-1 $(R1_FASTQ) --   pe1-2 $(R2_FASTQ) --only-assembler --meta
     """
     input:
-        expand(["{sample}/trimmed_1P.fastq.gz",
-                "{sample}/trimmed_2P.fastq.gz",
-                "{sample}/trimmed_1U.fastq.gz",
-                "{sample}/trimmed_2U.fastq.gz"], sample=config['inputs'])
+        "reads.trimmed.paired.fastq.gz",
+        "reads.trimmed.unpaired.fastq.gz"
     output:
         "spades/contigs.fasta"
     params:
-        read_file_arguments=" ".join([v['spades_read_file_arguments'] \
-                                      for v in config['inputs'].values()]),
         ram_limit=config['spades']['ram']
     shell:
-        """python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades {params.read_file_arguments} --only-assembler --meta
-        python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades --restart-from mc --meta
+        """python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades --pe1-12 {input[0]} --pe1-s {input[1]} --only-assembler --meta
         """
