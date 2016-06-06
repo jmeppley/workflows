@@ -21,6 +21,14 @@ for binary in binaries:
     set_binary_path(binary,[BIN_DIR,OPT_DIR])
 
 cleaned_reads='reads.cleaned.fastq'
+skip_trim = config.setdefault("skip_trim","False")=="True"
+if not skip_trim:
+    spades_input = [
+        "reads.trimmed.paired.fastq.gz",
+        "reads.trimmed.unpaired.fastq.gz"]
+else:
+    print ("No triming!")
+    spades_input = "reads.raw.fastq"
 
 for i, sample in enumerate(config['inputs']):
     sample_data=config['inputs'][sample]
@@ -32,9 +40,6 @@ for i, sample in enumerate(config['inputs']):
 rule all:
     input:
         expand("{sample}/reads.raw.fastq",sample=config['inputs'].keys()),
-        expand("{sample}/trimmed_{ext}.fastq.gz",
-                    sample=config['inputs'],
-                    ext=["1P","2P","1U","2U"]),
         "spades/contigs.fasta"
 
 rule rename_forward_reads:
@@ -72,6 +77,17 @@ rule interleave:
         "{sample}/reads.raw.fastq"
     shell:
         "{config[system_paths][seqtk]} mergepe {input} > {output}"
+
+rule merge_interleaved:
+    """
+    Combine all interleaved raw reads files into one for no-trim assembly
+    """
+    input:
+        expand("{sample}/reads.raw.fastq", sample=config['inputs'])
+    output:
+        "reads.raw.fastq"
+    shell:
+        "cat {input} > {output}"
 
 rule trimming_adapters:
     """
@@ -137,14 +153,13 @@ rule merge_trimmed:
            for sample in config['inputs']]
                )
 
-rule spades_trimmed:
+rule run_spades:
     """
     $(CONTIGS_LOCAL): $(R1_FASTQ) $(R2_FASTQ) | $(OUTPUT_DIR)
         $(SPADES) -m $(SPADES_RAM) -o $(OUTPUT_DIR)/spades --pe1-1 $(R1_FASTQ) --   pe1-2 $(R2_FASTQ) --only-assembler --meta
     """
     input:
-        "reads.trimmed.paired.fastq.gz",
-        "reads.trimmed.unpaired.fastq.gz"
+        spades_input
     output:
         "spades/contigs.fasta"
     params:
@@ -152,3 +167,5 @@ rule spades_trimmed:
     shell:
         """python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades --pe1-12 {input[0]} --pe1-s {input[1]} --only-assembler --meta
         """
+
+
