@@ -16,19 +16,12 @@ def set_binary_path(binary,paths):
         else:
             config["system_paths"][binary]=binary
 
-binaries=['miraconvert','seqtk','createPrimerFile.py']
+binaries=['miraconvert','seqtk','createPrimerFile.py','prinseq']
 for binary in binaries:
     set_binary_path(binary,[BIN_DIR,OPT_DIR])
 
 cleaned_reads='reads.cleaned.fastq'
 skip_trim = config.setdefault("skip_trim","False")=="True"
-if not skip_trim:
-    spades_input = [
-        "reads.trimmed.paired.fastq.gz",
-        "reads.trimmed.unpaired.fastq.gz"]
-else:
-    print ("No triming!")
-    spades_input = "reads.raw.fastq"
 
 for i, sample in enumerate(config['inputs']):
     sample_data=config['inputs'][sample]
@@ -39,8 +32,9 @@ for i, sample in enumerate(config['inputs']):
 
 rule all:
     input:
-        expand("{sample}/reads.raw.fastq",sample=config['inputs'].keys()),
-        "spades/contigs.fasta"
+        expand("{sample}/reads.raw.stats",sample=config['inputs'].keys()),
+        "spades/contigs.fasta",
+        "contigs.stats"
 
 rule rename_forward_reads:
     """
@@ -153,6 +147,14 @@ rule merge_trimmed:
            for sample in config['inputs']]
                )
 
+if not skip_trim:
+    spades_input = [
+        "reads.trimmed.paired.fastq.gz",
+        "reads.trimmed.unpaired.fastq.gz"]
+else:
+    print ("No triming!")
+    spades_input = "reads.raw.fastq"
+
 rule run_spades:
     """
     $(CONTIGS_LOCAL): $(R1_FASTQ) $(R2_FASTQ) | $(OUTPUT_DIR)
@@ -163,9 +165,49 @@ rule run_spades:
     output:
         "spades/contigs.fasta"
     params:
-        ram_limit=config['spades']['ram']
+        ram_limit=config['spades']['ram'],
+        spades_flags="" if skip_trim else "--only-assembler",
+        input_flags="--pe1-12 %s" % (spades_input) if skip_trim \
+            else "--pe1-12 %s --pe1-s %s" % (spades_input[0],\
+                                             spades_input[1])
     shell:
-        """python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades --pe1-12 {input[0]} --pe1-s {input[1]} --only-assembler --meta
         """
+        python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades {params.input_flags} {params.spades_flags} --meta
+        """
+
+rule contigs_fasta:
+    """
+    Crate a link to contigs.fasta a the top level
+    """
+    input:
+        "spades/contigs.fasta"
+    output:
+        "contigs.fasta"
+    shell:
+        "ln {input} {output}"
+
+rule prinseq_fasta:
+    """ calculate basic stats for a fasta file """
+    input:
+        "{file_root}.fasta"
+    output:
+        "{file_root}.stats"
+    shell:
+        "{config[system_paths][prinseq]} -fasta {input} -stats_len -stats_info > {output}"
+
+rule prinseq_fastq:
+    """ calculate basic stats for a fastq file """
+    input:
+        "{file_root}.fastq"
+    output:
+        "{file_root}.stats"
+    shell:
+        "{config[system_paths][prinseq]} -fastq {input} -stats_len -stats_info > {output}"
+
+# TODO: include .gzipped fasta files in the above rule (or create second rule)
+# TODO: histogram
+# TODO: prokka (or cmsearch and prodigal)
+
+
 
 
