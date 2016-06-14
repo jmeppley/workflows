@@ -1,8 +1,8 @@
 {
  "inputs": {
   "dummy_sample": {
-   "forward_reads": "sample1_r1.fastq",
-   "reverse_reads": "sample1.r2.fastq",
+   "R1": "sample1_r1.fastq",
+   "R2": "sample1.r2.fastq",
    "sample_num": 1,
    "sample_sheet": "SampleSheet.csv"
   }

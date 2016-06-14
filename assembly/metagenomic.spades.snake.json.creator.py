@@ -47,7 +47,7 @@ def main():
                     if m:
                         sample_name=m.group(1)
                         sample_num=int(m.group(2))
-                        dir = "forward_reads" if m.group(3)=="1" else "reverse_reads"
+                        dir = "R1" if m.group(3)=="1" else "R2"
                         sample_data[dir]=os.path.join(root,file_name)
                         continue
                 if sample_name is None:
@@ -82,7 +82,7 @@ def main():
                     if m:
                         sample_name=m.group(1)
                         sample_num=int(m.group(2))
-                        dir = "forward_reads" if m.group(3)=="1" else "reverse_reads"
+                        dir = "R1" if m.group(3)=="1" else "R2"
                         sample_data_dict.setdefault(sample_name,{}).setdefault(run_name,{}).setdefault(sample_num,{})[dir]=os.path.join(root,file_name)
                         continue
 
