@@ -23,7 +23,6 @@ for binary in binaries:
 
 # Define some global variables
 cleaned_reads='reads.cleaned.fastq'
-skip_trim = config.setdefault("skip_trim","False")=="True"
 read_directions = ['R1','R2']
 
 # hack for SLURM output files
@@ -86,14 +85,6 @@ rule merge_interleaved:
     shell:
         "cat {input} > {output}"
 
-# TODO: the following should be moved into a run: decalration in the create primers rule!
-for i, sample in enumerate(config['inputs']):
-    sample_data=config['inputs'][sample]
-    barcodes,chemistry = get_barcodes_and_chemistry(sample_data['sample_sheet'],
-                                              sample_data['sample_num'])
-    sample_data['barcodes']=' '.join(barcodes)
-    sample_data['primer_template']=glob.glob(OPT_DIR + "/py-metagenomics/primerTemplates/" + chemistry + ".*primers.fasta")[-1] 
-
 rule trimming_adapters:
     """
     Generates fasta file with adapters for trimming
@@ -104,15 +95,21 @@ rule trimming_adapters:
         "{sample}/adapters.fa"
     log:
         "logs/{sample}_adapters.fa.log"
-    params:
-        barcodes = \
-         lambda wildcards: config["inputs"][wildcards.sample]['barcodes'],
-        primer_template = \
-         lambda wildcards: config["inputs"][wildcards.sample]['primer_template']
     benchmark:
         "benchmarks/{sample}/create_adapters_file.txt"
-    shell:
-        "{config[system_paths][createPrimerFile.py]} {params.primer_template} {params.barcodes} > {output}"
+    run:
+        sample = wildcards.sample
+        sample_data=config['inputs'][sample]
+        barcodes,chemistry = \
+            get_barcodes_and_chemistry(sample_data['sample_sheet'], \
+                                       sample_data['sample_num'])
+        barcodes=' '.join(barcodes)
+        primer_template_file=glob.glob(OPT_DIR + \
+                                       "/py-metagenomics/primerTemplates/" + \
+                                       chemistry + \
+                                       ".*primers.fasta")[-1] 
+        shell("{config[system_paths][createPrimerFile.py]} \
+               {primer_template_file} {barcodes} > {output}")
 
 rule trimmomatic_pe:
     """Trims given paired-end reads with given parameters"""
@@ -170,21 +167,14 @@ rule merge_trimmed:
            for sample in config['inputs']]
                )
 
-if not skip_trim:
-    spades_input = [
-        "reads.trimmed.paired.fastq.gz",
-        "reads.trimmed.unpaired.fastq.gz"]
-else:
-    print ("No triming!")
-    spades_input = "reads.raw.fastq"
-
 rule run_spades:
     """
     $(CONTIGS_LOCAL): $(R1_FASTQ) $(R2_FASTQ) | $(OUTPUT_DIR)
         $(SPADES) -m $(SPADES_RAM) -o $(OUTPUT_DIR)/spades --pe1-1 $(R1_FASTQ) --   pe1-2 $(R2_FASTQ) --only-assembler --meta
     """
     input:
-        spades_input
+        "reads.trimmed.paired.fastq.gz",
+        "reads.trimmed.unpaired.fastq.gz"
     output:
         "spades/contigs.fasta"
     log:
@@ -192,17 +182,14 @@ rule run_spades:
     threads:
         20
     params:
+        slurm_log="logs/spades.log",
         ram_limit=config['spades']['ram'],
-        pipeline_flags="" if skip_trim else "--only-assembler",
-        continue_flags="--continue" if "continue_spades" in config else "", 
-        input_flags="--pe1-12 %s" % (spades_input) if skip_trim \
-            else "--pe1-12 %s --pe1-s %s" % (spades_input[0],\
-                                             spades_input[1])
+        continue_flags="--continue" if "continue_spades" in config else ""
     benchmark:
         "benchmarks/spades.txt"
     shell:
         """
-        python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades -t {threads} {params.input_flags} {params.pipeline_flags} {params.continue_flags} --meta 
+        python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades -t {threads} --pe1-12 {input[0]} --pe1-s {input[1]} {params.continue_flags} --meta 
         """
 
 rule contigs_fasta:
