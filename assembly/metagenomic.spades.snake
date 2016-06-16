@@ -183,13 +183,14 @@ rule run_spades:
         20
     params:
         slurm_log="logs/spades.log",
-        ram_limit=config['spades']['ram'],
+        ram_limit=config['spades'].get('ram','255'),
+        kmers=config['spades'].get('kmers','21,33,55,77,99,127'),
         continue_flags="--continue" if "continue_spades" in config else ""
     benchmark:
         "benchmarks/spades.txt"
     shell:
         """
-        python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades -t {threads} --pe1-12 {input[0]} --pe1-s {input[1]} {params.continue_flags} --meta 
+        python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades -t {threads} -k {params.kmers} --pe1-12 {input[0]} --pe1-s {input[1]} {params.continue_flags} --meta 
         """
 
 rule contigs_fasta:
