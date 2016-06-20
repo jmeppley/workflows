@@ -31,6 +31,7 @@ def main():
 
     # CLEAR dummy input data
     config["inputs"]={}
+    sample_names=set()
     
     # find read files and update data structure
     if args.sample_num is not None:
@@ -53,6 +54,13 @@ def main():
                 if sample_name is None:
                     raise Exception("No fastq found for sample %d in %s" % (sample_num, run_name))
                 config['inputs'][sample_name]=sample_data
+                sample_names.add(sample_name)
+        
+        if len(sample_names)==1:
+            config['assembly_name']=list(sample_names)[0]
+        else:
+            # TODO: add options to change this
+            config['assembly_name']='assembly'
 
         # OPEN output handle
         if args.output_json is not None:
@@ -97,6 +105,7 @@ def main():
         for (sample_name, run_data) in sample_data_dict.items():
             sample_count=0
             config['inputs']={}
+            config['assembly_name']=sample_name
             for run_name, sample_num_data in run_data.items():
                 if run_name not in sample_sheet_dict:
                     raise Exception("No sample sheet found for run %s" % run_name)

@@ -1,9 +1,10 @@
 import os, re, sys, glob
+from Bio import SeqIO
 SNAKEMAKE_RULE_DIR='../snakemake-workflows'
 
 OPT_DIR=config['system_paths']['opt_dir']
-BIN_DIR=config['system_paths']['bin_dir']
 sys.path.append("%s/py-metagenomics" % (OPT_DIR))
+#sys.path.append("%s/moleculardb/scripts" % (OPT_DIR))
 from edl.illumina import get_barcodes_and_chemistry
 
 # Make sure we know where to find the necessary commands
@@ -11,15 +12,17 @@ def set_binary_path(binary,paths):
     if binary not in config['system_paths']:
         for path in paths:
             binary_full_path=os.path.join(path,binary)
+            binary_name=os.path.split(binary)[-1]
             if os.path.exists(binary_full_path):
-                config["system_paths"][binary]=binary_full_path
+                config["system_paths"][binary_name]=binary_full_path
                 break
         else:
             config["system_paths"][binary]=binary
 
-binaries=['miraconvert','seqtk','createPrimerFile.py','prinseq']
+binaries=['miraconvert','seqtk','createPrimerFile.py','prinseq','prodigal',\
+          'barrnap','filter_blast_m8.py']
 for binary in binaries:
-    set_binary_path(binary,[BIN_DIR,OPT_DIR])
+    set_binary_path(binary,config['system_paths']['bin_dirs'])
 
 # Define some global variables
 cleaned_reads='reads.cleaned.fastq'
@@ -37,7 +40,10 @@ rule all:
     input:
         expand("{sample}/reads.raw.fastq.stats",sample=config['inputs'].keys()),
         "spades/contigs.fasta",
-        "contigs.fasta.stats"
+        "contigs.fasta.stats",
+        "contigs.fasta.histograms",
+        "contigs.annotations.barrnap.gff",
+        "contigs.annotations.prodigal.gff"
     log:
         temp("logs/all.log")
 
@@ -195,17 +201,34 @@ rule run_spades:
 
 rule contigs_fasta:
     """
-    Crate a link to contigs.fasta a the top level
+    Rename contigs
     """
     input:
         "spades/contigs.fasta"
     output:
         "contigs.fasta"
     log:
-        temp("logs/contigs.fasta.link.log")
-    shell:
-        "rm -f {output} && \
-        ln {input} {output}"
+        "logs/contigs.fasta.link.log"
+    run:
+        root_name = config['assembly_name']
+        with open(output[0], 'w') as OUTPUT:
+            for i,record in enumerate(SeqIO.parse(input[0], 'fasta')):
+                contig_name = "%s_c%d" % (root_name, i+1)
+                OUTPUT.write(">%s %s\n%s\n" % (contig_name,
+                                               record.description,
+                                               str(record.seq)))
+
+rule contig_stats:
+    """ get N50 (etc) and histograms for contigs """
+    input:
+        "contigs.fasta"
+    output:
+        "contigs.fasta.histograms"
+    run:
+        from edl.assembly import calc_stats
+        f=calc_stats(input[0], txt_width=70, bins=20, log=True, minLength=200)
+        with open(output[0],'w') as OUTPUT:
+            OUTPUT.write(f)
 
 rule prinseq_any:
     """ calculate basic stats for a fasta file """
@@ -227,9 +250,54 @@ rule prinseq_any:
         "{config[system_paths][prinseq]} {params.input_flag} {input} \
          -stats_len -stats_info > {output}"
 
-# TODO: include .gzipped fasta files in the above rule (or create second rule)
-# TODO: histogram
-# TODO: prokka (or cmsearch and prodigal)
+rule barrnap_kingdom:
+    """ 
+    Find likely rRNA genes using barrnap for each kingdom
+    """
+    input:
+        "contigs.fasta"
+    output:
+        temp("rrna.{kingdom}.gff")
+    threads:
+        8
+    shell:
+        "{config[system_paths][barrnap]} --quiet --threads {threads} --kingdom {wildcards.kingdom} {input} > {output}"
+
+rule barnap_merge:
+    """ merge barrnap results for all 4 kingdoms """
+    input:
+        expand("rrna.{kingdom}.gff", kingdom=['euk','bac','arc','mito'])
+    output:
+        "contigs.annotations.barrnap.gff"
+    shell:
+        "cat {input} | sort | python2 {config[system_paths][filter_blast_m8.py]} -s evalue -f gff --nonoverlapping -P 0 > {output}"
+
+rule prodigal:
+    """ get gene predictions form prodigal """
+    input:
+        "contigs.fasta"
+    output:
+        "contigs.annotations.prodigal.gff"
+    shell:
+        "{config[system_paths][prodigal]} -i {input} -f gff -o {output} -p meta -q"
+
+rule merge_annotations:
+    """ 
+    merge all GFFs and drop overlaps 
+    
+    For now, we drop everything that overlaps, but I will reate a script to drop genes only if they overlap rRNA
+    """
+    input:
+        expand("contigs.annotations.{type}.gff", type=["barrnap",\
+                                                       "prodigal"])
+    output:
+        "contigs.annotations.gff"
+    shell:
+        "cat {input} | sort | python2 {config[system_paths][filter_blast_m8.py]} -f gff --nonoverlapping > {output}"
+
+# TODO: tRNAs
+# TODO: gff merge (in progress)
+# TODO: gene fasta files
 
 
 
