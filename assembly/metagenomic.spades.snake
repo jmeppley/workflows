@@ -33,7 +33,9 @@ for i, sample in enumerate(config['inputs']):
 rule all:
     input:
         expand("{sample}/reads.raw.stats",sample=config['inputs'].keys()),
-        "spades/contigs.fasta",
+        "contigs.stats",
+        "reads.trimmed.paired.stats",
+        "reads.trimmed.unpaired.stats",
         "contigs.stats"
 
 rule rename_forward_reads:
@@ -204,10 +206,13 @@ rule prinseq_fastq:
     shell:
         "{config[system_paths][prinseq]} -fastq {input} -stats_len -stats_info > {output}"
 
-# TODO: include .gzipped fasta files in the above rule (or create second rule)
-# TODO: histogram
-# TODO: prokka (or cmsearch and prodigal)
+rule prinseq_fastq_gz:
+    """ calculate basic stats for a gzipped fastq file """
+    input:
+        "{file_root}.fastq.gz"
+    output:
+        "{file_root}.stats"
+    shell:
+        "gzunip -c {input} | {config[system_paths][prinseq]} -fastq stdin -stats_len -stats_info > {output}"
 
-
-
-
+# TODO: merge stats rule
