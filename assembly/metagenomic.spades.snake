@@ -1,76 +1,80 @@
 import os, re, sys, glob
+from Bio import SeqIO
 SNAKEMAKE_RULE_DIR='../snakemake-workflows'
 
 OPT_DIR=config['system_paths']['opt_dir']
-BIN_DIR=config['system_paths']['bin_dir']
 sys.path.append("%s/py-metagenomics" % (OPT_DIR))
+#sys.path.append("%s/moleculardb/scripts" % (OPT_DIR))
 from edl.illumina import get_barcodes_and_chemistry
 
+# Make sure we know where to find the necessary commands
 def set_binary_path(binary,paths):
     if binary not in config['system_paths']:
         for path in paths:
             binary_full_path=os.path.join(path,binary)
+            binary_name=os.path.split(binary)[-1]
             if os.path.exists(binary_full_path):
-                config["system_paths"][binary]=binary_full_path
+                config["system_paths"][binary_name]=binary_full_path
                 break
         else:
             config["system_paths"][binary]=binary
 
-binaries=['miraconvert','seqtk','createPrimerFile.py','prinseq']
+binaries=['miraconvert','seqtk','createPrimerFile.py','prinseq','prodigal',\
+          'barrnap','filter_blast_m8.py']
 for binary in binaries:
-    set_binary_path(binary,[BIN_DIR,OPT_DIR])
+    set_binary_path(binary,config['system_paths']['bin_dirs'])
 
+# Define some global variables
 cleaned_reads='reads.cleaned.fastq'
-skip_trim = config.setdefault("skip_trim","False")=="True"
+read_directions = ['R1','R2']
 
-for i, sample in enumerate(config['inputs']):
-    sample_data=config['inputs'][sample]
-    barcodes,chemistry = get_barcodes_and_chemistry(sample_data['sample_sheet'],
-                                              sample_data['sample_num'])
-    sample_data['barcodes']=' '.join(barcodes)
-    sample_data['primer_template']=glob.glob(OPT_DIR + "/py-metagenomics/primerTemplates/" + chemistry + ".*primers.fasta")[-1] 
+# hack for SLURM output files
+#if not os.path.exists('logs'):
+#    os.mkdir('logs')
 
+############
+# RULES
+#
+# Start with the final product(s):
 rule all:
     input:
-        expand("{sample}/reads.raw.stats",sample=config['inputs'].keys()),
-        "contigs.stats",
+        expand("{sample}/reads.raw.fastq.stats",sample=config['inputs'].keys()),
+        "spades/contigs.fasta",
         "reads.trimmed.paired.stats",
         "reads.trimmed.unpaired.stats",
-        "contigs.stats"
+        "contigs.fasta.stats",
+        "contigs.fasta.histograms",
+        "contigs.annotations.barrnap.gff",
+        "contigs.annotations.prodigal.gff"
+    log:
+        temp("logs/all.log")
 
-rule rename_forward_reads:
-    """
-    Rename reads to be based on a "sample" name
-    """
+rule rename_raw_reads:
+    """ Rename reads to be based on a "sample" name """
     input:
-        lambda wildcards: config['inputs'][wildcards.sample]['forward_reads']
+        lambda wildcards: config['inputs'][wildcards.sample][wildcards.direction]
     output:
-        temp("{sample}/R1.renamed.fastq"),
-        temp("{sample}/R1.renamed.fastq.log")
+        temp("{sample}/{direction}.renamed.fastq")
+    log:
+        temp("logs/{sample}_{direction}.renamed.fastq.log")
+    benchmark:
+        temp("benchmarks/{sample}/rename_reads_{direction}.txt")
     shell:
-        "{config[system_paths][miraconvert]} -f fastq -R {wildcards.sample} -S solexa -t fastq {input} {output[0]} > {output[1]}"
-
-rule rename_reverse_reads:
-    """
-    Rename reads to be based on a "sample" name
-    """
-    input:
-        lambda wildcards: config['inputs'][wildcards.sample]['reverse_reads']
-    output:
-        temp("{sample}/R2.renamed.fastq"),
-        temp("{sample}/R2.renamed.fastq.log")
-    shell:
-        "{config[system_paths][miraconvert]} -f fastq -R {wildcards.sample} -S solexa -t fastq {input} {output[0]} > {output[1]}"
+        "{config[system_paths][miraconvert]} -f fastq -R {wildcards.sample} -S solexa -t fastq {input} {output}"
 
 rule interleave:
     """
     Interleave forward and reverse reads while reanaming
     """
     input:
-        "{sample}/R1.renamed.fastq",
-        "{sample}/R2.renamed.fastq"
+        expand("{{sample}}/{direction}.renamed.fastq", \
+                                    direction=read_directions),
     output:
         "{sample}/reads.raw.fastq"
+    log:
+        "logs/{sample}_reads.raw.fastq.log"
+    benchmark:
+        "benchmarks/{sample}/interleave.txt"
     shell:
         "{config[system_paths][seqtk]} mergepe {input} > {output}"
 
@@ -82,46 +86,64 @@ rule merge_interleaved:
         expand("{sample}/reads.raw.fastq", sample=config['inputs'])
     output:
         "reads.raw.fastq"
+    log:
+        "logs/reads.raw.fastq.log"
+    benchmark:
+        "benchmarks/merge_interleave.txt"
     shell:
         "cat {input} > {output}"
 
 rule trimming_adapters:
     """
-    GEnerates fasta file with adapters for trimming
+    Generates fasta file with adapters for trimming
     """
     input:
         lambda wildcards: config['inputs'][wildcards.sample]['sample_sheet']
     output:
         "{sample}/adapters.fa"
-    params:
-        barcodes = \
-         lambda wildcards: config["inputs"][wildcards.sample]['barcodes'],
-        primer_template = \
-         lambda wildcards: config["inputs"][wildcards.sample]['primer_template']
-    shell:
-        "{config[system_paths][createPrimerFile.py]} {params.primer_template} {params.barcodes} > {output}"
+    log:
+        "logs/{sample}_adapters.fa.log"
+    benchmark:
+        "benchmarks/{sample}/create_adapters_file.txt"
+    run:
+        sample = wildcards.sample
+        sample_data=config['inputs'][sample]
+        barcodes,chemistry = \
+            get_barcodes_and_chemistry(sample_data['sample_sheet'], \
+                                       sample_data['sample_num'])
+        barcodes=' '.join(barcodes)
+        primer_template_file=glob.glob(OPT_DIR + \
+                                       "/py-metagenomics/primerTemplates/" + \
+                                       chemistry + \
+                                       ".*primers.fasta")[-1] 
+        shell("{config[system_paths][createPrimerFile.py]} \
+               {primer_template_file} {barcodes} > {output}")
 
 rule trimmomatic_pe:
     """Trims given paired-end reads with given parameters"""
     input:
-        "{sample}/R1.renamed.fastq",
-        "{sample}/R2.renamed.fastq",
+        expand("{{sample}}/{direction}.renamed.fastq", \
+                                    direction=read_directions),
         "{sample}/adapters.fa"
     output:
         "{sample}/trimmed_1P.fastq.gz",
         "{sample}/trimmed_2P.fastq.gz",
         "{sample}/trimmed_1U.fastq.gz",
-        "{sample}/trimmed_2U.fastq.gz",
-        "{sample}/trimmed.fasta.log"
+        "{sample}/trimmed_2U.fastq.gz"
+    log:
+        "logs/{sample}_trimmed.fasta.log"
+
     params:
         trim_params=lambda wildcards: config['trimmomatic_params'] % \
             ("%s/adapters.fa" % (wildcards.sample))
+    benchmark:
+        "benchmarks/trimmomatic.txt"
     shell:
         """
         time java -jar {config[system_paths][trimmomatic_jar]} PE \
             {input[0]} {input[1]} \
             {output[0]} {output[2]} {output[1]} {output[3]} \
-            {params.trim_params} 2> {output[4]}
+            {params.trim_params}
         """
 
 rule merge_trimmed:
@@ -137,6 +159,10 @@ rule merge_trimmed:
     output:
         "reads.trimmed.paired.fastq.gz",
         "reads.trimmed.unpaired.fastq.gz"
+    log:
+        "logs/reads.trimmed.merge.log"
+    benchmark:
+        "benchmarks/merge_trimmed.txt"
     shell:
         '\n'.join( \
         ["rm -f {output[0]} {output[1]}",] + \
@@ -149,62 +175,127 @@ rule merge_trimmed:
            for sample in config['inputs']]
                )
 
-if not skip_trim:
-    spades_input = [
-        "reads.trimmed.paired.fastq.gz",
-        "reads.trimmed.unpaired.fastq.gz"]
-else:
-    print ("No triming!")
-    spades_input = "reads.raw.fastq"
-
 rule run_spades:
     """
     $(CONTIGS_LOCAL): $(R1_FASTQ) $(R2_FASTQ) | $(OUTPUT_DIR)
         $(SPADES) -m $(SPADES_RAM) -o $(OUTPUT_DIR)/spades --pe1-1 $(R1_FASTQ) --   pe1-2 $(R2_FASTQ) --only-assembler --meta
     """
     input:
-        spades_input
+        "reads.trimmed.paired.fastq.gz",
+        "reads.trimmed.unpaired.fastq.gz"
     output:
         "spades/contigs.fasta"
+    log:
+        temp("logs/spades.log")
+    threads:
+        20
     params:
-        ram_limit=config['spades']['ram'],
-        spades_flags="" if skip_trim else "--only-assembler",
-        input_flags="--pe1-12 %s" % (spades_input) if skip_trim \
-            else "--pe1-12 %s --pe1-s %s" % (spades_input[0],\
-                                             spades_input[1])
+        slurm_log="logs/spades.log",
+        ram_limit=config['spades'].get('ram','255'),
+        kmers=config['spades'].get('kmers','21,33,55,77,99,127'),
+        continue_flags="--continue" if "continue_spades" in config else ""
+    benchmark:
+        "benchmarks/spades.txt"
     shell:
         """
-        python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades {params.input_flags} {params.spades_flags} --meta
+        python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades -t {threads} -k {params.kmers} --pe1-12 {input[0]} --pe1-s {input[1]} {params.continue_flags} --meta 
         """
 
 rule contigs_fasta:
     """
-    Crate a link to contigs.fasta a the top level
+    Rename contigs
     """
     input:
         "spades/contigs.fasta"
     output:
         "contigs.fasta"
-    shell:
-        "ln {input} {output}"
+    log:
+        "logs/contigs.fasta.link.log"
+    run:
+        root_name = config['assembly_name']
+        with open(output[0], 'w') as OUTPUT:
+            for i,record in enumerate(SeqIO.parse(input[0], 'fasta')):
+                contig_name = "%s_c%d" % (root_name, i+1)
+                OUTPUT.write(">%s %s\n%s\n" % (contig_name,
+                                               record.description,
+                                               str(record.seq)))
 
-rule prinseq_fasta:
+rule contig_stats:
+    """ get N50 (etc) and histograms for contigs """
+    input:
+        "contigs.fasta"
+    output:
+        "contigs.fasta.histograms"
+    run:
+        from edl.assembly import calc_stats
+        f=calc_stats(input[0], txt_width=70, bins=20, log=True, minLength=200)
+        with open(output[0],'w') as OUTPUT:
+            OUTPUT.write(f)
+
+rule prinseq_any:
     """ calculate basic stats for a fasta file """
     input:
-        "{file_root}.fasta"
+        "{file_root}.{ext}"
     output:
-        "{file_root}.stats"
+        "{file_root}.{ext}.stats"
+    log:
+        lambda wildcards: "logs/{file_root}.{ext}.stats.log"\
+                            .format(file_root=re.sub(r'/','_',\
+                                                     wildcards.file_root),
+                                    ext=wildcards.ext)
+    params:
+        input_flag=lambda wildcards:"-fastq" \
+         if re.search(r'q',wildcards.ext) else "-fasta",
+    benchmark:
+        "benchmarks/prinseq_{file_root}_{ext}.txt"
     shell:
-        "{config[system_paths][prinseq]} -fasta {input} -stats_len -stats_info > {output}"
+        "{config[system_paths][prinseq]} {params.input_flag} {input} \
+         -stats_len -stats_info > {output}"
 
-rule prinseq_fastq:
-    """ calculate basic stats for a fastq file """
+rule barrnap_kingdom:
+    """ 
+    Find likely rRNA genes using barrnap for each kingdom
+    """
     input:
-        "{file_root}.fastq"
+        "contigs.fasta"
     output:
-        "{file_root}.stats"
+        temp("rrna.{kingdom}.gff")
+    threads:
+        8
     shell:
-        "{config[system_paths][prinseq]} -fastq {input} -stats_len -stats_info > {output}"
+        "{config[system_paths][barrnap]} --quiet --threads {threads} --kingdom {wildcards.kingdom} {input} > {output}"
+
+rule barnap_merge:
+    """ merge barrnap results for all 4 kingdoms """
+    input:
+        expand("rrna.{kingdom}.gff", kingdom=['euk','bac','arc','mito'])
+    output:
+        "contigs.annotations.barrnap.gff"
+    shell:
+        "cat {input} | sort | python2 {config[system_paths][filter_blast_m8.py]} -s evalue -f gff --nonoverlapping -P 0 > {output}"
+
+rule prodigal:
+    """ get gene predictions form prodigal """
+    input:
+        "contigs.fasta"
+    output:
+        "contigs.annotations.prodigal.gff"
+    shell:
+        "{config[system_paths][prodigal]} -i {input} -f gff -o {output} -p meta -q"
+
+rule merge_annotations:
+    """ 
+    merge all GFFs and drop overlaps 
+    
+    For now, we drop everything that overlaps, but I will reate a script to drop genes only if they overlap rRNA
+    """
+    input:
+        expand("contigs.annotations.{type}.gff", type=["barrnap",\
+                                                       "prodigal"])
+    output:
+        "contigs.annotations.gff"
+    shell:
+        "cat {input} | sort | python2 {config[system_paths][filter_blast_m8.py]} -f gff --nonoverlapping > {output}"
 
 rule prinseq_fastq_gz:
     """ calculate basic stats for a gzipped fastq file """
@@ -214,5 +305,9 @@ rule prinseq_fastq_gz:
         "{file_root}.stats"
     shell:
         "gzunip -c {input} | {config[system_paths][prinseq]} -fastq stdin -stats_len -stats_info > {output}"
+
+# TODO: tRNAs
+# TODO: gff merge (in progress)
+# TODO: gene fasta files
 
 # TODO: merge stats rule
