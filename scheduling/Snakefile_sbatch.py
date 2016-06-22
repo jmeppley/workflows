@@ -72,10 +72,15 @@ class SnakeJobSbatch(SnakeJob):
         if self.log_file is None:
             if len(self.ofiles)>0:
                 # otherwise use the first output file
-                self.log_file=self.ofiles[0] + '-slurm.out'
+                outfile=self.ofiles[0] +'-slurm.out'
+                outdir,outname=os.path.split(outfile)
+                if len(outdir.strip())==0:
+                    self.log_file=os.path.join('logs',outfile)
+                else:
+                    self.log_file=os.path.join(outdir,'logs',outfile)
             else: 
                 # a reasonable default for other rules
-                self.log_file='snakemake-{0}-slurm.out'.format(self.rule)
+                self.log_file='logs/snakemake-{0}-slurm.out'.format(self.rule)
         # directory must exist, though:
         make_dir(os.path.dirname(os.path.abspath(self.log_file)))
 
@@ -120,10 +125,16 @@ class SnakeJobSbatch(SnakeJob):
         # Snakemake expects only id of submitted job on stdout for scheduling
         # with {dependencies}
         try:
-            print("%i" % int(popenrv[0].split()[-1]))
+            slurm_job_id=int(popenrv[0].split()[-1])
+            print("%i" % slurm_job_id)
         except ValueError:
             print("Not a submitted job: %s" % popenrv[0])
             sys.exit(2)
+
+        # write JOB ID to file for easier tracking
+        with open(self.log_file + ".jid",'w') as JIDOUT:
+            JIDOUT.write(str(slurm_job_id))
+            JIDOUT.write('\n')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
