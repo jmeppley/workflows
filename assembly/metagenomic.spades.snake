@@ -20,7 +20,7 @@ def set_binary_path(binary,paths):
             config["system_paths"][binary]=binary
 
 binaries=['miraconvert','seqtk','createPrimerFile.py','prinseq','prodigal',\
-          'barrnap','filter_blast_m8.py']
+          'barrnap','filter_blast_m8.py','merge_gffs.py']
 for binary in binaries:
     set_binary_path(binary,config['system_paths']['bin_dirs'])
 
@@ -42,8 +42,10 @@ rule all:
         "spades/contigs.fasta",
         "contigs.fasta.stats",
         "contigs.fasta.histograms",
-        "contigs.annotations.barrnap.gff",
-        "contigs.annotations.prodigal.gff"
+        "contigs.annotations.gff",
+        "contigs.annotations.faa",
+        "reads.trimmed.paired.fastq.gz.stats",
+        "reads.trimmed.unpaired.fastq.gz.stats"
     log:
         temp("logs/all.log")
 
@@ -235,7 +237,7 @@ rule prinseq_any:
     input:
         "{file_root}.{ext}"
     output:
-        "{file_root}.{ext}.stats"
+        "{file_root}.{ext,f.+}.stats"
     log:
         lambda wildcards: "logs/{file_root}.{ext}.stats.log"\
                             .format(file_root=re.sub(r'/','_',\
@@ -244,10 +246,13 @@ rule prinseq_any:
     params:
         input_flag=lambda wildcards:"-fastq" \
          if re.search(r'q',wildcards.ext) else "-fasta",
+        cat=lambda wildcards:"gunzip -c" \
+         if re.search(r'\.gz$',wildcards.ext) else "cat"
     benchmark:
         "benchmarks/prinseq_{file_root}_{ext}.txt"
     shell:
-        "{config[system_paths][prinseq]} {params.input_flag} {input} \
+        "{params.cat} {input} | \
+        {config[system_paths][prinseq]} {params.input_flag} stdin \
          -stats_len -stats_info > {output}"
 
 rule barrnap_kingdom:
@@ -270,7 +275,7 @@ rule barnap_merge:
     output:
         "contigs.annotations.barrnap.gff"
     shell:
-        "cat {input} | sort | python2 {config[system_paths][filter_blast_m8.py]} -s evalue -f gff --nonoverlapping -P 0 > {output}"
+        "cat {input} | sort | {config[system_paths][filter_blast_m8.py]} -s evalue -f gff --nonoverlapping -P 0 > {output}"
 
 rule prodigal:
     """ get gene predictions form prodigal """
@@ -288,17 +293,21 @@ rule merge_annotations:
     For now, we drop everything that overlaps, but I will reate a script to drop genes only if they overlap rRNA
     """
     input:
+        "contigs.fasta",
         expand("contigs.annotations.{type}.gff", type=["barrnap",\
                                                        "prodigal"])
     output:
-        "contigs.annotations.gff"
+        "contigs.annotations.gff",
+        "contigs.annotations.fna",
+        "contigs.annotations.faa"
+    params:
+        output_root="contigs.annotations",
+        rrna_gffs="-r contigs.annotations.barrnap.gff",
+        cds_gffs="-c contigs.annotations.prodigal.gff"
     shell:
-        "cat {input} | sort | python2 {config[system_paths][filter_blast_m8.py]} -f gff --nonoverlapping > {output}"
+        "{config[system_paths][merge_gffs.py]} {params.rrna_gffs} {params.cds_gffs} {input[0]} {params.output_root}"
 
+# Later
 # TODO: tRNAs
-# TODO: gff merge (in progress)
-# TODO: gene fasta files
-
-
-
+# TODO: record program versions
 
