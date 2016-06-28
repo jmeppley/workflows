@@ -43,7 +43,7 @@ rule all:
         "contigs.fasta.stats",
         "contigs.fasta.histograms",
         "contigs.annotations.gff",
-        "contigs.annotations.faa",
+        "contigs.annotations.faa.stats",
         "reads.trimmed.paired.fastq.gz.stats",
         "reads.trimmed.unpaired.fastq.gz.stats"
     log:
@@ -228,7 +228,7 @@ rule contig_stats:
         "contigs.fasta.histograms"
     run:
         from edl.assembly import calc_stats
-        f=calc_stats(input[0], txt_width=70, bins=20, log=True, minLength=200)
+        f=calc_stats(input[0], txt_width=70, bins=50, log=True, minLength=200)
         with open(output[0],'w') as OUTPUT:
             OUTPUT.write(f)
 
