@@ -113,7 +113,7 @@ class SnakeJobSbatch(SnakeJob):
                     'log_file': self.log_file,
                     'extra_parameters': rule_conf.get('extra_parameters', "")
             }
-            sbatch_cmd = """sbatch --output={log_file} {dep_str} -A {account} -p {partition} -n {cores} -t {days}-{hours}:{minutes}:00 \
+            sbatch_cmd = """sbatch --open-mode=append --output={log_file} {dep_str} -A {account} -p {partition} -n {cores} -t {days}-{hours}:{minutes}:00 \
                     '{script_name}'""".format(**attributes)
         else:
             raise UndefinedJobRule('No schedule config found for schedule_{0}'.format(self.rule))
