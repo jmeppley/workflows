@@ -43,7 +43,7 @@ rule all:
         "contigs.fasta.stats",
         "contigs.fasta.histograms",
         "contigs.annotations.gff",
-        "contigs.annotations.faa",
+        "contigs.annotations.faa.stats",
         "reads.trimmed.paired.fastq.gz.stats",
         "reads.trimmed.unpaired.fastq.gz.stats"
     log:
@@ -211,6 +211,8 @@ rule contigs_fasta:
         "contigs.fasta"
     log:
         "logs/contigs.fasta.link.log"
+    benchmark:
+        "benchmarks/contigs.fasta.txt"
     run:
         root_name = config['assembly_name']
         with open(output[0], 'w') as OUTPUT:
@@ -226,9 +228,11 @@ rule contig_stats:
         "contigs.fasta"
     output:
         "contigs.fasta.histograms"
+    benchmark:
+        "benchmarks/contigs.fasta.histograms.txt"
     run:
         from edl.assembly import calc_stats
-        f=calc_stats(input[0], txt_width=70, bins=20, log=True, minLength=200)
+        f=calc_stats(input[0], txt_width=70, bins=50, log=True, minLength=200)
         with open(output[0],'w') as OUTPUT:
             OUTPUT.write(f)
 
@@ -246,6 +250,8 @@ rule prinseq_any:
     params:
         input_flag=lambda wildcards:"-fastq" \
          if re.search(r'q',wildcards.ext) else "-fasta",
+        aa=lambda wildcards:"-aa" \
+         if re.search(r'\bfaa\b',wildcards.ext) else "",
         cat=lambda wildcards:"gunzip -c" \
          if re.search(r'\.gz$',wildcards.ext) else "cat"
     benchmark:
@@ -253,7 +259,7 @@ rule prinseq_any:
     shell:
         "{params.cat} {input} | \
         {config[system_paths][prinseq]} {params.input_flag} stdin \
-         -stats_len -stats_info > {output}"
+         -stats_len -stats_info {params.aa} > {output}"
 
 rule barrnap_kingdom:
     """ 
@@ -263,6 +269,8 @@ rule barrnap_kingdom:
         "contigs.fasta"
     output:
         temp("rrna.{kingdom}.gff")
+    benchmark:
+        "benchmarks/rrna.{kingdom}.gff.txt"
     threads:
         8
     shell:
@@ -274,6 +282,8 @@ rule barnap_merge:
         expand("rrna.{kingdom}.gff", kingdom=['euk','bac','arc','mito'])
     output:
         "contigs.annotations.barrnap.gff"
+    benchmark:
+        "benchmarks/contigs.annotations.barrnap.txt"
     shell:
         "cat {input} | sort | {config[system_paths][filter_blast_m8.py]} -s evalue -f gff --nonoverlapping -P 0 > {output}"
 
@@ -283,6 +293,8 @@ rule prodigal:
         "contigs.fasta"
     output:
         "contigs.annotations.prodigal.gff"
+    benchmark:
+        "benchmarks/contigs.annotations.prodigal.txt"
     shell:
         "{config[system_paths][prodigal]} -i {input} -f gff -o {output} -p meta -q"
 
@@ -304,6 +316,8 @@ rule merge_annotations:
         output_root="contigs.annotations",
         rrna_gffs="-r contigs.annotations.barrnap.gff",
         cds_gffs="-c contigs.annotations.prodigal.gff"
+    benchmark:
+        "benchmarks/contigs.annotations.merge.txt"
     shell:
         "{config[system_paths][merge_gffs.py]} {params.rrna_gffs} {params.cds_gffs} {input[0]} {params.output_root}"
 
