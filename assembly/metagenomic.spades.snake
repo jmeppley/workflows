@@ -1,11 +1,12 @@
 import os, re, sys, glob, yaml, pandas, subprocess
-from Bio import SeqIO
+from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
 configfile: "./assembly_params.json"
 
 OPT_DIR=config['system_paths']['opt_dir']
 sys.path.append("%s/py-metagenomics" % (OPT_DIR))
 #sys.path.append("%s/moleculardb/scripts" % (OPT_DIR))
 from edl.illumina import get_barcodes_and_chemistry
+from edl import __version__ as PYMG_VERSION
 
 # Make sure we know where to find the necessary commands
 def set_binary_path(binary,paths):
@@ -28,15 +29,16 @@ for binary in binaries:
 cleaned_reads='reads.cleaned.fastq'
 read_directions = ['R1','R2']
 
-# hack for SLURM output files
-#if not os.path.exists('logs'):
-#    os.mkdir('logs')
-        
 #######
 # Functions
-
-def get_version(command, version_flag='--version', regular_expression=None):
-    out = subprocess.check_output(" ".join([config['system_paths'][command],
+def get_version(command, version_flag='--version', 
+                cmd_prefix='',
+                regular_expression=None):
+    """
+    Gets the version string from a command
+    """
+    out = subprocess.check_output(" ".join([cmd_prefix,
+                                            config['system_paths'][command],
                                             version_flag,
                                             "; exit 0"]),
                                   stderr=subprocess.STDOUT,
@@ -45,6 +47,14 @@ def get_version(command, version_flag='--version', regular_expression=None):
         return out.strip()
     else:
         return regular_expression.search(out).group(1)
+
+def parse_stats(stats_file):
+    """
+    pull out the read and base counts from a prinseq output file.
+    Returns a two item dict with integer values and keys: 'reads', 'bases'
+    """
+    stats = pandas.read_table(stats_file,names=('module','key','value'),index_col=1)['value']
+    return {k:int(stats[k]) for k in ['reads','bases']}
 
 ############
 # RULES
@@ -88,7 +98,8 @@ rule interleave:
     benchmark:
         "benchmarks/{sample}/interleave.txt"
     version:
-        get_version('seqtk','',re.compile(r'Version:\s*(\S+)'))
+        get_version('seqtk','',
+                    regular_expression=re.compile(r'Version:\s*(\S+)'))
     shell:
         "{config[system_paths][seqtk]} mergepe {input} > {output}"
 
@@ -135,14 +146,6 @@ rule trimming_adapters:
         shell("{config[system_paths][createPrimerFile.py]} \
                {primer_template_file} {barcodes} > {output}")
 
-rule trimmomatic_version:
-    input:
-        expand("{sample}/trimmed_2U.fastq.gz", sample=config['inputs'])
-    output:
-        "logs/versions/trimmomatic.version"
-    shell:
-        "java -jar {config[system_paths][trimmomatic_jar]} -version > {output}"
-
 rule trimmomatic_pe:
     """Trims given paired-end reads with given parameters"""
     input:
@@ -163,7 +166,7 @@ rule trimmomatic_pe:
     benchmark:
         "benchmarks/trimmomatic.txt"
     version:
-        get_version('trimmomatic_jar','-v',cmd_prefix='java -jar')
+        get_version('trimmomatic_jar','-version',cmd_prefix='java -jar')
     shell:
         """
         time java -jar {config[system_paths][trimmomatic_jar]} PE \
@@ -189,6 +192,9 @@ rule merge_trimmed:
         "logs/reads.trimmed.merge.log"
     benchmark:
         "benchmarks/merge_trimmed.txt"
+    version:
+        get_version('seqtk','',
+                    regular_expression=re.compile(r'Version:\s*(\S+)'))
     shell:
         '\n'.join( \
         ["rm -f {output[0]} {output[1]}",] + \
@@ -200,14 +206,6 @@ rule merge_trimmed:
           gzip -c >> {output[1]}" % (sample, sample) \
            for sample in config['inputs']]
                )
-
-rule spades_version:
-    input:
-        "spades/contigs.fasta"
-    output:
-        "logs/versions/spades.version"
-    shell:
-        "python {config[system_paths][spades.py]} --version 2>&1 | grep -v fubar > {output}"
 
 rule run_spades:
     """
@@ -230,6 +228,8 @@ rule run_spades:
         continue_flags="--continue" if "continue_spades" in config else ""
     benchmark:
         "benchmarks/spades.txt"
+    version:
+        get_version('spades.py', cmd_prefix='python')
     shell:
         """
         python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades -t {threads} -k {params.kmers} --pe1-12 {input[0]} --pe1-s {input[1]} {params.continue_flags} --meta 
@@ -247,6 +247,8 @@ rule contigs_fasta:
         "logs/contigs.fasta.link.log"
     benchmark:
         "benchmarks/contigs.fasta.txt"
+    version:
+        "biopython-{}".format(BIOPYTHON_VERSION)
     run:
         root_name = config['assembly_name']
         with open(output[0], 'w') as OUTPUT:
@@ -264,6 +266,8 @@ rule contig_stats:
         "contigs.fasta.histograms"
     benchmark:
         "benchmarks/contigs.fasta.histograms.txt"
+    version:
+        "py-metagenomics-{}".format(PYMG_VERSION)
     run:
         from edl.assembly import calc_stats
         f=calc_stats(input[0], txt_width=70, bins=50, log=True, minLength=200)
@@ -290,18 +294,12 @@ rule prinseq_any:
          if re.search(r'\.gz$',wildcards.ext) else "cat"
     benchmark:
         "benchmarks/prinseq_{file_root}_{ext}.txt"
+    version:
+        get_version('prinseq','-version')
     shell:
         "{params.cat} {input} | \
         {config[system_paths][prinseq]} {params.input_flag} stdin \
          -stats_len -stats_info {params.aa} > {output}"
-
-rule barrnap_version:
-    input:
-        "contigs.annotations.barrnap.gff"
-    output:
-        "logs/versions/barrnap.version"
-    shell:
-        "{config[system_paths][barrnap]} --version 2>&1 | grep -v fubar > {output}"
 
 rule barrnap_kingdom:
     """ 
@@ -315,6 +313,8 @@ rule barrnap_kingdom:
         "benchmarks/rrna.{kingdom}.gff.txt"
     threads:
         8
+    version:
+        get_version('barrnap')
     shell:
         "{config[system_paths][barrnap]} --quiet --threads {threads} --kingdom {wildcards.kingdom} {input} > {output}"
 
@@ -326,16 +326,10 @@ rule barnap_merge:
         "contigs.annotations.barrnap.gff"
     benchmark:
         "benchmarks/contigs.annotations.barrnap.txt"
+    version:
+        get_version('filter_blast_m8.py')
     shell:
         "cat {input} | sort | {config[system_paths][filter_blast_m8.py]} -s evalue -f gff --nonoverlapping -P 0 > {output}"
-
-rule prodigal_version:
-    input:
-        "contigs.annotations.prodigal.gff"
-    output:
-        "logs/versions/prodigal.version"
-    shell:
-        '{config[system_paths][prodigal]}  -v 2>&1 | grep -v "^$" > {output}'
 
 rule prodigal:
     """ get gene predictions form prodigal """
@@ -345,6 +339,8 @@ rule prodigal:
         "contigs.annotations.prodigal.gff"
     benchmark:
         "benchmarks/contigs.annotations.prodigal.txt"
+    version:
+        get_version('prodigal','-v')
     shell:
         "{config[system_paths][prodigal]} -i {input} -f gff -o {output} -p meta -q"
 
@@ -368,16 +364,10 @@ rule merge_annotations:
         cds_gffs="-c contigs.annotations.prodigal.gff"
     benchmark:
         "benchmarks/contigs.annotations.merge.txt"
+    version:
+        get_version('merge_gffs.py')
     shell:
         "{config[system_paths][merge_gffs.py]} {params.rrna_gffs} {params.cds_gffs} {input[0]} {params.output_root}"
-
-# Later
-# TODO: tRNAs
-# TODO: record program versions
-
-def parse_stats(stats_file):
-    stats = pandas.read_table(stats_file,names=('module','key','value'),index_col=1)['value']
-    return {k:int(stats[k]) for k in ['reads','bases']}
 
 rule final_report:
     input:
@@ -386,19 +376,10 @@ rule final_report:
         "contigs.annotations.faa.stats",
         "reads.trimmed.paired.fastq.gz.stats",
         "reads.trimmed.unpaired.fastq.gz.stats",
-        'contigs.fasta.histograms',
-        'logs/versions/spades.version',
-        'logs/versions/barrnap.version',
-        'logs/versions/prodigal.version',
-        'logs/versions/trimmomatic.version'
+        'contigs.fasta.histograms'
     output:
         "contigs.report"
     run:
-        # version reports
-        versions={re.sub(r'^.+/([^/]+)\.version$',r'\1',f):\
-                  open(f).readlines()[0].strip() \
-                  for f in input if re.search(r'version$',f)}
-        
         contig_stats={'raw reads':0,'raw bases':0}
         # Raw reads
         for raw_reads_stats_file in [i for i in input if re.search(r'reads\.raw.+stats',i)]:
@@ -430,7 +411,7 @@ rule final_report:
         stats = parse_stats('contigs.annotations.faa.stats')
         contig_stats['genes']=stats['reads']
 
-        report={"versions":versions, "assembly":contig_stats}
+        report={"assembly":contig_stats}
         with open(output[0],'w') as OUTF:
             OUTF.write(yaml.dump(report, default_flow_style=False))
 
@@ -439,3 +420,5 @@ rule clean:
         samples=" ".join(config['inputs'])
     shell:
         "rm -rf logs benchmarks spades contigs.* reads.trimmed.* {params.samples}"
+
+# TODO: tRNAs
