@@ -2,9 +2,9 @@ import os, re, sys, glob
 from Bio import SeqIO
 SNAKEMAKE_RULE_DIR='../snakemake-workflows'
 
-OPT_DIR=config['system_paths']['opt_dir']
-sys.path.append("%s/py-metagenomics" % (OPT_DIR))
-#sys.path.append("%s/moleculardb/scripts" % (OPT_DIR))
+PYMG_DIR=config['system_paths']['pymg_dir']
+sys.path.append(PYMG_DIR)
+#sys.path.append("%s/moleculardb/scripts" % (PYMG_DIR))
 from edl.illumina import get_barcodes_and_chemistry
 
 # Make sure we know where to find the necessary commands
@@ -22,7 +22,8 @@ def set_binary_path(binary,paths):
 binaries=['miraconvert','seqtk','createPrimerFile.py','prinseq','prodigal',\
           'barrnap','filter_blast_m8.py','merge_gffs.py']
 for binary in binaries:
-    set_binary_path(binary,config['system_paths']['bin_dirs'])
+    set_binary_path(binary,config['system_paths']['bin_dirs'] + \
+                    [config['system_paths']['pymg_dir']])
 
 # Define some global variables
 cleaned_reads='reads.cleaned.fastq'
@@ -60,7 +61,7 @@ rule rename_raw_reads:
     benchmark:
         temp("benchmarks/{sample}/rename_reads_{direction}.txt")
     shell:
-        "{config[system_paths][miraconvert]} -f fastq -R {wildcards.sample} -S solexa -t fastq {input} {output}"
+        "{config[system_paths][miraconvert]} -f fastq -R {wildcards.sample} -S solexa -t fastq {input} {output} > {log}"
 
 rule interleave:
     """
@@ -112,8 +113,8 @@ rule trimming_adapters:
             get_barcodes_and_chemistry(sample_data['sample_sheet'], \
                                        sample_data['sample_num'])
         barcodes=' '.join(barcodes)
-        primer_template_file=glob.glob(OPT_DIR + \
-                                       "/py-metagenomics/primerTemplates/" + \
+        primer_template_file=glob.glob(PYMG_DIR + \
+                                       "/primerTemplates/" + \
                                        chemistry + \
                                        ".*primers.fasta")[-1] 
         shell("{config[system_paths][createPrimerFile.py]} \
@@ -143,7 +144,7 @@ rule trimmomatic_pe:
         time java -jar {config[system_paths][trimmomatic_jar]} PE \
             {input[0]} {input[1]} \
             {output[0]} {output[2]} {output[1]} {output[3]} \
-            {params.trim_params}
+            {params.trim_params} > {log}
         """
 
 rule merge_trimmed:
