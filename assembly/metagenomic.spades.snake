@@ -21,7 +21,7 @@ def set_binary_path(binary,paths):
             config["system_paths"][binary]=binary
 
 binaries=['miraconvert','seqtk','createPrimerFile.py','prinseq','prodigal',\
-          'barrnap','filter_blast_m8.py','merge_gffs.py']
+          'filter_blast_m8.py','merge_gffs.py','cmsearch']
 for binary in binaries:
     set_binary_path(binary,config['system_paths']['bin_dirs'] + \
                     [config['system_paths']['pymg_dir']])
@@ -48,6 +48,31 @@ def get_version(command, version_flag='--version',
         return out.strip()
     else:
         return regular_expression.search(out).group(1)
+
+def get_model_version(molecule, models_dir):
+    """
+    Gets the version of the cm and hmm models used from a "VERSION"
+    file in the models folder.
+
+    Returns "Unknown" if the version file is missing.
+    """
+
+    # Look for a VERSION file
+    version_file = os.path.join(models_dir,'VERSION')
+    if os.path.exists(version_file):
+        with open(version_file) as VF:
+            return next(VF).strip()
+
+    # Fall back to README file
+    readme_file = os.path.join(models_dir,'README') 
+    if os.path.exists(readme_file):
+        with open(readme_file) as RMF:
+            for line in RMF:
+                if re.search('r(Release\s*[0-9.]+)',line):
+                    return "RFAM " + line.strip()
+
+    # Fallback to unknown
+    return "Unknown"
 
 def parse_stats(stats_file):
     """
@@ -302,44 +327,56 @@ rule prinseq_any:
         {config[system_paths][prinseq]} {params.input_flag} stdin \
          -stats_len -stats_info {params.aa} > {output}"
 
-rule barrnap_kingdom:
+rule cmsearch:
     """ 
-    Find likely rRNA genes using barrnap for each kingdom
+    Find likely rRNA genes using cmsearch and RFAM models
     """
     input:
         "contigs.fasta"
     output:
-        temp("rrna.{kingdom}.gff")
+        temp("contigs.annotations.{molecule}.tbl")
+    params:
+        cmfile=os.path.join(config['system_paths']['models'],'{molecule}.cm'),
+        flags=lambda wildcards:\
+          "--hmmonly" if wildcards.molecule=='rRNA' else ""
     benchmark:
-        "benchmarks/rrna.{kingdom}.gff.txt"
+        "benchmarks/contigs.annotations.{molecule}.tbl.txt"
     threads:
         8
     version:
-        get_version('barrnap')
+        lambda wildcards:\
+            get_version('cmsearch',
+                        '-h',
+                        regular_expression=re.\
+                          compile(r'^#\s*(INFERNAL[\s_-.]*[0-9.]+.+$')) \
+                + " :: " + get_model_version(wildcards.molecule,
+                                             config['system_paths']['models'])
     shell:
-        "{config[system_paths][barrnap]} --quiet --threads {threads} --kingdom {wildcards.kingdom} {input} > {output}"
+        "{config[system_paths][cmsearch]} {params.flags} -o /dev/null --tblout {output} --cpu {threads} {params.cmfile} {input}"
 
-rule barnap_merge:
-    """ merge barrnap results for all 4 kingdoms """
+rule cmsearch_tbl_to_gff:
+    """
+    convert cmsearch output to gff
+    """
     input:
-        expand("rrna.{kingdom}.gff", kingdom=['euk','bac','arc','mito'])
+        "contigs.annotations.{molecule}.tbl"
     output:
-        "contigs.annotations.barrnap.gff"
+        "contigs.annotations.{molecule}.gff"
     benchmark:
-        "benchmarks/contigs.annotations.barrnap.txt"
+        "contigs.annotations.{molecule}.gff.txt"
     version:
         get_version('filter_blast_m8.py')
     shell:
-        "cat {input} | sort | {config[system_paths][filter_blast_m8.py]} -s evalue -f gff --nonoverlapping -P 0 > {output}"
+        "{config[system_paths][filter_blast_m8.py]} -v -f cmsearch --gff -o {output} {input}"
 
 rule prodigal:
     """ get gene predictions form prodigal """
     input:
         "contigs.fasta"
     output:
-        "contigs.annotations.prodigal.gff"
+        "contigs.annotations.genes.gff"
     benchmark:
-        "benchmarks/contigs.annotations.prodigal.txt"
+        "benchmarks/contigs.annotations.genes.txt"
     version:
         get_version('prodigal','-v')
     shell:
@@ -352,23 +389,22 @@ rule merge_annotations:
     For now, we drop everything that overlaps, but I will reate a script to drop genes only if they overlap rRNA
     """
     input:
-        "contigs.fasta",
-        expand("contigs.annotations.{type}.gff", type=["barrnap",\
-                                                       "prodigal"])
+        contigs="contigs.fasta",
+        rrnas="contigs.annotations.rRNA.gff",
+        trnas="contigs.annotations.tRNA.gff",
+        genes="contigs.annotations.genes.gff"
     output:
         "contigs.annotations.gff",
         "contigs.annotations.fna",
         "contigs.annotations.faa"
     params:
-        output_root="contigs.annotations",
-        rrna_gffs="-r contigs.annotations.barrnap.gff",
-        cds_gffs="-c contigs.annotations.prodigal.gff"
+        output_root="contigs.annotations"
     benchmark:
         "benchmarks/contigs.annotations.merge.txt"
     version:
         get_version('merge_gffs.py')
     shell:
-        "{config[system_paths][merge_gffs.py]} {params.rrna_gffs} {params.cds_gffs} {input[0]} {params.output_root}"
+        "{config[system_paths][merge_gffs.py]} -r {input.rrnas} -r {input.trnas} -c {input.genes} {input.contigs} {params.output_root}"
 
 rule final_report:
     input:
@@ -423,3 +459,5 @@ rule clean:
         "rm -rf logs benchmarks spades contigs.* reads.trimmed.* {params.samples}"
 
 # TODO: tRNAs
+# TODO: map reads to contigs with BWA|bowtie2
+# TODO: apply contig filter (min length, min read count)
