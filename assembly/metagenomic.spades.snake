@@ -30,6 +30,22 @@ for binary in binaries:
 # Define some global variables
 read_directions = ['R1','R2']
 
+# default configuration
+if 'spades' not in config:
+    config['spades']={'ram':255,
+                      'threads':20,
+                      'kmers':'21,33,55,77,99,127'}
+if 'cmsearch' not in config:
+    config['cmsearch']={'threads':8}
+if 'bbduk' not in config:
+    config['bbduk']={'ram':'1g',
+      'adapter_flags':'ktrim=r k=23 mink=11 hdist=1tbo tpe tbo tpe',
+      'phix_flags':'k=27 hdist=1 qtrim=rl trimq=17 cardinality=t mingc=0.05 maxgc=0.95'}
+if 'bfc' not in config:
+    config['bfc']={'ram':'5g',
+                   'threads':'20',
+                   'params':'-1 -k21'}
+
 #######
 # Functions
 def get_version(command, version_flag='--version', 
@@ -253,9 +269,10 @@ rule trim_bbduk_adapters:
         adapter_file=config['system_paths']['bbmap'] \
                         + "/resources/adapters.fa"
     shell:
-        "{config[system_paths][bbduk.sh]} -Xmx1g in={input} out={output} \
-          interleaved overwrite ktrim=r k=23 mink=11 hdist=1 \
-          ref={params.adapter_file} tbo tpe 2> {log}"
+        "{config[system_paths][bbduk.sh]} -Xmx{config[bbduk][ram]} \
+          in={input} out={output} \
+          interleaved overwrite {config[bbduk][adapter_flags]} \
+          ref={params.adapter_file} 2> {log}"
 
 rule trim_bbduk_phix:
     """
@@ -278,9 +295,9 @@ rule trim_bbduk_phix:
         phiX_file=config['system_paths']['bbmap'] \
                          + "/resources/phix174_ill.ref.fa.gz"
     shell:
-        "{config[system_paths][bbduk.sh]} -Xmx1g in={input} out={output[0]} \
-          gchist={output[1]} interleaved overwrite k=27 hdist=1 \
-          qtrim=rl trimq=17 cardinality=t mingc=0.05 maxgc=0.95 \
+        "{config[system_paths][bbduk.sh]} -Xmx{config[bbduk][ram]} \
+          in={input} out={output[0]} gchist={output[1]} \
+          interleaved overwrite {config[bbduk][phix_flags]} \
           ref={params.phiX_file} 2> {log}"
 
 rule err_corr_bfc:
@@ -295,12 +312,15 @@ rule err_corr_bfc:
         "benchmarks/reads.paired.corrected.txt"
     log:
         "logs/reads.paired.corrected.log"
-    params:
-        kmers=config['spades'].get('kmers','21,33,55,77,99,127'),
     version:
         get_version('bfc')
+    threads:
+        int(config['bfc']['threads'])
     shell:
-        "{config[system_paths][bfc]} -1 -s 5g -k 21 -t 20 {input} 2> {log} | {config[system_paths][seqtk]} dropse - | gzip -c > {output}"
+        "{config[system_paths][bfc]} -s {config[bfc][ram]} \
+          {config[bfc][params] -t {threads} {input} 2> {log} \
+          | {config[system_paths][seqtk]} dropse - \
+          | gzip -c > {output}"
 
 rule run_spades:
     """
@@ -314,11 +334,11 @@ rule run_spades:
     log:
         temp("logs/spades.log")
     threads:
-        20
+        int(config['spades']['threads'])
     params:
         slurm_log="logs/spades.log",
-        ram_limit=config['spades'].get('ram','255'),
-        kmers=config['spades'].get('kmers','21,33,55,77,99,127'),
+        ram_limit=config['spades']['ram']
+        kmers=config['spades']['kmers']
         continue_flags="--continue" if "continue_spades" in config else ""
     benchmark:
         "benchmarks/spades.txt"
@@ -410,7 +430,7 @@ rule cmsearch:
     benchmark:
         "benchmarks/contigs.annotations.{molecule}.tbl.txt"
     threads:
-        8
+        int(config['cmsearch']['threads'])
     version:
         lambda wildcards:\
             get_version('cmsearch',
@@ -506,7 +526,7 @@ rule final_report:
             contig_stats['{0} paired reads'.format(type)]=stats['reads']
             contig_stats['{0} paired bases'.format(type)]=stats['bases']
         # unpaired reads
-        stats = parse_stats('reads.trimmed.unpaired.fastq.gz.stats')
+        stats = parse_stats('reads.unpaired.trimmed.fastq.gz.stats')
         contig_stats['trimmed unpaired reads']=stats['reads']
 
         # contigs
