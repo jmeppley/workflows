@@ -44,7 +44,8 @@ if 'bbduk' not in config:
 if 'bfc' not in config:
     config['bfc']={'ram':'5g',
                    'threads':'20',
-                   'params':'-1 -k21'}
+                   'error_correction_params':'-k 55',
+                   'kmer_trimming_params':'-1 -k 21'}
 
 #######
 # Functions
@@ -318,7 +319,28 @@ rule err_corr_bfc:
         int(config['bfc']['threads'])
     shell:
         "{config[system_paths][bfc]} -s {config[bfc][ram]} \
-          {config[bfc][params] -t {threads} {input} 2> {log} \
+          {config[bfc][error_correction_params] -t {threads} {input} 2> {log} \
+          | gzip -c > {output}"
+
+rule kmer_trim_bfc:
+    """
+    Use BFC to drop unique kmers
+    """
+    input:
+        "reads.paired.cleaned.fastq.gz"
+    output:
+        "reads.paired.kmer_trimmed.fastq.gz"
+    benchmark:
+        "benchmarks/reads.paired.kmer_trimmed.txt"
+    log:
+        "logs/reads.paired.kmer_trimmed.log"
+    version:
+        get_version('bfc')
+    threads:
+        int(config['bfc']['threads'])
+    shell:
+        "{config[system_paths][bfc]} -s {config[bfc][ram]} \
+          {config[bfc][kmer_trimming_params] -t {threads} {input} 2> {log} \
           | {config[system_paths][seqtk]} dropse - \
           | gzip -c > {output}"
 
@@ -328,7 +350,7 @@ rule run_spades:
         $(SPADES) -m $(SPADES_RAM) -o $(OUTPUT_DIR)/spades --pe1-1 $(R1_FASTQ) --   pe1-2 $(R2_FASTQ) --only-assembler --meta
     """
     input:
-        "reads.paired.corrected.fastq.gz"
+        "reads.paired.kmer_trimmed.fastq.gz"
     output:
         "spades/contigs.fasta"
     log:
