@@ -62,7 +62,7 @@ rule rename_raw_reads:
     benchmark:
         temp("benchmarks/{sample}/rename_reads_{direction}.txt")
     shell:
-        "{config[system_paths][miraconvert]} -f fastq -R {wildcards.sample} -S solexa -t fastq {input} {output}"
+        "{config[system_paths][miraconvert]} -f fastq -R {wildcards.sample} -S solexa -t fastq {input} {output} > {log}"
 
 rule interleave:
     """
@@ -134,7 +134,6 @@ rule trimmomatic_pe:
         "{sample}/trimmed_2U.fastq.gz"
     log:
         "logs/{sample}_trimmed.fasta.log"
-
     params:
         trim_params=lambda wildcards: config['trimmomatic_params'] % \
             ("%s/adapters.fa" % (wildcards.sample))
@@ -145,7 +144,7 @@ rule trimmomatic_pe:
         time java -jar {config[system_paths][trimmomatic_jar]} PE \
             {input[0]} {input[1]} \
             {output[0]} {output[2]} {output[1]} {output[3]} \
-            {params.trim_params}
+            {params.trim_params} > {log}
         """
 
 rule merge_trimmed:
