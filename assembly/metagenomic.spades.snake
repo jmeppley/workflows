@@ -161,106 +161,18 @@ rule merge_interleaved:
     shell:
         "cat {input} > {output}"
 
-rule trimmomatic_adapters:
-    """
-    Generates fasta file with adapters for trimming
-    """
-    input:
-        lambda wildcards: config['inputs'][wildcards.sample]['sample_sheet']
-    output:
-        "{sample}/adapters.fa"
-    log:
-        "logs/{sample}_adapters.fa.log"
-    benchmark:
-        "benchmarks/{sample}/create_adapters_file.txt"
-    version:
-        get_version("createPrimerFile.py")
-    run:
-        sample = wildcards.sample
-        sample_data=config['inputs'][sample]
-        barcodes,chemistry = \
-            get_barcodes_and_chemistry(sample_data['sample_sheet'], \
-                                       sample_data['sample_num'])
-        barcodes=' '.join(barcodes)
-        primer_template_file=glob.glob(PYMG_DIR + \
-                                       "/primerTemplates/" + \
-                                       chemistry + \
-                                       ".*primers.fasta")[-1] 
-        shell("{config[system_paths][createPrimerFile.py]} \
-               {primer_template_file} {barcodes} > {output}")
-
-rule trimmomatic_pe:
-    """Trims given paired-end reads with given parameters"""
-    input:
-        expand("{{sample}}/{direction}.renamed.fastq", \
-                                    direction=read_directions),
-        "{sample}/adapters.fa"
-    output:
-        "{sample}/trimmed_1P.fastq.gz",
-        "{sample}/trimmed_2P.fastq.gz",
-        "{sample}/trimmed_1U.fastq.gz",
-        "{sample}/trimmed_2U.fastq.gz"
-    log:
-        "logs/{sample}_trimmed.fasta.log"
-    params:
-        trim_params=lambda wildcards: config['trimmomatic_params'] % \
-            ("%s/adapters.fa" % (wildcards.sample))
-    benchmark:
-        "benchmarks/trimmomatic.txt"
-    version:
-        get_version('trimmomatic_jar','-version',cmd_prefix='java -jar')
-    shell:
-        """
-        time java -jar {config[system_paths][trimmomatic_jar]} PE \
-            {input[0]} {input[1]} \
-            {output[0]} {output[2]} {output[1]} {output[3]} \
-            {params.trim_params} > {log}
-        """
-
-rule merge_trimmed:
-    """
-    Mrege the trimmed output of all samples into a single file
-    """
-    input:
-        expand([
-            "{sample}/trimmed_1P.fastq.gz",
-            "{sample}/trimmed_2P.fastq.gz",
-            "{sample}/trimmed_1U.fastq.gz",
-            "{sample}/trimmed_2U.fastq.gz"], sample=config['inputs'])
-    output:
-        "reads.paired.trimmed.fastq.gz",
-        "reads.unpaired.trimmed.fastq.gz"
-    log:
-        "logs/reads.trimmed.merge.log"
-    benchmark:
-        "benchmarks/merge_trimmed.txt"
-    version:
-        get_version('seqtk','',
-                    regular_expression=re.compile(r'Version:\s*(\S+)'))
-    shell:
-        '\n'.join( \
-        ["rm -f {output[0]} {output[1]}",] + \
-        ["{config[system_paths][seqtk]} mergepe \
-          %s/trimmed_1P.fastq.gz %s/trimmed_2P.fastq.gz | \
-          gzip -c >> {output[0]}" % (sample, sample) \
-           for sample in config['inputs']] + \
-        ["gunzip -c %s/trimmed_1U.fastq.gz %s/trimmed_2U.fastq.gz |\
-          gzip -c >> {output[1]}" % (sample, sample) \
-           for sample in config['inputs']]
-               )
-
 rule trim_bbduk_adapters:
     """
     remove adapters with bbduk
     """
     input:
-        "reads.paired.trimmed.fastq.gz"
+        "reads.raw.fastq"
     output:
-        temp("reads.paired.noadapt.fastq.gz")
+        temp("reads.noadapt.fastq.gz")
     benchmark:
-        "benchmarks/reads.paired.noadapt.fastq.txt"
+        "benchmarks/reads.noadapt.fastq.txt"
     log:
-        "logs/reads.paired.noadapt.log"
+        "logs/reads.noadapt.log"
     version:
         get_version('bbduk.sh',
                     regular_expression=\
@@ -279,14 +191,14 @@ rule trim_bbduk_phix:
     remove phiX with bbduk
     """
     input:
-        "reads.paired.noadapt.fastq.gz"
+        "reads.noadapt.fastq.gz"
     output:
-        "reads.paired.cleaned.fastq.gz",
-        "reads.paired.cleaned.gchist.txt"
+        temp("reads.cleaned.fastq.gz"),
+        "reads.cleaned.gchist.txt"
     benchmark:
-        "benchmarks/reads.paired.cleaned.fastq.txt"
+        "benchmarks/reads.cleaned.fastq.txt"
     log:
-        "logs/reads.paired.cleaned.log"
+        "logs/reads.cleaned.log"
     version:
         get_version('bbduk.sh',
                     regular_expression=\
@@ -305,20 +217,20 @@ rule err_corr_bfc:
     Use BFC for error correction
     """
     input:
-        "reads.paired.cleaned.fastq.gz"
+        "reads.cleaned.fastq.gz"
     output:
-        "reads.paired.corrected.fastq.gz"
+        temp("reads.corrected.fastq.gz")
     benchmark:
-        "benchmarks/reads.paired.corrected.txt"
+        "benchmarks/reads.corrected.txt"
     log:
-        "logs/reads.paired.corrected.log"
+        "logs/reads.corrected.log"
     version:
         get_version('bfc')
     threads:
         int(config['bfc']['threads'])
     shell:
         "{config[system_paths][bfc]} -s {config[bfc][ram]} \
-          {config[bfc][error_correction_params] -t {threads} {input} 2> {log} \
+          {config[bfc][error_correction_params]} -t {threads} {input} 2> {log} \
           | gzip -c > {output}"
 
 rule kmer_trim_bfc:
@@ -326,20 +238,20 @@ rule kmer_trim_bfc:
     Use BFC to drop unique kmers
     """
     input:
-        "reads.paired.cleaned.fastq.gz"
+        "reads.cleaned.fastq.gz"
     output:
-        "reads.paired.kmer_trimmed.fastq.gz"
+        "reads.kmer_trimmed.fastq.gz"
     benchmark:
-        "benchmarks/reads.paired.kmer_trimmed.txt"
+        "benchmarks/reads.kmer_trimmed.txt"
     log:
-        "logs/reads.paired.kmer_trimmed.log"
+        "logs/reads.kmer_trimmed.log"
     version:
         get_version('bfc')
     threads:
         int(config['bfc']['threads'])
     shell:
         "{config[system_paths][bfc]} -s {config[bfc][ram]} \
-          {config[bfc][kmer_trimming_params] -t {threads} {input} 2> {log} \
+          {config[bfc][kmer_trimming_params]} -t {threads} {input} 2> {log} \
           | {config[system_paths][seqtk]} dropse - \
           | gzip -c > {output}"
 
@@ -349,7 +261,7 @@ rule run_spades:
         $(SPADES) -m $(SPADES_RAM) -o $(OUTPUT_DIR)/spades --pe1-1 $(R1_FASTQ) --   pe1-2 $(R2_FASTQ) --only-assembler --meta
     """
     input:
-        "reads.paired.kmer_trimmed.fastq.gz"
+        "reads.kmer_trimmed.fastq.gz"
     output:
         "spades/contigs.fasta"
     log:
@@ -358,8 +270,8 @@ rule run_spades:
         int(config['spades']['threads'])
     params:
         slurm_log="logs/spades.log",
-        ram_limit=config['spades']['ram']
-        kmers=config['spades']['kmers']
+        ram_limit=config['spades']['ram'],
+        kmers=config['spades']['kmers'],
         continue_flags="--continue" if "continue_spades" in config else ""
     benchmark:
         "benchmarks/spades.txt"
@@ -517,40 +429,31 @@ rule merge_annotations:
 
 rule final_report:
     input:
-        expand("{sample}/reads.raw.fastq.stats",sample=config['inputs'].keys()),
         "contigs.fasta.stats",
         "contigs.annotations.faa.stats",
-        "reads.paired.corrected.fastq.gz.stats",
-        "reads.paired.cleaned.fastq.gz.stats",
-        "reads.paired.trimmed.fastq.gz.stats",
-        "reads.unpaired.trimmed.fastq.gz.stats",
+        "reads.kmer_trimmed.fastq.gz.stats",
+        "reads.corrected.fastq.gz.stats",
+        "reads.cleaned.fastq.gz.stats",
+        "reads.noadapt.fastq.gz.stats",
+        "reads.raw.fastq.stats",
         'contigs.fasta.histograms'
     output:
         "contigs.report"
     run:
-        contig_stats={'raw reads':0,'raw bases':0}
-        # Raw reads
-        for raw_reads_stats_file in [i for i in input if re.search(r'reads\.raw.+stats',i)]:
-            stats = parse_stats(raw_reads_stats_file)
-            print(raw_reads_stats_file)
-            print(stats)
-            contig_stats['raw reads']+=stats['reads']
-            contig_stats['raw bases']+=stats['bases']
+        read_stats={}
 
         # paired reads
         for i in input:
-            m = re.search(r'reads.paired\.([a-z]+)\.fastq.gz.stats',i)
+            m = re.search(r'reads\.([a-z]+)\.fastq\.(?:gz.)?stats',i)
             if m is None:
                 continue
             type=m.group(1)
             stats = parse_stats(i)
-            contig_stats['{0} paired reads'.format(type)]=stats['reads']
-            contig_stats['{0} paired bases'.format(type)]=stats['bases']
-        # unpaired reads
-        stats = parse_stats('reads.unpaired.trimmed.fastq.gz.stats')
-        contig_stats['trimmed unpaired reads']=stats['reads']
+            read_stats['{0} reads'.format(type)]=stats['reads']
+            read_stats['{0} bases'.format(type)]=stats['bases']
 
         # contigs
+        contig_stats={}
         stats = parse_stats('contigs.fasta.stats')
         contig_stats['contigs']=stats['reads']
         contig_stats['contig bases']=stats['bases']
@@ -565,7 +468,7 @@ rule final_report:
         stats = parse_stats('contigs.annotations.faa.stats')
         contig_stats['genes']=stats['reads']
 
-        report={"assembly":contig_stats}
+        report={"reads":read_stats,"assembly":contig_stats}
         with open(output[0],'w') as OUTF:
             OUTF.write(yaml.dump(report, default_flow_style=False))
 
