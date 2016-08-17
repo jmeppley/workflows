@@ -3,7 +3,7 @@ from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
 configfile: "./assembly_params.json"
 
 PYMG_DIR=config['system_paths']['pymg_dir']
-sys.path.append(PYMG_DIR)
+sys.path[0]=(PYMG_DIR)
 from edl.illumina import get_barcodes_and_chemistry
 from edl import __version__ as PYMG_VERSION
 
@@ -20,12 +20,25 @@ def set_binary_path(binary,paths):
             config["system_paths"][binary]=binary
 
 binaries=['miraconvert','seqtk','createPrimerFile.py','prinseq','prodigal',\
-          'filter_blast_m8.py','merge_gffs.py','cmsearch','bbduk.sh','bfc']
+          'filter_blast_m8.py','merge_gffs.py','cmsearch','bbduk.sh','bfc',\
+          'spades.py']
+bin_dirs = config['system_paths']['bin_dirs']
+bin_dirs.append(config['system_paths']['pymg_dir'])
+if 'bbmap' not in config['system_paths']:
+    try:
+        cmd='find `which bbduk.sh | sed -r s/bbduk\.sh/../` ' + \
+             '-name "adapters.fa" | sed -r s#/resources/adapters.fa##'
+        config['system_paths']['bbmap'] = subprocess.check_output(cmd,
+                                                                  shell=True)\
+                                                    .decode()
+    except:
+        print("Can't find bbmap resources, please set system_paths->bbmap in the snakemake config file")
+
+bin_dirs.append(config['system_paths']['bbmap'])
+
 for binary in binaries:
-    set_binary_path(binary,
-                    config['system_paths']['bin_dirs'] + 
-                     [config['system_paths']['pymg_dir'], 
-                      config['system_paths']['bbmap'], ])
+    if binary not in config['system_paths']:
+        set_binary_path(binary,bin_dirs)
 
 # Define some global variables
 read_directions = ['R1','R2']
