@@ -115,7 +115,7 @@ start = config.get("start","raw")
 if start == "raw":
     read_types=['raw','noadapt','cleaned']
 elif start == 'cleaned':
-    read_types = ['cleaned']:
+    read_types = ['cleaned']
 else:
     read_types = []
 
@@ -124,10 +124,6 @@ else:
 #
 # Start with the final product(s):
 rule all:
-    input:
-        "spades/contigs.fasta",
-        "contigs.fasta.histograms",
-        "contigs.annotations.gff",
     input:
         all_targets
     log:
@@ -292,11 +288,8 @@ rule contig_stats:
         "benchmarks/contigs.fasta.histograms.txt"
     version:
         "py-metagenomics-{}".format(PYMG_VERSION)
-    run:
-        from edl.assembly import calc_stats
-        f=calc_stats(input[0], txt_width=70, bins=50, log=True, minLength=200)
-        with open(output[0],'w') as OUTPUT:
-            OUTPUT.write(f)
+    shell:
+        "python {config[system_paths][pymg_dir]}/edl/assembly.py calc_stats     {input} txt_width=70 bins=50 log=True minLength=200 > {output}"
 
 rule prinseq_any:
     """ calculate basic stats for a fasta file """
@@ -533,7 +526,7 @@ rule contig_stats_table:
     benchmark:
         "benchmarks/contig.stats.txt"
     shell:
-        "python {config[system_paths][opt_dir]}/py-metagenomics/edl/assembly.py get_contig_stats {input} {output}"
+        "python {config[system_paths][pymg_dir]}/edl/assembly.py get_contig_stats {input} {output}"
 
 rule final_report:
     input:
@@ -555,6 +548,10 @@ rule final_report:
                 continue
             type=m.group(1)
             stats = parse_stats(i)
+            # get sample name if this is from a sample
+            m = re.match(r'^(.+)/reads',i)
+            if m:
+                type = m.group(1) + " " + type
             read_stats['{0} reads'.format(type)]=stats['reads']
             read_stats['{0} bases'.format(type)]=stats['bases']
 
@@ -582,6 +579,6 @@ rule clean:
     params:
         samples=" ".join(config['inputs'])
     shell:
-        "rm -rf logs benchmarks spades contigs.* reads.trimmed.* {params.samples}"
+        "rm -rf logs benchmarks spades contigs.* reads.* {params.samples}"
 
 # TODO?: apply contig filter (min length, min read count)
