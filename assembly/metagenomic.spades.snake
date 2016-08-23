@@ -21,14 +21,32 @@ def set_binary_path(binary,paths):
             config["system_paths"][binary]=binary
 
 binaries=['miraconvert','seqtk','createPrimerFile.py','prinseq','prodigal',\
-          'filter_blast_m8.py','merge_gffs.py','cmsearch']
+          'filter_blast_m8.py','merge_gffs.py','cmsearch','bbduk.sh',\
+          'bwa','samtools']
 for binary in binaries:
     set_binary_path(binary,config['system_paths']['bin_dirs'] + \
-                    [config['system_paths']['pymg_dir']])
+                    [config['system_paths']['pymg_dir'],] + \
+                    [config['system_paths']['bbmap'],])
 
 # Define some global variables
-cleaned_reads='reads.cleaned.fastq'
 read_directions = ['R1','R2']
+
+# default configuration
+if 'spades' not in config:
+    config['spades']={'ram':255,
+                      'threads':20,
+                      'kmers':'21,33,55,77,99,127'}
+if 'cmsearch' not in config:
+    config['cmsearch']={'threads':8}
+if 'bbduk' not in config:
+    config['bbduk']={'ram':'1g',
+      'adapter_flags':'ktrim=r k=23 mink=11 hdist=1 tbo tpe tbo tpe',
+      'phix_flags':'k=27 hdist=1 qtrim=rl trimq=17 cardinality=t mingc=0.05 maxgc=0.95'}
+if 'bfc' not in config:
+    config['bfc']={'ram':'5g',
+                   'threads':'20',
+                   'error_correction_params':'-k 55',
+                   'kmer_trimming_params':'-1 -k 21'}
 
 #######
 # Functions
@@ -82,6 +100,25 @@ def parse_stats(stats_file):
     stats = pandas.read_table(stats_file,names=('module','key','value'),index_col=1)['value']
     return {k:int(stats[k]) for k in ['reads','bases']}
 
+####
+# Flexible all target
+#
+all_targets = [
+        "contigs.report",
+        "contigs.stats.txt",
+        "contigs.annotations.gff",
+        "contigs.annotations.faa.stats",
+        "mapping/reads.vs.contigs.bam.bai"
+    ]
+
+start = config.get("start","raw")
+if start == "raw":
+    read_types=['raw','noadapt','cleaned']
+elif start == 'cleaned':
+    read_types = ['cleaned']:
+else:
+    read_types = []
+
 ############
 # RULES
 #
@@ -89,11 +126,12 @@ def parse_stats(stats_file):
 rule all:
     input:
         "spades/contigs.fasta",
-        "contigs.report",
         "contigs.fasta.histograms",
         "contigs.annotations.gff",
+    input:
+        all_targets
     log:
-        temp("logs/all.log")
+        "logs/all.log"
 
 rule rename_raw_reads:
     """ Rename reads to be based on a "sample" name """
@@ -102,9 +140,9 @@ rule rename_raw_reads:
     output:
         temp("{sample}/{direction}.renamed.fastq")
     log:
-        temp("logs/{sample}_{direction}.renamed.fastq.log")
+        "logs/{sample}_{direction}.renamed.fastq.log"
     benchmark:
-        temp("benchmarks/{sample}/rename_reads_{direction}.txt")
+        "benchmarks/{sample}/rename_reads_{direction}.txt"
     version:
         get_version('miraconvert','-v')
     shell:
@@ -136,102 +174,64 @@ rule merge_interleaved:
     input:
         expand("{sample}/reads.raw.fastq", sample=config['inputs'])
     output:
-        "reads.raw.fastq"
+        "reads.raw.fastq.gz"
     log:
         "logs/reads.raw.fastq.log"
     benchmark:
         "benchmarks/merge_interleave.txt"
     shell:
-        "cat {input} > {output}"
+        "cat {input} | gzip -c > {output}"
 
-rule trimming_adapters:
+rule trim_bbduk_adapters:
     """
-    Generates fasta file with adapters for trimming
+    remove adapters with bbduk
     """
     input:
-        lambda wildcards: config['inputs'][wildcards.sample]['sample_sheet']
+        "reads.raw.fastq.gz"
     output:
-        "{sample}/adapters.fa"
-    log:
-        "logs/{sample}_adapters.fa.log"
+        temp("reads.noadapt.fastq.gz")
     benchmark:
-        "benchmarks/{sample}/create_adapters_file.txt"
-    version:
-        get_version("createPrimerFile.py")
-    run:
-        sample = wildcards.sample
-        sample_data=config['inputs'][sample]
-        barcodes,chemistry = \
-            get_barcodes_and_chemistry(sample_data['sample_sheet'], \
-                                       sample_data['sample_num'])
-        barcodes=' '.join(barcodes)
-        primer_template_file=glob.glob(PYMG_DIR + \
-                                       "/primerTemplates/" + \
-                                       chemistry + \
-                                       ".*primers.fasta")[-1] 
-        shell("{config[system_paths][createPrimerFile.py]} \
-               {primer_template_file} {barcodes} > {output}")
-
-rule trimmomatic_pe:
-    """Trims given paired-end reads with given parameters"""
-    input:
-        expand("{{sample}}/{direction}.renamed.fastq", \
-                                    direction=read_directions),
-        "{sample}/adapters.fa"
-    output:
-        "{sample}/trimmed_1P.fastq.gz",
-        "{sample}/trimmed_2P.fastq.gz",
-        "{sample}/trimmed_1U.fastq.gz",
-        "{sample}/trimmed_2U.fastq.gz"
+        "benchmarks/reads.noadapt.fastq.txt"
     log:
-        "logs/{sample}_trimmed.fasta.log"
-
+        "logs/reads.noadapt.log"
+    version:
+        get_version('bbduk.sh',
+                    regular_expression=\
+                        re.compile(r'^(.+[Vv]ersion\s*[^\n\r]+)'))
     params:
-        trim_params=lambda wildcards: config['trimmomatic_params'] % \
-            ("%s/adapters.fa" % (wildcards.sample))
-    benchmark:
-        "benchmarks/trimmomatic.txt"
-    version:
-        get_version('trimmomatic_jar','-version',cmd_prefix='java -jar')
+        adapter_file=config['system_paths']['bbmap'] \
+                        + "/resources/adapters.fa"
     shell:
-        """
-        time java -jar {config[system_paths][trimmomatic_jar]} PE \
-            {input[0]} {input[1]} \
-            {output[0]} {output[2]} {output[1]} {output[3]} \
-            {params.trim_params} > {log}
-        """
+        "{config[system_paths][bbduk.sh]} -Xmx{config[bbduk][ram]} \
+          in={input} out={output} \
+          interleaved overwrite {config[bbduk][adapter_flags]} \
+          ref={params.adapter_file} 2> {log}"
 
-rule merge_trimmed:
+rule trim_bbduk_phix:
     """
-    Mrege the trimmed output of all samples into a single file
+    remove phiX with bbduk
     """
     input:
-        expand([
-            "{sample}/trimmed_1P.fastq.gz",
-            "{sample}/trimmed_2P.fastq.gz",
-            "{sample}/trimmed_1U.fastq.gz",
-            "{sample}/trimmed_2U.fastq.gz"], sample=config['inputs'])
+        "reads.noadapt.fastq.gz"
     output:
-        "reads.trimmed.paired.fastq.gz",
-        "reads.trimmed.unpaired.fastq.gz"
-    log:
-        "logs/reads.trimmed.merge.log"
+        "reads.cleaned.fastq.gz",
+        "reads.cleaned.gchist.txt"
     benchmark:
-        "benchmarks/merge_trimmed.txt"
+        "benchmarks/reads.cleaned.fastq.txt"
+    log:
+        "logs/reads.cleaned.log"
     version:
-        get_version('seqtk','',
-                    regular_expression=re.compile(r'Version:\s*(\S+)'))
+        get_version('bbduk.sh',
+                    regular_expression=\
+                        re.compile(r'^(.+[Vv]ersion\s*[^\n\r]+)'))
+    params:
+        phiX_file=config['system_paths']['bbmap'] \
+                         + "/resources/phix174_ill.ref.fa.gz"
     shell:
-        '\n'.join( \
-        ["rm -f {output[0]} {output[1]}",] + \
-        ["{config[system_paths][seqtk]} mergepe \
-          %s/trimmed_1P.fastq.gz %s/trimmed_2P.fastq.gz | \
-          gzip -c >> {output[0]}" % (sample, sample) \
-           for sample in config['inputs']] + \
-        ["gunzip -c %s/trimmed_1U.fastq.gz %s/trimmed_2U.fastq.gz |\
-          gzip -c >> {output[1]}" % (sample, sample) \
-           for sample in config['inputs']]
-               )
+        "{config[system_paths][bbduk.sh]} -Xmx{config[bbduk][ram]} \
+          in={input} out={output[0]} gchist={output[1]} \
+          interleaved overwrite {config[bbduk][phix_flags]} \
+          ref={params.phiX_file} 2> {log}"
 
 rule run_spades:
     """
@@ -239,18 +239,16 @@ rule run_spades:
         $(SPADES) -m $(SPADES_RAM) -o $(OUTPUT_DIR)/spades --pe1-1 $(R1_FASTQ) --   pe1-2 $(R2_FASTQ) --only-assembler --meta
     """
     input:
-        "reads.trimmed.paired.fastq.gz",
-        "reads.trimmed.unpaired.fastq.gz"
+        "reads.cleaned.fastq.gz"
     output:
         "spades/contigs.fasta"
     log:
-        temp("logs/spades.log")
+        "logs/spades.log"
     threads:
-        20
+        int(config['spades']['threads'])
     params:
-        slurm_log="logs/spades.log",
-        ram_limit=config['spades'].get('ram','255'),
-        kmers=config['spades'].get('kmers','21,33,55,77,99,127'),
+        ram_limit=config['spades']['ram'],
+        kmers=config['spades']['kmers'],
         continue_flags="--continue" if "continue_spades" in config else ""
     benchmark:
         "benchmarks/spades.txt"
@@ -258,7 +256,7 @@ rule run_spades:
         get_version('spades.py', cmd_prefix='python')
     shell:
         """
-        python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades -t {threads} -k {params.kmers} --pe1-12 {input[0]} --pe1-s {input[1]} {params.continue_flags} --meta 
+        python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades -t {threads} -k {params.kmers} --pe1-12 {input} {params.continue_flags} --meta 
         """
 
 rule contigs_fasta:
@@ -342,7 +340,7 @@ rule cmsearch:
     benchmark:
         "benchmarks/contigs.annotations.{molecule}.tbl.txt"
     threads:
-        8
+        int(config['cmsearch']['threads'])
     version:
         lambda wildcards:\
             get_version('cmsearch',
@@ -363,7 +361,7 @@ rule cmsearch_tbl_to_gff:
     output:
         "contigs.annotations.{molecule}.gff"
     benchmark:
-        "contigs.annotations.{molecule}.gff.txt"
+        "benchmarks/contigs.annotations.{molecule}.gff.txt"
     version:
         get_version('filter_blast_m8.py')
     shell:
@@ -406,34 +404,162 @@ rule merge_annotations:
     shell:
         "{config[system_paths][merge_gffs.py]} -r {input.rrnas} -r {input.trnas} -c {input.genes} {input.contigs} {params.output_root}"
 
+rule index_contigs:
+    """ prepare contigs for mapping with BWA """
+    input:
+        "contigs.fasta"
+    output:
+        "mapping/contigs.index.bwa.bwt"
+    log:
+        "logs/bwa_index.log"
+    benchmark:
+        "benchmarks/bwa_pre_index.txt"
+    shell:
+        "{config[system_paths][bwa]} index -p mapping/contigs.index.bwa      {input} 2>&1 >  {log}"
+
+rule combine_reads:
+    """ combine paired and unpaired for BWA """
+    input:
+        'reads.trimmed.unpaired.fastq.gz',
+        'reads.trimmed.paired.fastq.gz',
+    output:
+        temp('reads.trimmed.all.fastq')
+    benchmark:
+        "benchmarks/bwa_pre_combine.txt"
+    shell:
+        "gunzip -c {input} > {output}"
+
+rule uncompress_file:
+    input:
+        "{file_root}.gz"
+    output:
+        temp("{file_root}")
+    benchmark:
+        "benchmarks/{file_root}"
+    shell:
+        "gunzip -c {input} > {output}"
+
+rule map_reads:
+    """
+    map cleaned reads onto contigs
+    """
+    input:
+        "mapping/contigs.index.bwa.bwt",
+        "reads.cleaned.fastq"
+    output:
+        temp("mapping/reads.vs.contigs.sam")
+    log:
+        "logs/bwa_mem.log"
+    benchmark:
+        "benchmarks/bwa_mem_sam.txt"
+    threads:
+        20
+    shell:
+        "bwa mem -t {threads} mapping/contigs.index.bwa {input[1]} 2> {log}  > {output}"
+
+
+rule sam_to_bam:
+    input:
+        "{root}.sam"
+    output:
+        "{root}.bam"
+    benchmark:
+        "benchmarks/bwa_sam_bam.txt"
+    threads:
+        8
+    shell:
+        "{config[system_paths][samtools]} view -b {input} \
+        | {config[system_paths][samtools]} sort -l 5 -@ {threads} -m 10G - \
+        > {output}"
+
+rule index_bam:
+    input:
+        "{root}.bam"
+    output:
+        "{root}.bam.bai"
+    benchmark:
+        "benchmarks/bwa_index_bam.txt"
+    shell:
+        "{config[system_paths][samtools]} index {input}"
+
+rule contig_mapped_read_counts:
+    """ 
+    Count number of reads mapped to each contig. 
+
+    This just pulls out the refernce column (3) from the SAM output
+    and uses uniq -c to get a count.
+    """
+    input:
+        "mapping/reads.vs.contigs.bam.bai"
+    output:
+        "mapping/reads.vs.contigs.read_counts"
+    benchmark:
+        "benchmarks/bwa_count_reads.txt"
+    params:
+        input="mapping/reads.vs.contigs.bam"
+    shell:
+        "{config[system_paths][samtools]} view {params.input} \
+         | cut -f 3 \
+         | uniq -c \
+         > {output}"
+
+rule contig_mapped_read_depths:
+    """
+    Get read depth at each base in each contig. This is needed for
+    coverage calculation later.
+    """
+    input:
+        "mapping/reads.vs.contigs.bam.bai"
+    output:
+        "mapping/reads.vs.contigs.depths"
+    benchmark:
+        "benchmarks/bwa_get_depths.txt"
+    params:
+        input="mapping/reads.vs.contigs.bam"
+    shell:
+        "{config[system_paths][samtools]} depth {params.input} > {output}"
+
+rule contig_stats_table:
+    """
+    Combine stats from fasta header with depths and read counts to 
+    make a master table of contig stats
+    """
+    input:
+        "contigs.fasta",
+        rules.contig_mapped_read_depths.output,
+        rules.contig_mapped_read_counts.output
+    output:
+        "contigs.stats.txt"
+    benchmark:
+        "benchmarks/contig.stats.txt"
+    shell:
+        "python {config[system_paths][opt_dir]}/py-metagenomics/edl/assembly.py get_contig_stats {input} {output}"
+
 rule final_report:
     input:
         expand("{sample}/reads.raw.fastq.stats",sample=config['inputs'].keys()),
         "contigs.fasta.stats",
         "contigs.annotations.faa.stats",
-        "reads.trimmed.paired.fastq.gz.stats",
-        "reads.trimmed.unpaired.fastq.gz.stats",
+        expand("reads.{read_type}.fastq.gz.stats", 
+               read_type=read_types),
         'contigs.fasta.histograms'
     output:
         "contigs.report"
     run:
-        contig_stats={'raw reads':0,'raw bases':0}
-        # Raw reads
-        for raw_reads_stats_file in [i for i in input if re.search(r'reads\.raw.+stats',i)]:
-            stats = parse_stats(raw_reads_stats_file)
-            print(raw_reads_stats_file)
-            print(stats)
-            contig_stats['raw reads']+=stats['reads']
-            contig_stats['raw bases']+=stats['bases']
+        read_stats={}
 
-        # trimmed reads
-        stats = parse_stats('reads.trimmed.paired.fastq.gz.stats')
-        contig_stats['trimmed paired reads']=stats['reads']
-        contig_stats['trimmed paired bases']=stats['bases']
-        stats = parse_stats('reads.trimmed.unpaired.fastq.gz.stats')
-        contig_stats['trimmed unpaired reads']=stats['reads']
+        # paired reads
+        for i in input:
+            m = re.search(r'reads\.([a-z]+)\.fastq\.(?:gz.)?stats',i)
+            if m is None:
+                continue
+            type=m.group(1)
+            stats = parse_stats(i)
+            read_stats['{0} reads'.format(type)]=stats['reads']
+            read_stats['{0} bases'.format(type)]=stats['bases']
 
         # contigs
+        contig_stats={}
         stats = parse_stats('contigs.fasta.stats')
         contig_stats['contigs']=stats['reads']
         contig_stats['contig bases']=stats['bases']
@@ -448,7 +574,7 @@ rule final_report:
         stats = parse_stats('contigs.annotations.faa.stats')
         contig_stats['genes']=stats['reads']
 
-        report={"assembly":contig_stats}
+        report={"reads":read_stats,"assembly":contig_stats}
         with open(output[0],'w') as OUTF:
             OUTF.write(yaml.dump(report, default_flow_style=False))
 
@@ -458,6 +584,4 @@ rule clean:
     shell:
         "rm -rf logs benchmarks spades contigs.* reads.trimmed.* {params.samples}"
 
-# TODO: tRNAs
-# TODO: map reads to contigs with BWA|bowtie2
-# TODO: apply contig filter (min length, min read count)
+# TODO?: apply contig filter (min length, min read count)
