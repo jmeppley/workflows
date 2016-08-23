@@ -20,8 +20,8 @@ def set_binary_path(binary,paths):
             config["system_paths"][binary]=binary
 
 binaries=['miraconvert','seqtk','createPrimerFile.py','prinseq','prodigal',\
-          'filter_blast_m8.py','merge_gffs.py','cmsearch','bbduk.sh','bfc',\
-          'spades.py']
+          'filter_blast_m8.py','merge_gffs.py','cmsearch','bbduk.sh',\
+          'bwa','samtools']
 bin_dirs = config['system_paths']['bin_dirs']
 bin_dirs.append(config['system_paths']['pymg_dir'])
 if 'bbmap' not in config['system_paths']:
@@ -33,7 +33,6 @@ if 'bbmap' not in config['system_paths']:
                                                     .decode()
     except:
         print("Can't find bbmap resources, please set system_paths->bbmap in the snakemake config file")
-
 bin_dirs.append(config['system_paths']['bbmap'])
 
 for binary in binaries:
@@ -52,7 +51,7 @@ if 'cmsearch' not in config:
     config['cmsearch']={'threads':8}
 if 'bbduk' not in config:
     config['bbduk']={'ram':'1g',
-      'adapter_flags':'ktrim=r k=23 mink=11 hdist=1tbo tpe tbo tpe',
+      'adapter_flags':'ktrim=r k=23 mink=11 hdist=1 tbo tpe tbo tpe',
       'phix_flags':'k=27 hdist=1 qtrim=rl trimq=17 cardinality=t mingc=0.05 maxgc=0.95'}
 if 'bfc' not in config:
     config['bfc']={'ram':'5g',
@@ -112,18 +111,34 @@ def parse_stats(stats_file):
     stats = pandas.read_table(stats_file,names=('module','key','value'),index_col=1)['value']
     return {k:int(stats[k]) for k in ['reads','bases']}
 
+####
+# Flexible all target
+#
+all_targets = [
+        "contigs.report",
+        "contigs.stats.txt",
+        "contigs.annotations.gff",
+        "contigs.annotations.faa.stats",
+        "mapping/reads.vs.contigs.bam.bai"
+    ]
+
+start = config.get("start","raw")
+if start == "raw":
+    read_types=['raw','noadapt','cleaned']
+elif start == 'cleaned':
+    read_types = ['cleaned']
+else:
+    read_types = []
+
 ############
 # RULES
 #
 # Start with the final product(s):
 rule all:
     input:
-        "spades/contigs.fasta",
-        "contigs.report",
-        "contigs.fasta.histograms",
-        "contigs.annotations.gff",
+        all_targets
     log:
-        temp("logs/all.log")
+        "logs/all.log"
 
 rule rename_raw_reads:
     """ Rename reads to be based on a "sample" name """
@@ -166,20 +181,20 @@ rule merge_interleaved:
     input:
         expand("{sample}/reads.raw.fastq", sample=config['inputs'])
     output:
-        "reads.raw.fastq"
+        "reads.raw.fastq.gz"
     log:
         "logs/reads.raw.fastq.log"
     benchmark:
         "benchmarks/merge_interleave.txt"
     shell:
-        "cat {input} > {output}"
+        "cat {input} | gzip -c > {output}"
 
 rule trim_bbduk_adapters:
     """
     remove adapters with bbduk
     """
     input:
-        "reads.raw.fastq"
+        "reads.raw.fastq.gz"
     output:
         temp("reads.noadapt.fastq.gz")
     benchmark:
@@ -206,7 +221,7 @@ rule trim_bbduk_phix:
     input:
         "reads.noadapt.fastq.gz"
     output:
-        temp("reads.cleaned.fastq.gz"),
+        "reads.cleaned.fastq.gz",
         "reads.cleaned.gchist.txt"
     benchmark:
         "benchmarks/reads.cleaned.fastq.txt"
@@ -225,64 +240,20 @@ rule trim_bbduk_phix:
           interleaved overwrite {config[bbduk][phix_flags]} \
           ref={params.phiX_file} 2> {log}"
 
-rule err_corr_bfc:
-    """
-    Use BFC for error correction
-    """
-    input:
-        "reads.cleaned.fastq.gz"
-    output:
-        temp("reads.corrected.fastq.gz")
-    benchmark:
-        "benchmarks/reads.corrected.txt"
-    log:
-        "logs/reads.corrected.log"
-    version:
-        get_version('bfc')
-    threads:
-        int(config['bfc']['threads'])
-    shell:
-        "{config[system_paths][bfc]} -s {config[bfc][ram]} \
-          {config[bfc][error_correction_params]} -t {threads} {input} 2> {log} \
-          | gzip -c > {output}"
-
-rule kmer_trim_bfc:
-    """
-    Use BFC to drop unique kmers
-    """
-    input:
-        "reads.cleaned.fastq.gz"
-    output:
-        "reads.kmer_trimmed.fastq.gz"
-    benchmark:
-        "benchmarks/reads.kmer_trimmed.txt"
-    log:
-        "logs/reads.kmer_trimmed.log"
-    version:
-        get_version('bfc')
-    threads:
-        int(config['bfc']['threads'])
-    shell:
-        "{config[system_paths][bfc]} -s {config[bfc][ram]} \
-          {config[bfc][kmer_trimming_params]} -t {threads} {input} 2> {log} \
-          | {config[system_paths][seqtk]} dropse - \
-          | gzip -c > {output}"
-
 rule run_spades:
     """
     $(CONTIGS_LOCAL): $(R1_FASTQ) $(R2_FASTQ) | $(OUTPUT_DIR)
         $(SPADES) -m $(SPADES_RAM) -o $(OUTPUT_DIR)/spades --pe1-1 $(R1_FASTQ) --   pe1-2 $(R2_FASTQ) --only-assembler --meta
     """
     input:
-        "reads.kmer_trimmed.fastq.gz"
+        "reads.cleaned.fastq.gz"
     output:
         "spades/contigs.fasta"
     log:
-        temp("logs/spades.log")
+        "logs/spades.log"
     threads:
         int(config['spades']['threads'])
     params:
-        slurm_log="logs/spades.log",
         ram_limit=config['spades']['ram'],
         kmers=config['spades']['kmers'],
         continue_flags="--continue" if "continue_spades" in config else ""
@@ -292,7 +263,7 @@ rule run_spades:
         get_version('spades.py', cmd_prefix='python')
     shell:
         """
-        python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades -t {threads} -k {params.kmers} --pe1-12 {input} {params.continue_flags} --meta --only-assembler
+        python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades -t {threads} -k {params.kmers} --pe1-12 {input} {params.continue_flags} --meta 
         """
 
 rule contigs_fasta:
@@ -328,11 +299,8 @@ rule contig_stats:
         "benchmarks/contigs.fasta.histograms.txt"
     version:
         "py-metagenomics-{}".format(PYMG_VERSION)
-    run:
-        from edl.assembly import calc_stats
-        f=calc_stats(input[0], txt_width=70, bins=50, log=True, minLength=200)
-        with open(output[0],'w') as OUTPUT:
-            OUTPUT.write(f)
+    shell:
+        "python {config[system_paths][pymg_dir]}/edl/assembly.py calc_stats     {input} txt_width=70 bins=50 log=True minLength=200 > {output}"
 
 rule prinseq_any:
     """ calculate basic stats for a fasta file """
@@ -440,15 +408,144 @@ rule merge_annotations:
     shell:
         "{config[system_paths][merge_gffs.py]} -r {input.rrnas} -r {input.trnas} -c {input.genes} {input.contigs} {params.output_root}"
 
+rule index_contigs:
+    """ prepare contigs for mapping with BWA """
+    input:
+        "contigs.fasta"
+    output:
+        "mapping/contigs.index.bwa.bwt"
+    log:
+        "logs/bwa_index.log"
+    benchmark:
+        "benchmarks/bwa_pre_index.txt"
+    shell:
+        "{config[system_paths][bwa]} index -p mapping/contigs.index.bwa      {input} 2>&1 >  {log}"
+
+rule combine_reads:
+    """ combine paired and unpaired for BWA """
+    input:
+        'reads.trimmed.unpaired.fastq.gz',
+        'reads.trimmed.paired.fastq.gz',
+    output:
+        temp('reads.trimmed.all.fastq')
+    benchmark:
+        "benchmarks/bwa_pre_combine.txt"
+    shell:
+        "gunzip -c {input} > {output}"
+
+rule uncompress_file:
+    input:
+        "{file_root}.gz"
+    output:
+        temp("{file_root}")
+    benchmark:
+        "benchmarks/{file_root}"
+    shell:
+        "gunzip -c {input} > {output}"
+
+rule map_reads:
+    """
+    map cleaned reads onto contigs
+    """
+    input:
+        "mapping/contigs.index.bwa.bwt",
+        "reads.cleaned.fastq"
+    output:
+        temp("mapping/reads.vs.contigs.sam")
+    log:
+        "logs/bwa_mem.log"
+    benchmark:
+        "benchmarks/bwa_mem_sam.txt"
+    threads:
+        20
+    shell:
+        "bwa mem -t {threads} mapping/contigs.index.bwa {input[1]} 2> {log}  > {output}"
+
+
+rule sam_to_bam:
+    input:
+        "{root}.sam"
+    output:
+        "{root}.bam"
+    benchmark:
+        "benchmarks/bwa_sam_bam.txt"
+    threads:
+        8
+    shell:
+        "{config[system_paths][samtools]} view -b {input} \
+        | {config[system_paths][samtools]} sort -l 5 -@ {threads} -m 10G - \
+        > {output}"
+
+rule index_bam:
+    input:
+        "{root}.bam"
+    output:
+        "{root}.bam.bai"
+    benchmark:
+        "benchmarks/bwa_index_bam.txt"
+    shell:
+        "{config[system_paths][samtools]} index {input}"
+
+rule contig_mapped_read_counts:
+    """ 
+    Count number of reads mapped to each contig. 
+
+    This just pulls out the refernce column (3) from the SAM output
+    and uses uniq -c to get a count.
+    """
+    input:
+        "mapping/reads.vs.contigs.bam.bai"
+    output:
+        "mapping/reads.vs.contigs.read_counts"
+    benchmark:
+        "benchmarks/bwa_count_reads.txt"
+    params:
+        input="mapping/reads.vs.contigs.bam"
+    shell:
+        "{config[system_paths][samtools]} view {params.input} \
+         | cut -f 3 \
+         | uniq -c \
+         > {output}"
+
+rule contig_mapped_read_depths:
+    """
+    Get read depth at each base in each contig. This is needed for
+    coverage calculation later.
+    """
+    input:
+        "mapping/reads.vs.contigs.bam.bai"
+    output:
+        "mapping/reads.vs.contigs.depths"
+    benchmark:
+        "benchmarks/bwa_get_depths.txt"
+    params:
+        input="mapping/reads.vs.contigs.bam"
+    shell:
+        "{config[system_paths][samtools]} depth {params.input} > {output}"
+
+rule contig_stats_table:
+    """
+    Combine stats from fasta header with depths and read counts to 
+    make a master table of contig stats
+    """
+    input:
+        "contigs.fasta",
+        rules.contig_mapped_read_depths.output,
+        rules.contig_mapped_read_counts.output
+    output:
+        "contigs.stats.txt"
+    benchmark:
+        "benchmarks/contig.stats.txt"
+    shell:
+        "python {config[system_paths][pymg_dir]}/edl/assembly.py get_contig_stats {input} {output}"
+
 rule final_report:
     input:
+        expand("{sample}/reads.raw.fastq.stats",sample=config['inputs'].keys()),
         "contigs.fasta.stats",
         "contigs.annotations.faa.stats",
-        "reads.kmer_trimmed.fastq.gz.stats",
-        "reads.corrected.fastq.gz.stats",
-        "reads.cleaned.fastq.gz.stats",
-        "reads.noadapt.fastq.gz.stats",
-        "reads.raw.fastq.stats",
+        expand("reads.{read_type}.fastq.gz.stats", 
+               read_type=read_types),
         'contigs.fasta.histograms'
     output:
         "contigs.report"
@@ -462,6 +559,12 @@ rule final_report:
                 continue
             type=m.group(1)
             stats = parse_stats(i)
+
+            # get sample name if this is from a sample
+            m = re.match(r'^(.+)/reads',i)
+            if m:
+                type = m.group(1) + " " + type
+            
             read_stats['{0} reads'.format(type)]=stats['reads']
             read_stats['{0} bases'.format(type)]=stats['bases']
 
@@ -491,5 +594,4 @@ rule clean:
     shell:
         "rm -rf logs benchmarks spades contigs.* reads.* {params.samples}"
 
-# TODO: map reads to contigs with BWA|bowtie2
-# TODO: apply contig filter (min length, min read count)
+# TODO?: apply contig filter (min length, min read count)
