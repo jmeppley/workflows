@@ -2,11 +2,15 @@ import os, re, sys, glob, yaml, pandas, subprocess
 from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
 configfile: "./assembly_params.json"
 
-PYMG_DIR=config['system_paths']['pymg_dir']
-sys.path[0]=(PYMG_DIR)
-from edl.illumina import get_barcodes_and_chemistry
+snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
+if 'pymg_dir' not in config['system_paths']:
+    config['system_paths']['pymg_dir']=snakefile_path
+else:
+    sys.path.append(config['system_paths']['pymg_dir'])
 from edl import __version__ as PYMG_VERSION
 
+if 'models' not in config['system_paths']:
+    config['system_paths']['models']=os.path.join(snakefile_path,'models')
 # Make sure we know where to find the necessary commands
 def set_binary_path(binary,paths):
     if binary not in config['system_paths']:
@@ -19,7 +23,7 @@ def set_binary_path(binary,paths):
         else:
             config["system_paths"][binary]=binary
 
-binaries=['miraconvert','seqtk','createPrimerFile.py','prinseq','prodigal',\
+binaries=['miraconvert','seqtk','prinseq','prodigal',\
           'filter_blast_m8.py','merge_gffs.py','cmsearch','bbduk.sh',\
           'bwa','samtools']
 bin_dirs = config['system_paths']['bin_dirs']
@@ -283,24 +287,13 @@ rule contigs_fasta:
     run:
         root_name = config['assembly_name']
         with open(output[0], 'w') as OUTPUT:
-            for i,record in enumerate(SeqIO.parse(input[0], 'fasta')):
+            for i, (title, sequence) \
+                in enumerate(SeqIO.FastaIO.SimpleFastaParser(input[0])):
+
                 contig_name = "%s_c%d" % (root_name, i+1)
                 OUTPUT.write(">%s %s\n%s\n" % (contig_name,
-                                               record.description,
-                                               str(record.seq)))
-
-rule contig_stats:
-    """ get N50 (etc) and histograms for contigs """
-    input:
-        "contigs.fasta"
-    output:
-        "contigs.fasta.histograms"
-    benchmark:
-        "benchmarks/contigs.fasta.histograms.txt"
-    version:
-        "py-metagenomics-{}".format(PYMG_VERSION)
-    shell:
-        "python {config[system_paths][pymg_dir]}/edl/assembly.py calc_stats     {input} txt_width=70 bins=50 log=True minLength=200 > {output}"
+                                               title,
+                                               sequence))
 
 rule prinseq_any:
     """ calculate basic stats for a fasta file """
@@ -533,11 +526,14 @@ rule contig_stats_table:
         rules.contig_mapped_read_depths.output,
         rules.contig_mapped_read_counts.output
     output:
-        "contigs.stats.txt"
+        "contigs.stats.txt",
+        "contigs.fasta.histograms"
     benchmark:
         "benchmarks/contig.stats.txt"
+    version:
+        "py-metagenomics-{}".format(PYMG_VERSION)
     shell:
-        "python {config[system_paths][pymg_dir]}/edl/assembly.py get_contig_stats {input} {output}"
+        "python {config[system_paths][pymg_dir]}/edl/assembly.py get_contig_stats {input} {output} txt_width=75 log=True"
 
 rule final_report:
     input:
@@ -575,7 +571,8 @@ rule final_report:
         contig_stats['contig bases']=stats['bases']
 
         # N##
-        stats=pandas.read_table('contigs.fasta.histograms',sep=':',index_col='key', names=('key','value'),nrows=8)['value']
+        stats=pandas.read_table('contigs.fasta.histograms',sep=':',index_col='key', names=('key','value'),nrows=8)
+        stats=stats.set_index(stats.index.str.strip())['value']
         contig_stats['N50']=int(stats['N50'])
         contig_stats['N75']=int(stats['N75'])
         contig_stats['N90']=int(stats['N90'])
