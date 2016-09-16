@@ -179,6 +179,7 @@ def get_samtool_depth_table_from_handle(depth_stream):
 
     # loop over contig bases
     current_contig=None
+    depths=[]
     for line in depth_stream:
         contig, base, depth = line.split()
         depth=int(depth)
@@ -186,26 +187,22 @@ def get_samtool_depth_table_from_handle(depth_stream):
             if current_contig is not None:
                 # end of contig, save numbers
                 contigs.append(current_contig)
-                av_covs.append(depths/bases)
-                mn_covs.append(min_depth)
-                mx_covs.append(max_depth)
-            bases=0
-            depths=0
-            max_depth=depth
-            min_depth=depth
+                depths = numpy.array(depths)
+                av_covs.append(depths.mean())
+                mn_covs.append(depths.min())
+                mx_covs.append(depths.max())
+            depths=[]
             current_contig = contig
 
         # update contig numbers with current base
-        bases+=1
-        depths+=depth
-        min_depth=min(depth,min_depth)
-        max_depth=max(depth,max_depth)
+        depths.append(depth)
 
     # end of final contig, save numbers
     contigs.append(current_contig)
-    av_covs.append(depths/bases)
-    mn_covs.append(min_depth)
-    mx_covs.append(max_depth)
+    depths = numpy.array(depths)
+    av_covs.append(depths.mean())
+    mn_covs.append(depths.min())
+    mx_covs.append(depths.max())
 
     return pandas.DataFrame({'contig':contigs,'av cov':av_covs,'mx cov':mx_covs,'mn cov':mn_covs},columns=['contig','av cov','mn cov','mx cov']).set_index('contig')
 

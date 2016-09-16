@@ -157,7 +157,7 @@ rule rename_raw_reads:
     version:
         get_version('miraconvert','-v')
     shell:
-        "{config[system_paths][miraconvert]} -f fastq -R {wildcards.sample} -S solexa -t fastq {input} {output} > {log}"
+        "miraconvert -f fastq -R {wildcards.sample} -S solexa -t fastq {input} {output} > {log}"
 
 rule interleave:
     """
