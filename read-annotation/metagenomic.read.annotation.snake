@@ -132,13 +132,15 @@ rule assign_taxa:
     shell:
          "cat {input} \
          | sed -r 's/_GENE_[0-9]+//' \
-         | assign_paths.py -o {output} -r {wildcards.clade} \
+         | assign_taxa.py -o {output} -r {wildcards.clade} \
             -f blastplus -H 1 -s score -c first"
 
 rule compile_counts:
     """
     Use clade assignments and HMM results to generate table of gene faimly
     counts by clade.
+
+    Look for lastal results if the DB is KEGG. The python code will know what to do.
     """
     input:
         rules.assign_taxa.output,
