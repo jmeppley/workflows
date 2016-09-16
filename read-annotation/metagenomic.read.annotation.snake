@@ -34,6 +34,10 @@ for db in db_paths:
 
 snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
 mgorfs=snakefile_path + "/mgorfs.pl"
+#
+# End configuration
+##########
+
 
 ##########
 # RULES:
@@ -71,7 +75,7 @@ rule predict_genes:
     log:
         "logs/predict_genes"
     shell:
-        "{mgorfs} -i {input} -o {output}"
+        "{mgorfs} -i {input} -A {output}"
 
 rule hmmer:
     """
@@ -125,11 +129,11 @@ rule assign_taxa:
         "benchmarks/assign_taxa.{clade}"
     log:
         "logs/assign_taxa.{clade}"
-    run:
-        compile_read_clade_assignments(output_file=output[0],
-                                       hit_table=input[0],
-                                       rank=wildcards.clade,
-                                       )
+    shell:
+         "cat {input} \
+         | sed -r 's/_GENE_[0-9]+//' \
+         | assign_paths.py -o {output} -r {wildcards.clade} \
+            -f blastplus -H 1 -s score -c first"
 
 rule compile_counts:
     """
@@ -138,7 +142,7 @@ rule compile_counts:
     """
     input:
         rules.assign_taxa.output,
-        "read_genes.vs.{db}.tbl"
+        lambda wildcards: "read_genes.vs.{db}.lastp" if wildcards.db=='KEGG' else "read_genes.vs.{db}.tbl"
     output:
         "read.annotations.{clade}.{db}.txt"
     benchmark:
@@ -149,8 +153,7 @@ rule compile_counts:
         compile_gene_family_counts(output_file=output[0],
                                    clade_designations=input[0],
                                    hit_table=input[1],
-                                   database=wildcards.db,
-                                   dbtype="tbl")
+                                   database=wildcards.db)
 
 ##########
 # Functions

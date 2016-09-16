@@ -1,4 +1,4 @@
-#! /usr/bin/perl
+#!/usr/bin/env perl
 #$ -S /usr/bin/perl
 # ===========================================================================
 # Author: Gene Tyson 08/29/07
@@ -64,14 +64,14 @@ my $output_prefix = (defined($opt_prefix)) ? $opt_prefix : "output";
 my $command;
 if ($version =~ m/^[oO]/ or $version eq 'metagene') {
     print STDERR "Using original metagene\n" if $debug;
-    $command = '/common/bin/metagene';
+    $command = 'metagene';
     $old_mg = 1;
 } elsif ($version =~ m/^[mM]/) {
     print STDERR "Using mga -m\n" if $debug;
-    $command = '/common/bin/mga -m';
+    $command = 'mga -m';
 } elsif ($version =~ m/^[sS]/) {
     print STDERR "Using mga -s\n" if $debug;
-    $command = '/common/bin/mga -s';
+    $command = 'mga -s';
 } else {
     die "Unkown version string: $version\n Use -h option to see usage.\n";
 }
