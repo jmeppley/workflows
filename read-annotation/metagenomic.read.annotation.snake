@@ -1,0 +1,167 @@
+configfile: "annotation.yaml"
+
+#########
+# CONFIGURATION
+
+# rank to collect taxa on (defaults to order)
+clade_rank=config.get('clade_rank', 'order')
+
+# gene family databases to use for annotation
+# in config file as dict of db:path pairs where
+#  db is one of RefSeq,KEGG,PFAM,COG, or TIGR
+# and
+#  path is the location of the db
+# this dict should be in config['db_paths']
+db_list=[]
+db_paths={}
+for db, path in config['db_paths'].items():
+    db=db.upper()
+    if db!='REFSEQ':
+        db_list.append(db)
+    db_paths[db]=path
+
+# threads per search are set in the threads: parameter
+# Either use the db name or "default". EG:
+# threads:
+#   default: 5
+#   RefSeq: 20
+#   KEGG:   10
+# Defaults to 8 for eveerything
+db_threads={}
+default_threads=config.get('threads',{}).get('default', 8)
+for db in db_paths:
+    db_threads[db]=config.get('threads',{}).get(db, default_threads)
+
+snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
+mgorfs=snakefile_path + "/mgorfs.pl"
+#
+# End configuration
+##########
+
+
+##########
+# RULES:
+#  This lays out the dependencies and logic of the workflow
+#  After the "all" target, it is generally laid out start to finish
+rule all:
+    input:
+        expand("read.annotations.{db}.txt", db=db_list)
+
+rule extract_reads:
+    """
+    Pull reads out of BAM file
+    """
+    input:
+        "reads.vs.contigs.bam"
+    output:
+        "reads.fasta"
+    benchmark:
+        "benchmarks/extract_reads"
+    log:
+        "logs/extract_reads"
+    shell:
+        "samtools fasta -0 {output} {input}"
+
+rule predict_genes:
+    """
+    Generate FAA (fasta of amino acid sequences) for genes predicted in reads
+    """
+    input:
+        "reads.fasta"
+    output:
+        faa="read_genes.faa"
+    benchmark:
+        "benchmarks/predict_genes"
+    log:
+        "logs/predict_genes"
+    shell:
+        "{mgorfs} -i {input} -A {output}"
+
+rule hmmer:
+    """
+    Look for profile matches
+    """
+    input:
+        rules.predict_genes.output.faa
+    output:
+        "read_genes.vs.{db}.tbl"
+    benchmark:
+        "benchmarks/hmmer.{db}"
+    log:
+        "logs/hmmer.{db}"
+    threads:
+        db_threads[db]
+    params:
+        db_path=lambda wildcards: db_paths[wildcards.db]
+    shell:
+        "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
+        {params.db_path} {input}"
+
+rule lastal:
+    """
+    Look for matches in RefSeq for predicted genes
+    """
+    input:
+        rules.predict_genes.output.faa
+    output:
+        "read_genes.vs.{db}.lastp"
+    benchmark:
+        "benchmarks/lastal.{db}"
+    log:
+        "logs/lastal.{db}"
+    threads:
+        db_threads[db]
+    params:
+        db_path=lambda wildcards: db_paths[wildcards.db]
+    shell:
+        "lastal -P {threads} -f BlastTab -b 1 -x 15 -y 7 -z 25 \
+         {params.db_path} {input} > {output}"
+
+rule assign_taxa:
+    """
+    Turn a hit table of predicted genes vs RefSeq into a table of reads
+    """
+    input:
+        "read_genes.vs.REFSEQ.lastp"
+    output:
+        "reads.annotations.{clade}.txt"
+    benchmark:
+        "benchmarks/assign_taxa.{clade}"
+    log:
+        "logs/assign_taxa.{clade}"
+    shell:
+         "cat {input} \
+         | sed -r 's/_GENE_[0-9]+//' \
+         | assign_taxa.py -o {output} -r {wildcards.clade} \
+            -f blastplus -H 1 -s score -c first"
+
+rule compile_counts:
+    """
+    Use clade assignments and HMM results to generate table of gene faimly
+    counts by clade.
+
+    Look for lastal results if the DB is KEGG. The python code will know what to do.
+    """
+    input:
+        rules.assign_taxa.output,
+        lambda wildcards: "read_genes.vs.{db}.lastp" if wildcards.db=='KEGG' else "read_genes.vs.{db}.tbl"
+    output:
+        "read.annotations.{clade}.{db}.txt"
+    benchmark:
+        "benchmarks/compile_counts.{clade}.{db}"
+    log:
+        "logs/compile_counts.{clade}.{db}"
+    run:
+        compile_gene_family_counts(output_file=output[0],
+                                   clade_designations=input[0],
+                                   hit_table=input[1],
+                                   database=wildcards.db)
+
+##########
+# Functions
+def compile_gene_family_counts(output_file, clade_designations, hit_table,
+                               database, dbtype='tbl'):
+    pass
+
+def compile_read_clade_assignments(output_file, hit_table, rank='order'):
+    pass
