@@ -46,7 +46,7 @@ mgorfs=snakefile_path + "/mgorfs.pl"
 #  After the "all" target, it is generally laid out start to finish
 rule all:
     input:
-        expand("read.annotations.%s.{db}.txt" % (clade_rank), db=db_list)
+        expand("reads.annotations.%s.{db}.txt" % (clade_rank), db=db_list)
 
 rule extract_reads:
     """
@@ -121,34 +121,65 @@ rule lastal:
 rule assign_taxa:
     """
     Turn a hit table of predicted genes vs RefSeq into a table of reads
+
+    Uses sed to change gene names back into read names before the assignment script sets to work.
     """
     input:
         "read_genes.vs.REFSEQ.lastp"
     output:
-        "reads.annotations.{rank}.txt"
+        "reads.annotations.taxon_:erank.{rank}.txt"
     benchmark:
         "benchmarks/assign_taxa.{rank}"
     log:
         "logs/assign_taxa.{rank}"
+    params:
+        taxdump=os.path.split(db_paths['REFSEQ'])[0],
+        taxmap=db_paths['REFSEQ'] + ".tax"
     shell:
          "cat {input} \
          | sed -r 's/_GENE_[0-9]+//' \
          | assign_taxa.py -o {output} -r {wildcards.rank} \
-            -f blastplus -H 1 -s score -c first"
+            -f blast -F 0 -C first -p accs \
+            -n {params.taxdump} -m {params.taxmap}"
 
-rule compile_counts:
+rule assign_paths:
     """
-    Use clade assignments and HMM results to generate table of gene faimly
-    counts by clade.
+    Turn a hit table (from hmmer or lastal) into a one-to-many map from reads to gene families.
 
-    Look for lastal results if the DB is KEGG. The python code will know what to do.
+    Uses sed to change gene names back into read names before the assignment script sets to work.
     """
     input:
-        rules.assign_taxa.output,
         #"read_genes.vs.{db}.tbl"
         lambda wildcards: "read_genes.vs.%s.lastp"%(wildcards.db) if wildcards.db=='KEGG' else "read_genes.vs.%s.tbl"%(wildcards.db)
     output:
-        "read.annotations.{rank}.{db}.txt"
+        "reads.annotations.gene_family.{db}.txt"
+    benchmark:
+        "benchmarks/assign_paths.{db}"
+    log:
+        "logs/assign_paths.{db}"
+    params:
+        format=lambda w: 'blast' if w.db=='KEGG' else 'hmmsearchdom',
+        params=lambda w: {
+                            'KEGG':'-p hitid -M kegg -m %s.kos' \
+                                    % (db_paths.get('KEGG','')),
+                            'PFAM':'-p pfam',
+                            'COG':'-p cog',
+                         }[w.db]
+    shell:
+         "cat {input} \
+         | sed -r 's/_GENE_[0-9]+//' \
+         | assign_paths.py -o {output} -f {params.format} {params.params} \
+         "
+
+rule compile_counts:
+    """
+    Use clade assignments and gene family assignments to compile a table of gene family counts by clade.
+    """
+    input:
+        rules.assign_taxa.output,
+        rules.assign_paths.output
+    output:
+        "reads.annotations.{rank}.{db}.txt"
     benchmark:
         "benchmarks/compile_counts.{rank}.{db}"
     log:
@@ -156,11 +187,10 @@ rule compile_counts:
     run:
         compile_gene_family_counts(output_file=output[0],
                                    clade_designations=input[0],
-                                   hit_table=input[1],
-                                   database=wildcards.db)
+                                   family_designations=input[1],
+                                  )
 
 ##########
 # Functions
-def compile_gene_family_counts(output_file, clade_designations, hit_table,
-                               database, dbtype='tbl'):
+def compile_gene_family_counts(output_file, clade_designations, family_designations):
     pass
