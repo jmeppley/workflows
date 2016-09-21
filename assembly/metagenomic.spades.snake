@@ -67,9 +67,16 @@ if 'bfc' not in config:
 # Functions
 def get_version(command, version_flag='--version', 
                 cmd_prefix='',
+                lines=None,
                 regular_expression=None):
     """
     Gets the version string from a command
+
+    cmd_prefix is useful if you need an interpreter (bash, python, etc)
+    
+    lines can be a line number (int), a slice object, or an iterable indicating which lines of the output to grab
+
+    if regular_expression given, the first captured group is returned.
     """
     out = subprocess.check_output(" ".join([cmd_prefix,
                                             config['system_paths'][command],
@@ -77,6 +84,18 @@ def get_version(command, version_flag='--version',
                                             "; exit 0"]),
                                   stderr=subprocess.STDOUT,
                                   shell=True).decode()
+
+    # select specific lines
+    if lines is not None:
+        out_lines = out.split("\n")
+        if isinstance(lines,slice):
+            out = "\n".join(out_lines[lines])
+        elif isinstance(lines, int):
+            out = out_lines[lines]
+        else:
+            out = "\n".join(out_lines[i] for i in lines)
+
+    # apply regular expression if given
     if regular_expression is None:
         return out.strip()
     else:
@@ -411,6 +430,10 @@ rule index_contigs:
         "logs/bwa_index.log"
     benchmark:
         "benchmarks/bwa_pre_index.txt"
+    version:
+        get_version('bwa', 
+                    version_flag="", 
+                    regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
     shell:
         "{config[system_paths][bwa]} index -p mapping/contigs.index.bwa      {input} 2>&1 >  {log}"
 
@@ -423,6 +446,8 @@ rule combine_reads:
         temp('reads.trimmed.all.fastq')
     benchmark:
         "benchmarks/bwa_pre_combine.txt"
+    version:
+        get_version('gunzip', lines=0)
     shell:
         "gunzip -c {input} > {output}"
 
@@ -433,6 +458,8 @@ rule uncompress_file:
         temp("{file_root}")
     benchmark:
         "benchmarks/{file_root}"
+    version:
+        get_version('gunzip', lines=0)
     shell:
         "gunzip -c {input} > {output}"
 
@@ -449,6 +476,10 @@ rule map_reads:
         "logs/bwa_mem.log"
     benchmark:
         "benchmarks/bwa_mem_sam.txt"
+    version:
+        get_version('bwa', 
+                    version_flag="", 
+                    regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
     threads:
         20
     shell:
@@ -464,6 +495,8 @@ rule sam_to_bam:
         "benchmarks/bwa_sam_bam.txt"
     threads:
         8
+    version:
+        get_version('samtools', lines=0)
     shell:
         "{config[system_paths][samtools]} view -b {input} \
         | {config[system_paths][samtools]} sort -l 5 -@ {threads} -m 10G - \
@@ -476,6 +509,8 @@ rule index_bam:
         "{root}.bam.bai"
     benchmark:
         "benchmarks/bwa_index_bam.txt"
+    version:
+        get_version('samtools', lines=0)
     shell:
         "{config[system_paths][samtools]} index {input}"
 
@@ -492,6 +527,8 @@ rule contig_mapped_read_counts:
         "mapping/reads.vs.contigs.read_counts"
     benchmark:
         "benchmarks/bwa_count_reads.txt"
+    version:
+        get_version('samtools', lines=0)
     params:
         input="mapping/reads.vs.contigs.bam"
     shell:
@@ -511,6 +548,8 @@ rule contig_mapped_read_depths:
         "mapping/reads.vs.contigs.depths"
     benchmark:
         "benchmarks/bwa_get_depths.txt"
+    version:
+        get_version('samtools', lines=0)
     params:
         input="mapping/reads.vs.contigs.bam"
     shell:
