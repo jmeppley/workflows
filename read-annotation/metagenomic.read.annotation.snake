@@ -28,7 +28,7 @@ for db, path in config['db_paths'].items():
 #   KEGG:   10
 # Defaults to 8 for eveerything
 default_threads=config.get('threads',{}).get('default', 8)
-db_threads={db:default_threads for db in db_paths}
+db_threads={db:default_threads for db in list(db_paths.keys())+['REFSEQ','PRODIGAL']}
 for db,n_threads in config.get('threads',{}).items():
     db=db.upper()
     db_threads[db]=n_threads
@@ -39,6 +39,49 @@ mgorfs=snakefile_path + "/mgorfs.pl"
 # End configuration
 ##########
 
+#######
+# Functions
+import subprocess, re
+def get_version(command, version_flag='--version', 
+                cmd_prefix='',
+                lines=None,
+                regular_expression=None):
+    """
+    Gets the version string from a command
+
+    cmd_prefix is useful if you need an interpreter (bash, python, etc)
+    
+    lines can be a line number (int), a slice object, or an iterable indicating which lines of the output to grab
+
+    if regular_expression given, the first captured group is returned.
+    """
+    out = subprocess.check_output(" ".join([cmd_prefix,
+                                            command,
+                                            version_flag,
+                                            "; exit 0"]),
+                                  stderr=subprocess.STDOUT,
+                                  shell=True).decode()
+
+    # select specific lines
+    if lines is not None:
+        out_lines = out.split("\n")
+        if isinstance(lines,slice):
+            out = "\n".join(out_lines[lines])
+        elif isinstance(lines, int):
+            out = out_lines[lines]
+        else:
+            out = "\n".join(out_lines[i] for i in lines)
+
+    # apply regular expression if given
+    if regular_expression is None:
+        return out.strip()
+    else:
+        return regular_expression.search(out).group(1)
+
+#
+# End functions
+##########
+
 
 ##########
 # RULES:
@@ -46,7 +89,7 @@ mgorfs=snakefile_path + "/mgorfs.pl"
 #  After the "all" target, it is generally laid out start to finish
 rule all:
     input:
-        expand("reads.annotations.%s.{db}.txt" % (clade_rank), db=db_list)
+        expand("reads.annotations.%s.{db}.txt" % (clade_rank), db=db_list),
 
 rule extract_reads:
     """
@@ -60,21 +103,45 @@ rule extract_reads:
         "benchmarks/extract_reads"
     log:
         "logs/extract_reads"
+    version:
+        get_version('samtools', lines=[0,])
     shell:
-        "samtools fasta -0 {output} {input}"
+        "samtools fasta -0 {output} {input} > {log}"
 
-rule predict_genes:
+rule predict_genes_prodigal:
     """
     Generate FAA (fasta of amino acid sequences) for genes predicted in reads
     """
     input:
         "reads.fasta"
     output:
-        faa="read_genes.faa"
-    benchmark:
-        "benchmarks/predict_genes"
+        faa="read_genes.prodigal.faa"
     log:
-        "logs/predict_genes"
+        "logs/predict_genes_prodigal"
+    benchmark:
+        "benchmarks/predict_genes_prodigal"
+    version:
+        get_version('batch_launcher.py') + '::' + \
+        get_version('prodigal','-v')
+    threads:
+        db_threads['PRODIGAL']
+    shell:
+        "batch_launcher.py -N {threads} -i -i -o -a -T fasta -X local -v -- prodigal -i {input} -a {output} -p meta -q -o /dev/null > {log} 2>&1 "
+
+rule predict_genes_mga:
+    """
+    Generate FAA (fasta of amino acid sequences) for genes predicted in reads
+    """
+    input:
+        "reads.fasta"
+    output:
+        faa="read_genes.mga.faa"
+    benchmark:
+        "benchmarks/predict_genes_mga"
+    version:
+        "mga + mgorfs (unversioned)"
+    log:
+        "logs/predict_genes_mga"
     shell:
         "{mgorfs} -i {input} -A {output}"
 
@@ -83,13 +150,15 @@ rule hmmer:
     Look for profile matches
     """
     input:
-        rules.predict_genes.output.faa
+        rules.predict_genes_prodigal.output.faa
     output:
         "read_genes.vs.{db}.tbl"
     benchmark:
         "benchmarks/hmmer.{db}"
     log:
         "logs/hmmer.{db}"
+    version:
+        get_version('hmmsearch','-h',lines=[1,])
     threads:
         lambda wildcards: db_threads[wildcards.db]
     params:
@@ -103,13 +172,15 @@ rule lastal:
     Look for matches in RefSeq for predicted genes
     """
     input:
-        rules.predict_genes.output.faa
+        rules.predict_genes_prodigal.output.faa
     output:
         "read_genes.vs.{db}.lastp"
     benchmark:
         "benchmarks/lastal.{db}"
     log:
         "logs/lastal.{db}"
+    version:
+        get_version('lastal')
     threads:
         lambda wildcards: db_threads[wildcards.db]
     params:
@@ -117,6 +188,12 @@ rule lastal:
     shell:
         "lastal -P {threads} -f BlastTab -b 1 -x 15 -y 7 -z 25 \
          {params.db_path} {input} > {output}"
+
+# remove gene suffixes, so we are counting reads
+# for prodigal
+strip_gene_numbers_with_sed="sed -r 's/^(S+)_\d+(\s+#)/\1\2/'"
+# for mga/mgorfs
+#strip_gene_numbers_with_sed="sed -r 's/^(S+)_GENE_\d+\b/\1/'"
 
 rule assign_taxa:
     """
@@ -127,7 +204,7 @@ rule assign_taxa:
     input:
         "read_genes.vs.REFSEQ.lastp"
     output:
-        "reads.annotations.taxon_:erank.{rank}.txt"
+        "reads.annotations.taxon_rank.{rank}.txt"
     benchmark:
         "benchmarks/assign_taxa.{rank}"
     log:
@@ -137,7 +214,7 @@ rule assign_taxa:
         taxmap=db_paths['REFSEQ'] + ".tax"
     shell:
          "cat {input} \
-         | sed -r 's/_GENE_[0-9]+//' \
+         | {strip_gene_numbers_with_sed} \
          | assign_taxa.py -o {output} -r {wildcards.rank} \
             -f blast -F 0 -C first -p accs \
             -n {params.taxdump} -m {params.taxmap}"
@@ -157,18 +234,20 @@ rule assign_paths:
         "benchmarks/assign_paths.{db}"
     log:
         "logs/assign_paths.{db}"
+    version:
+        get_version('assign_paths.py')
     params:
         format=lambda w: 'blast' if w.db=='KEGG' else 'hmmsearchdom',
-        params=lambda w: {
-                            'KEGG':'-p hitid -M kegg -m %s.kos' \
-                                    % (db_paths.get('KEGG','')),
-                            'PFAM':'-p pfam',
-                            'COG':'-p cog',
+        params=lambda w: {'KEGG':'-p hitid -M kegg -m %s.kos' \
+                                  % (db_paths.get('KEGG','')),
+                          'PFAM':'-p pfam',
+                          'TIGR':'-p hitid',
+                          'COG':'-p hitid',
                          }[w.db]
     shell:
          "cat {input} \
-         | sed -r 's/_GENE_[0-9]+//' \
-         | assign_paths.py -o {output} -f {params.format} {params.params} \
+         | {strip_gene_numbers_with_sed} \
+         | assign_paths.py -o {output} -C first -f {params.format} {params.params} \
          "
 
 rule compile_counts:
@@ -184,13 +263,13 @@ rule compile_counts:
         "benchmarks/compile_counts.{rank}.{db}"
     log:
         "logs/compile_counts.{rank}.{db}"
-    run:
-        compile_gene_family_counts(output_file=output[0],
-                                   clade_designations=input[0],
-                                   family_designations=input[1],
-                                  )
+    version:
+        get_version('compile_hit_counts.py')
+    shell:
+        "compile_hit_counts.py -1 {input[0]} -2 {input[1]} -o {output} "
 
-##########
-# Functions
-def compile_gene_family_counts(output_file, clade_designations, family_designations):
-    pass
+rule clean:
+    """ remove all generated files """
+    shell:
+        "rm -rf logs benchmarks spades reads.fasta reads.annotations.* read_genes.*"
+
