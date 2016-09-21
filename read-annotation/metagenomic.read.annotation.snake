@@ -28,7 +28,7 @@ for db, path in config['db_paths'].items():
 #   KEGG:   10
 # Defaults to 8 for eveerything
 default_threads=config.get('threads',{}).get('default', 8)
-db_threads={db:default_threads for db in list(db_paths.keys())+['REFSEQ','PRODIGAL']}
+db_threads={db:default_threads for db in list(db_paths.keys())+['REFSEQ','PRODIGAL','MGORFS']}
 for db,n_threads in config.get('threads',{}).items():
     db=db.upper()
     db_threads[db]=n_threads
@@ -126,7 +126,8 @@ rule predict_genes_prodigal:
     threads:
         db_threads['PRODIGAL']
     shell:
-        "batch_launcher.py -N {threads} -i -i -o -a -T fasta -X local -v -- prodigal -i {input} -a {output} -p meta -q -o /dev/null > {log} 2>&1 "
+        "batch_launcher.py -N {threads} -i -i -o -a -T fasta -X local -v -- \
+        prodigal -i {input} -a {output} -p meta -q -o /dev/null > {log} 2>&1 "
 
 rule predict_genes_mga:
     """
@@ -139,11 +140,15 @@ rule predict_genes_mga:
     benchmark:
         "benchmarks/predict_genes_mga"
     version:
+        get_version('batch_launcher.py') + '::' + \
         "mga + mgorfs (unversioned)"
     log:
         "logs/predict_genes_mga"
+    threads:
+        db_threads['MGORFS']
     shell:
-        "{mgorfs} -i {input} -A {output}"
+        "batch_launcher.py -N {threads} -i -i -o -A -T fasta -X local -v --  \
+        {mgorfs} -i {input} -A {output}"
 
 rule hmmer:
     """
