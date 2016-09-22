@@ -1,0 +1,12 @@
+genes_faa: genes.faa
+clade_rank: order
+output_style: table
+db_paths:
+    RefSeq: /home/jmeppley/lys/servers/galaxy/py-metagenomics/databases/lastdb/RefSeq/75/RefSeq-75.AllProteins.faa.ldb/lastdb
+    KEGG: /mnt/lysine/jmeppley/servers/galaxy/py-metagenomics/databases/lastdb/KEGG/KeggGene.pep.20160919/lastdb
+    PFAM:   /mnt/lysine/jmeppley/servers/galaxy/py-metagenomics/databases/lastdb/PFAM/30.0/Pfam-A.hmm
+    COG:   /mnt/lysine/jmeppley/servers/galaxy/py-metagenomics/databases/lastdb/cdd/16_January_2015/COG/COG.hmm
+    TIGR:   /mnt/lysine/jmeppley/servers/galaxy/py-metagenomics/databases/lastdb/TIGRFAM/15.0/TIGRFAMS_HMM
+threads:
+    default:  10
+    PFAM: 12

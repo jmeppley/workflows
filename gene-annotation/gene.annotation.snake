@@ -3,6 +3,9 @@ configfile: "annotation.yaml"
 #########
 # CONFIGURATION
 #
+# starting file
+genes_faa=config.get("genes_faa", 'genes.faa')
+#
 # rank to collect taxa on (defaults to order)
 clade_rank=config.get('clade_rank', 'order')
 #
@@ -25,10 +28,9 @@ for db, path in config['db_paths'].items():
 # threads:
 #   default: 5
 #   RefSeq: 20
-#   KEGG:   10
 # Defaults to 8 for eveerything
 default_threads=config.get('threads',{}).get('default', 8)
-db_threads={db:default_threads for db in list(db_paths.keys())+['REFSEQ','PRODIGAL','MGORFS']}
+db_threads={db:default_threads for db in list(db_paths.keys())+['REFSEQ',]}
 for db,n_threads in config.get('threads',{}).items():
     db=db.upper()
     db_threads[db]=n_threads
@@ -86,7 +88,7 @@ def get_version(command, version_flag='--version',
 rule all:
     input:
         expand("genes.annotations.%s.{db}.txt" % (clade_rank), db=db_list),
-        "genes.faa.stats"
+        "{genes_faa}.stats".format(genes_faa=genes_faa)
 
 rule prinseq_any:
     """ calculate basic stats for a fasta file """
@@ -120,7 +122,7 @@ rule hmmer:
     Look for profile matches
     """
     input:
-        "genes.faa"
+        genes_faa
     output:
         "genes.vs.{db}.tbl"
     benchmark:
@@ -142,7 +144,7 @@ rule lastal:
     Look for matches in RefSeq for genes
     """
     input:
-        "genes.fasta"
+        genes_faa
     output:
         "genes.vs.{db}.lastp"
     benchmark:
