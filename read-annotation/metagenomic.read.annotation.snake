@@ -2,10 +2,10 @@ configfile: "annotation.yaml"
 
 #########
 # CONFIGURATION
-
+#
 # rank to collect taxa on (defaults to order)
 clade_rank=config.get('clade_rank', 'order')
-
+#
 # gene family databases to use for annotation
 # in config file as dict of db:path pairs where
 #  db is one of RefSeq,KEGG,PFAM,COG, or TIGR
@@ -19,7 +19,7 @@ for db, path in config['db_paths'].items():
     if db!='REFSEQ':
         db_list.append(db)
     db_paths[db]=path
-
+#
 # threads per search are set in the threads: parameter
 # Either use the db name or "default". EG:
 # threads:
@@ -32,7 +32,7 @@ db_threads={db:default_threads for db in list(db_paths.keys())+['REFSEQ','PRODIG
 for db,n_threads in config.get('threads',{}).items():
     db=db.upper()
     db_threads[db]=n_threads
-
+#
 snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
 mgorfs=snakefile_path + "/mgorfs.pl"
 #
@@ -77,7 +77,7 @@ def get_version(command, version_flag='--version',
         return out.strip()
     else:
         return regular_expression.search(out).group(1)
-
+#
 #
 # End functions
 ##########
@@ -109,7 +109,7 @@ rule extract_reads:
     version:
         get_version('samtools', lines=[0,])
     shell:
-        "samtools fasta -0 {output} {input} > {log}"
+        "samtools fasta -0 {output} {input} > {log} 2>&1"
 
 rule prinseq_any:
     """ calculate basic stats for a fasta file """
@@ -153,11 +153,10 @@ rule predict_genes_prodigal:
     version:
         get_version('batch_launcher.py') + '::' + \
         get_version('prodigal','-v')
-    threads:
-        db_threads['PRODIGAL']
+    params:
+        batch_prefix="batch_launcher.py -N {threads} -i -i -o -a -T fasta -X local -v -- ".format(threads=db_threads['PRODIGAL']) if int(db_threads['PRODIGAL']) > 1 else ""
     shell:
-        "batch_launcher.py -N {threads} -i -i -o -a -T fasta -X local -v -- \
-        prodigal -i {input} -a {output} -p meta -q -o /dev/null > {log} 2>&1 "
+        "{params.batch_prefix} prodigal -i {input} -a {output} -p meta -q -o /dev/null > {log} 2>&1 "
 
 rule predict_genes_mga:
     """
@@ -174,11 +173,10 @@ rule predict_genes_mga:
         "mga + mgorfs (unversioned)"
     log:
         "logs/predict_genes_mga"
-    threads:
-        db_threads['MGORFS']
+    params:
+        batch_prefix="batch_launcher.py -N {threads} -i -i -o -a -T fasta -X local -v -- ".format(threads=db_threads['MGORFS']) if int(db_threads['MGORFS']) > 1 else ""
     shell:
-        "batch_launcher.py -N {threads} -i -i -o -A -T fasta -X local -v --  \
-        {mgorfs} -i {input} -A {output}"
+        "{params.batch_prefix} {mgorfs} -i {input} -A {output}"
 
 rule hmmer:
     """
