@@ -164,8 +164,6 @@ rule lastal:
 rule assign_taxa:
     """
     Turn a hit table of genes vs RefSeq into a table of gene taxon assignments
-
-    Uses sed to change gene names back into read names before the assignment script sets to work.
     """
     input:
         "genes.vs.REFSEQ.lastp"
@@ -179,17 +177,13 @@ rule assign_taxa:
         taxdump=os.path.split(db_paths['REFSEQ'])[0],
         taxmap=db_paths['REFSEQ'] + ".tax"
     shell:
-         "cat {input} \
-         | {strip_gene_numbers_with_sed} \
-         | assign_taxa.py -o {output} -r {wildcards.rank} \
+         " assign_taxa.py {input} -o {output} -r {wildcards.rank} \
             -f blast -F 0 -C first -p accs \
             -n {params.taxdump} -m {params.taxmap}"
 
 rule assign_paths:
     """
     Turn a hit table (from hmmer or lastal) into a one-to-many map from genes to gene families.
-
-    Uses sed to change gene names back into read names before the assignment script sets to work.
     """
     input:
         #"genes.vs.{db}.tbl"
@@ -211,10 +205,8 @@ rule assign_paths:
                           'COG':'-p hitid',
                          }[w.db]
     shell:
-         "cat {input} \
-         | {strip_gene_numbers_with_sed} \
-         | assign_paths.py -o {output} -C first -f {params.format} {params.params} \
-         "
+         " assign_paths.py {input} -o {output} -C first -f {params.format} \
+         {params.params} "
 
 rule compile_counts:
     """
@@ -234,7 +226,7 @@ rule compile_counts:
     params:
         three_column_opt="-L" if config.get('output_style','default').lower() == 'long' else ""
     shell:
-        "compile_hit_counts.py {three_column_opt} -1 {input[0]} -2 {input[1]} -o {output} "
+        "compile_hit_counts.py {params.three_column_opt} -1 {input[0]} -2 {input[1]} -o {output} -S"
 
 rule clean:
     """ remove all generated files """
