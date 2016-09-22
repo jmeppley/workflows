@@ -301,7 +301,7 @@ rule compile_counts:
     params:
         three_column_opt="-L" if config.get('output_style','default').lower() == 'long' else ""
     shell:
-        "compile_hit_counts.py {three_column_opt} -1 {input[0]} -2 {input[1]} -o {output} "
+        "compile_hit_counts.py {three_column_opt} -1 {input[0]} -2 {input[1]} -o {output} -S "
 
 rule clean:
     """ remove all generated files """
