@@ -1,0 +1,241 @@
+configfile: "annotation.yaml"
+
+#########
+# CONFIGURATION
+#
+# rank to collect taxa on (defaults to order)
+clade_rank=config.get('clade_rank', 'order')
+#
+# gene family databases to use for annotation
+# in config file as dict of db:path pairs where
+#  db is one of RefSeq,KEGG,PFAM,COG, or TIGR
+# and
+#  path is the location of the db
+# this dict should be in config['db_paths']
+db_list=[]
+db_paths={}
+for db, path in config['db_paths'].items():
+    db=db.upper()
+    if db!='REFSEQ':
+        db_list.append(db)
+    db_paths[db]=path
+#
+# threads per search are set in the threads: parameter
+# Either use the db name or "default". EG:
+# threads:
+#   default: 5
+#   RefSeq: 20
+#   KEGG:   10
+# Defaults to 8 for eveerything
+default_threads=config.get('threads',{}).get('default', 8)
+db_threads={db:default_threads for db in list(db_paths.keys())+['REFSEQ','PRODIGAL','MGORFS']}
+for db,n_threads in config.get('threads',{}).items():
+    db=db.upper()
+    db_threads[db]=n_threads
+#
+# End configuration
+##########
+
+#######
+# Functions
+import subprocess, re
+def get_version(command, version_flag='--version', 
+                cmd_prefix='',
+                lines=None,
+                regular_expression=None):
+    """
+    Gets the version string from a command
+
+    cmd_prefix is useful if you need an interpreter (bash, python, etc)
+    
+    lines can be a line number (int), a slice object, or an iterable indicating which lines of the output to grab
+
+    if regular_expression given, the first captured group is returned.
+    """
+    out = subprocess.check_output(" ".join([cmd_prefix,
+                                            command,
+                                            version_flag,
+                                            "; exit 0"]),
+                                  stderr=subprocess.STDOUT,
+                                  shell=True).decode()
+
+    # select specific lines
+    if lines is not None:
+        out_lines = out.split("\n")
+        if isinstance(lines,slice):
+            out = "\n".join(out_lines[lines])
+        elif isinstance(lines, int):
+            out = out_lines[lines]
+        else:
+            out = "\n".join(out_lines[i] for i in lines)
+
+    # apply regular expression if given
+    if regular_expression is None:
+        return out.strip()
+    else:
+        return regular_expression.search(out).group(1)
+#
+#
+# End functions
+##########
+
+##########
+# RULES:
+#  This lays out the dependencies and logic of the workflow
+#  After the "all" target, it is generally laid out start to finish
+rule all:
+    input:
+        expand("genes.annotations.%s.{db}.txt" % (clade_rank), db=db_list),
+        "genes.faa.stats"
+
+rule prinseq_any:
+    """ calculate basic stats for a fasta file """
+    input:
+        "{file_root}.{ext}"
+    output:
+        "{file_root}.{ext,f.+}.stats"
+    log:
+        lambda wildcards: "logs/{file_root}.{ext}.stats.log"\
+                            .format(file_root=re.sub(r'/','_',\
+                                                     wildcards.file_root),
+                                    ext=wildcards.ext)
+    params:
+        input_flag=lambda wildcards:"-fastq" \
+         if re.search(r'q',wildcards.ext) else "-fasta",
+        aa=lambda wildcards:"-aa" \
+         if re.search(r'\bfaa\b',wildcards.ext) else "",
+        cat=lambda wildcards:"gunzip -c" \
+         if re.search(r'\.gz$',wildcards.ext) else "cat"
+    benchmark:
+        "benchmarks/prinseq_{file_root}_{ext}.txt"
+    version:
+        get_version('prinseq-lite.pl','-version')
+    shell:
+        "{params.cat} {input} | \
+        prinseq-lite.pl {params.input_flag} stdin \
+         -stats_len -stats_info {params.aa} > {output}"
+
+rule hmmer:
+    """
+    Look for profile matches
+    """
+    input:
+        "genes.faa"
+    output:
+        "genes.vs.{db}.tbl"
+    benchmark:
+        "benchmarks/hmmer.{db}"
+    log:
+        "logs/hmmer.{db}"
+    version:
+        get_version('hmmsearch','-h',lines=[1,])
+    threads:
+        lambda wildcards: db_threads[wildcards.db]
+    params:
+        db_path=lambda wildcards: db_paths[wildcards.db]
+    shell:
+        "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
+        {params.db_path} {input}"
+
+rule lastal:
+    """
+    Look for matches in RefSeq for genes
+    """
+    input:
+        "genes.fasta"
+    output:
+        "genes.vs.{db}.lastp"
+    benchmark:
+        "benchmarks/lastal.{db}"
+    log:
+        "logs/lastal.{db}"
+    version:
+        get_version('lastal')
+    threads:
+        lambda wildcards: db_threads[wildcards.db]
+    params:
+        db_path=lambda wildcards: db_paths[wildcards.db]
+    shell:
+        "lastal -P {threads} -f BlastTab -b 1 -x 15 -y 7 -z 25 \
+         {params.db_path} {input} > {output}"
+
+rule assign_taxa:
+    """
+    Turn a hit table of genes vs RefSeq into a table of gene taxon assignments
+
+    Uses sed to change gene names back into read names before the assignment script sets to work.
+    """
+    input:
+        "genes.vs.REFSEQ.lastp"
+    output:
+        "genes.annotations.taxon_rank.{rank}.txt"
+    benchmark:
+        "benchmarks/assign_taxa.{rank}"
+    log:
+        "logs/assign_taxa.{rank}"
+    params:
+        taxdump=os.path.split(db_paths['REFSEQ'])[0],
+        taxmap=db_paths['REFSEQ'] + ".tax"
+    shell:
+         "cat {input} \
+         | {strip_gene_numbers_with_sed} \
+         | assign_taxa.py -o {output} -r {wildcards.rank} \
+            -f blast -F 0 -C first -p accs \
+            -n {params.taxdump} -m {params.taxmap}"
+
+rule assign_paths:
+    """
+    Turn a hit table (from hmmer or lastal) into a one-to-many map from genes to gene families.
+
+    Uses sed to change gene names back into read names before the assignment script sets to work.
+    """
+    input:
+        #"genes.vs.{db}.tbl"
+        lambda wildcards: "genes.vs.%s.lastp"%(wildcards.db) if wildcards.db=='KEGG' else "genes.vs.%s.tbl"%(wildcards.db)
+    output:
+        "genes.annotations.gene_family.{db}.txt"
+    benchmark:
+        "benchmarks/assign_paths.{db}"
+    log:
+        "logs/assign_paths.{db}"
+    version:
+        get_version('assign_paths.py')
+    params:
+        format=lambda w: 'blast' if w.db=='KEGG' else 'hmmsearchdom',
+        params=lambda w: {'KEGG':'-p hitid -M kegg -m %s.kos' \
+                                  % (db_paths.get('KEGG','')),
+                          'PFAM':'-p pfam',
+                          'TIGR':'-p hitid',
+                          'COG':'-p hitid',
+                         }[w.db]
+    shell:
+         "cat {input} \
+         | {strip_gene_numbers_with_sed} \
+         | assign_paths.py -o {output} -C first -f {params.format} {params.params} \
+         "
+
+rule compile_counts:
+    """
+    Use clade assignments and gene family assignments to compile a table of gene family counts by clade.
+    """
+    input:
+        rules.assign_taxa.output,
+        rules.assign_paths.output
+    output:
+        "genes.annotations.{rank}.{db}.txt"
+    benchmark:
+        "benchmarks/compile_counts.{rank}.{db}"
+    log:
+        "logs/compile_counts.{rank}.{db}"
+    version:
+        get_version('compile_hit_counts.py')
+    params:
+        three_column_opt="-L" if config.get('output_style','default').lower() == 'long' else ""
+    shell:
+        "compile_hit_counts.py {three_column_opt} -1 {input[0]} -2 {input[1]} -o {output} "
+
+rule clean:
+    """ remove all generated files """
+    shell:
+        "rm -rf logs benchmarks genes.annotations.* genes.vs.*"
+
