@@ -85,6 +85,8 @@ def get_version(command, version_flag='--version',
 # RULES:
 #  This lays out the dependencies and logic of the workflow
 #  After the "all" target, it is generally laid out start to finish
+localrules: all, clean
+
 rule all:
     input:
         expand("genes.annotations.%s.{db}.txt" % (clade_rank), db=db_list),
