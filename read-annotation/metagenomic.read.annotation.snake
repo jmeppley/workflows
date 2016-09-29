@@ -1,7 +1,11 @@
 configfile: "annotation.yaml"
+import tempfile
 
 #########
 # CONFIGURATION
+#
+# bam file to start from
+bam_file_with_reads=config.get('bam_file','reads.vs.contigs.bam')
 #
 # rank to collect taxa on (defaults to order)
 clade_rank=config.get('clade_rank', 'order')
@@ -99,7 +103,7 @@ rule extract_reads:
     Pull reads out of BAM file
     """
     input:
-        "reads.vs.contigs.bam"
+        bam_file_with_reads
     output:
         "reads.fasta"
     benchmark:
@@ -178,6 +182,60 @@ rule predict_genes_mga:
     shell:
         "{params.batch_prefix} {mgorfs} -i {input} -A {output}"
 
+rule hmmer_stmp:
+    """
+    Look for profile matches, but copy everything to /tmp first
+    """
+    input:
+        rules.predict_genes_prodigal.output.faa
+    output:
+        "read_genes.vs.{db}.tbl.stmp"
+    benchmark:
+        "benchmarks/hmmer.{db}.stmp"
+    log:
+        "logs/hmmer.{db}.stmp"
+    version:
+        get_version('hmmsearch','-h',lines=[1,])
+    threads:
+        lambda wildcards: db_threads[wildcards.db]
+    params:
+        db_path=lambda wildcards: db_paths[wildcards.db],
+        tmp_dir=tempfile.TemporaryDirectory(suffix=None, prefix=None, dir='/mnt/stmp/jme')
+    shell:
+        """
+        for F in {params.db_path}.*; do cp $F {params.tmp_dir.name}/hmm.${{F##*.}}; done
+        cp {input} {params.tmp_dir.name}/input
+        hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
+        {params.tmp_dir.name}/hmm {params.tmp_dir.name}/input
+        """
+
+rule hmmer_tmp:
+    """
+    Look for profile matches, but copy everything to /tmp first
+    """
+    input:
+        rules.predict_genes_prodigal.output.faa
+    output:
+        "read_genes.vs.{db}.tbl.tmp"
+    benchmark:
+        "benchmarks/hmmer.{db}.tmp"
+    log:
+        "logs/hmmer.{db}.tmp"
+    version:
+        get_version('hmmsearch','-h',lines=[1,])
+    threads:
+        lambda wildcards: db_threads[wildcards.db]
+    params:
+        db_path=lambda wildcards: db_paths[wildcards.db],
+        tmp_dir=tempfile.TemporaryDirectory(suffix=None, prefix=None, dir='/tmp/jme')
+    shell:
+        """
+        for F in {params.db_path}.*; do cp $F {params.tmp_dir.name}/hmm.${{F##*.}}; done
+        cp {input} {params.tmp_dir.name}/input
+        hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
+        {params.tmp_dir.name}/hmm {params.tmp_dir.name}/input
+        """
+
 rule hmmer:
     """
     Look for profile matches
@@ -245,6 +303,8 @@ rule assign_taxa:
     params:
         taxdump=os.path.split(db_paths['REFSEQ'])[0],
         taxmap=db_paths['REFSEQ'] + ".tax"
+    version:
+        get_version('assign_taxa.py')
     shell:
          "cat {input} \
          | {strip_gene_numbers_with_sed} \
@@ -301,7 +361,7 @@ rule compile_counts:
     params:
         three_column_opt="-L" if config.get('output_style','default').lower() == 'long' else ""
     shell:
-        "compile_hit_counts.py {three_column_opt} -1 {input[0]} -2 {input[1]} -o {output} -S "
+        "compile_hit_counts.py {params.three_column_opt} -1 {input[0]} -2 {input[1]} -o {output} -S "
 
 rule clean:
     """ remove all generated files """
