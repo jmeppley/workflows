@@ -1,4 +1,8 @@
 configfile: "annotation.yaml"
+# Python makefile to pull out reads from a BAM alignment 
+#  and use RefSeq, KEGG, PFAM, and others to annotate them
+# Annotations are generated as tables of gene_family counts 
+#  groupbed by taxonomic clade
 
 #########
 # CONFIGURATION
@@ -271,12 +275,11 @@ rule assign_paths:
         get_version('assign_paths.py')
     params:
         format=lambda w: 'blast' if w.db=='KEGG' else 'hmmsearchdom',
+        # KEGG and PFAM need special handling
         params=lambda w: {'KEGG':'-p hitid -M kegg -m %s.kos' \
                                   % (db_paths.get('KEGG','')),
                           'PFAM':'-p pfam',
-                          'TIGR':'-p hitid',
-                          'COG':'-p hitid',
-                         }[w.db]
+                         }.get(w.db,'-p hitid')
     shell:
          "cat {input} \
          | {strip_gene_numbers_with_sed} \
@@ -301,7 +304,7 @@ rule compile_counts:
     params:
         three_column_opt="-L" if config.get('output_style','default').lower() == 'long' else ""
     shell:
-        "compile_hit_counts.py {three_column_opt} -1 {input[0]} -2 {input[1]} -o {output} -S "
+        "compile_hit_counts.py {params.three_column_opt} -1 {input[0]} -2 {input[1]} -o {output} -S "
 
 rule clean:
     """ remove all generated files """
