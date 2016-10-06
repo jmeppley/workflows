@@ -14,32 +14,14 @@ bam_file_with_reads=config.get('bam_file','reads.vs.contigs.bam')
 # rank to collect taxa on (defaults to order)
 clade_rank=config.get('clade_rank', 'order')
 #
-# gene family databases to use for annotation
-# in config file as dict of db:path pairs where
-#  db is one of RefSeq,KEGG,PFAM,COG, or TIGR
-# and
-#  path is the location of the db
-# this dict should be in config['db_paths']
-db_list=[]
-db_paths={}
-for db, path in config['db_paths'].items():
-    db=db.upper()
-    if db!='REFSEQ':
-        db_list.append(db)
-    db_paths[db]=path
-#
 # threads per search are set in the threads: parameter
 # Either use the db name or "default". EG:
 # threads:
 #   default: 5
-#   RefSeq: 20
-#   KEGG:   10
+#   lastal: 20
+#   prodigal:   10
 # Defaults to 8 for eveerything
-default_threads=config.get('threads',{}).get('default', 8)
-db_threads={db:default_threads for db in list(db_paths.keys())+['REFSEQ','PRODIGAL','MGORFS']}
-for db,n_threads in config.get('threads',{}).items():
-    db=db.upper()
-    db_threads[db]=n_threads
+default_threads=config.setdefault('threads',{}).get('default', 3)
 #
 snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
 mgorfs=snakefile_path + "/mgorfs.pl"
@@ -86,6 +68,28 @@ def get_version(command, version_flag='--version',
     else:
         return regular_expression.search(out).group(1)
 #
+def get_hit_table_nane_from_widlcards_db(wildcards):
+    """
+    Return the hit table name based on the db name using the db config info
+    """
+    db=wildcards.db
+    db_type=config['dbs'][db].get('type','hmmer')
+    if db_type=='hmmer':
+        if 'frags' in config['dbs'][db]:
+            return "read_genes.vs.{db}.tbl.dbatch"
+        else:
+            return "read_genes.vs.{db}.tbl".format(**wildcards)
+    elif db_type=='lastdb':
+        return "read_genes.vs.{db}.lastp".format(**wildcards)
+
+    # Don't know what to do:
+    raise Exception("Unknown database type for {}: {}".format(db,db_type)
+#
+def get_gene_family_db_list():
+    """
+    Return list of configured DBs that are not RefSeq
+    """
+    return [db for db in config['dbs'] if db.upper()!="REFSEQ"]
 #
 # End functions
 ##########
@@ -97,7 +101,8 @@ def get_version(command, version_flag='--version',
 #  After the "all" target, it is generally laid out start to finish
 rule all:
     input:
-        expand("reads.annotations.%s.{db}.txt" % (clade_rank), db=db_list),
+        expand("reads.annotations.%s.{db}.txt" % (clade_rank), 
+                db=get_db_list()),
         "reads.fasta.stats",
         #"read_genes.mga.faa.stats",
         "read_genes.prodigal.faa.stats"
@@ -120,21 +125,27 @@ rule extract_reads:
         "samtools fasta -0 {output} {input} > {log} 2>&1"
 
 rule prinseq_any:
-    """ calculate basic stats for a fasta file """
+    """
+    calculate basic stats for a fasta or fastq file, gzipped or not 
+    """
     input:
         "{file_root}.{ext}"
     output:
         "{file_root}.{ext,f.+}.stats"
     log:
+        # complicated lmbda to handle different input types
         lambda wildcards: "logs/{file_root}.{ext}.stats.log"\
                             .format(file_root=re.sub(r'/','_',\
                                                      wildcards.file_root),
                                     ext=wildcards.ext)
     params:
+        # use "ext" wildcard to set sequence format (fasta or fastq)
         input_flag=lambda wildcards:"-fastq" \
          if re.search(r'q',wildcards.ext) else "-fasta",
+        # use -aa for .faa or .faa.gz files
         aa=lambda wildcards:"-aa" \
          if re.search(r'\bfaa\b',wildcards.ext) else "",
+        # uncompress ".gz" files
         cat=lambda wildcards:"gunzip -c" \
          if re.search(r'\.gz$',wildcards.ext) else "cat"
     benchmark:
@@ -161,10 +172,12 @@ rule predict_genes_prodigal:
     version:
         get_version('batch_launcher.py') + '::' + \
         get_version('prodigal','-v')
-    params:
-        batch_prefix="batch_launcher.py -N {threads} -i -i -o -a -T fasta -X local -v -- ".format(threads=db_threads['PRODIGAL']) if int(db_threads['PRODIGAL']) > 1 else ""
+    threads:
+        config['threads'].get('prodigal',default_threads)
     shell:
-        "{params.batch_prefix} prodigal -i {input} -a {output} -p meta -q -o /dev/null > {log} 2>&1 "
+        # Use batch launcher to multithread prodigal
+        "batch_launcher.py -N {threads} -i -i -o -a -T fasta -X local -v -- \
+         prodigal -i {input} -a {output} -p meta -q -o /dev/null > {log} 2>&1 "
 
 rule predict_genes_mga:
     """
@@ -181,10 +194,11 @@ rule predict_genes_mga:
         "mga + mgorfs (unversioned)"
     log:
         "logs/predict_genes_mga"
-    params:
-        batch_prefix="batch_launcher.py -N {threads} -i -i -o -a -T fasta -X local -v -- ".format(threads=db_threads['MGORFS']) if int(db_threads['MGORFS']) > 1 else ""
+    threads:
+        config['threads'].get('mgorfs',default_threads)
     shell:
-        "{params.batch_prefix} {mgorfs} -i {input} -A {output}"
+        "batch_launcher.py -N {threads} -i -i -o -A -T fasta -X local -v -- \
+         {mgorfs} -i {input} -A {output}"
 
 rule hmmer_stmp:
     """
@@ -201,10 +215,10 @@ rule hmmer_stmp:
     version:
         get_version('hmmsearch','-h',lines=[1,])
     threads:
-        lambda wildcards: db_threads[wildcards.db]
+        lambda wildcards: config['threads'].get(wildcards.db,default_threads)
     params:
-        db_path=lambda wildcards: db_paths[wildcards.db],
-        tmp_dir=tempfile.TemporaryDirectory(suffix=None, prefix=None, dir='/mnt/stmp/jme')
+        db_path=lambda wildcards: config['dbs'][wildcards.db]['path'],
+        tmp_dir=tempfile.TemporaryDirectory(suffix=None, prefix=None, dir='/mnt/stmp')
     shell:
         """
         for F in {params.db_path}.*; do cp $F {params.tmp_dir.name}/hmm.${{F##*.}}; done
@@ -228,10 +242,10 @@ rule hmmer_tmp:
     version:
         get_version('hmmsearch','-h',lines=[1,])
     threads:
-        lambda wildcards: db_threads[wildcards.db]
+        lambda wildcards: config['threads'].get(wildcards.db,default_threads)
     params:
-        db_path=lambda wildcards: db_paths[wildcards.db],
-        tmp_dir=tempfile.TemporaryDirectory(suffix=None, prefix=None, dir='/tmp/jme')
+        db_path=lambda wildcards: config['dbs'][wildcards.db]['path']
+        tmp_dir=tempfile.TemporaryDirectory(suffix=None, prefix=None, dir='/tmp')
     shell:
         """
         for F in {params.db_path}.*; do cp $F {params.tmp_dir.name}/hmm.${{F##*.}}; done
@@ -239,6 +253,46 @@ rule hmmer_tmp:
         hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
         {params.tmp_dir.name}/hmm {params.tmp_dir.name}/input
         """
+
+rule hmmer_dbfrag:
+    """
+    Look for profile matches in the Nth fragment of a DB
+    """
+    input:
+        rules.predict_genes_prodigal.output.faa
+    output:
+        "read_genes.vs.{db}.{N}.tbl.dfrag"
+    benchmark:
+        "benchmarks/hmmer.{db}.{N}"
+    log:
+        "logs/hmmer.{db}.{N}"
+    version:
+        get_version('hmmsearch','-h',lines=[1,])
+    threads:
+        lambda wildcards: config['threads'].get(wildcards.db,default_threads)
+    params:
+        db_path=lambda wildcards: config['db_frag_paths'][wildcards.db].format(N=int(wildcards.N))
+    shell:
+        "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
+        {params.db_path} {input}"
+
+rule hmmer_fragdb:
+    """
+    Look for profile matches in N fragments of a larger db. This rule just merges the N outputs of hmmer_dbfrag.
+    """
+    input:
+        lambda w: expand("read_genes.vs.{db}.{{N}}.tbl.dfrag".format(db=w.db), 
+                         N=range(1,1+config['dbs'][w.db]['frags']))
+    output:
+        "read_genes.vs.{db}.tbl.dbatch"
+    benchmark:
+        "benchmarks/hmmer.{db}.dbatch"
+    log:
+        "logs/hmmer.{db}.dbatch"
+    version:
+        get_version('sort',lines=[1,])
+    shell:
+        "cat {input} | grep -v '^#' | sort -k 1,1 > {output}"
 
 rule hmmer:
     """
@@ -255,9 +309,9 @@ rule hmmer:
     version:
         get_version('hmmsearch','-h',lines=[1,])
     threads:
-        lambda wildcards: db_threads[wildcards.db]
+        lambda wildcards: config['threads'].get(wildcards.db,default_threads)
     params:
-        db_path=lambda wildcards: db_paths[wildcards.db]
+        db_path=lambda wildcards: config['dbs'][wildcards.db]['path']
     shell:
         "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
         {params.db_path} {input}"
@@ -277,9 +331,9 @@ rule lastal:
     version:
         get_version('lastal')
     threads:
-        lambda wildcards: db_threads[wildcards.db]
+        lambda wildcards: config['threads'].get(wildcards.db,default_threads)
     params:
-        db_path=lambda wildcards: db_paths[wildcards.db]
+        db_path=lambda wildcards: config['dbs'][wildcards.db]['path']
     shell:
         "lastal -P {threads} -f BlastTab -b 1 -x 15 -y 7 -z 25 \
          {params.db_path} {input} > {output}"
@@ -305,8 +359,8 @@ rule assign_taxa:
     log:
         "logs/assign_taxa.{rank}"
     params:
-        taxdump=os.path.split(db_paths['REFSEQ'])[0],
-        taxmap=db_paths['REFSEQ'] + ".tax"
+        taxdump=os.path.split(config['dbs']['REFSEQ']['path'])[0],
+        taxmap=config['dbs']['REFSEQ']['path'] + ".tax"
     version:
         get_version('assign_taxa.py')
     shell:
@@ -324,7 +378,8 @@ rule assign_paths:
     """
     input:
         #"read_genes.vs.{db}.tbl"
-        lambda wildcards: "read_genes.vs.%s.lastp"%(wildcards.db) if wildcards.db=='KEGG' else "read_genes.vs.%s.tbl"%(wildcards.db)
+        # function that returns search result file name based on DB name
+        get_hit_table_name_from_wildcards_db
     output:
         "reads.annotations.gene_family.{db}.txt"
     benchmark:
@@ -337,7 +392,7 @@ rule assign_paths:
         format=lambda w: 'blast' if w.db=='KEGG' else 'hmmsearchdom',
         # KEGG and PFAM need special handling
         params=lambda w: {'KEGG':'-p hitid -M kegg -m %s.kos' \
-                                  % (db_paths.get('KEGG','')),
+                                  % (config['dbs'].get('KEGG',{'path':''})['path']),
                           'PFAM':'-p pfam',
                          }.get(w.db,'-p hitid')
     shell:

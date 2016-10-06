@@ -1,13 +1,22 @@
 clade_rank: order
 output_style: long
-db_paths:
-    RefSeq: /home/jmeppley/lys/servers/galaxy/py-metagenomics/databases/lastdb/RefSeq/75/RefSeq-75.AllProteins.faa.ldb/lastdb
-    KEGG: /mnt/lysine/jmeppley/servers/galaxy/py-metagenomics/databases/lastdb/KEGG/KeggGene.pep.20160919/lastdb
-    PFAM:   /mnt/lysine/jmeppley/servers/galaxy/py-metagenomics/databases/lastdb/PFAM/30.0/Pfam-A.hmm
-    COG:   /mnt/lysine/jmeppley/servers/galaxy/py-metagenomics/databases/lastdb/cdd/16_January_2015/COG/COG.hmm
-    TIGR:   /mnt/lysine/jmeppley/servers/galaxy/py-metagenomics/databases/lastdb/TIGRFAM/15.0/TIGRFAMS_HMM
 threads:
-    RefSeq:   20
-    KEGG:      8
-    default:  10
-    prodigal: 12
+    hmmer:    3
+    lastal:   10
+    prodigal: 20
+dbs:
+    RefSeq: 
+        path: /lus/scratch/jmeppley/seqdbs/RefSeq/78/RefSeq-78.AllProteins.faa.ldb/lastdb
+        type: lastdb
+    KEGG: 
+        path: /lus/scratch/jmeppley/seqdbs/KEGG/KeggGene.pep.20160919/lastdb
+        type: lastdb
+    PFAM:
+        path: /lus/scratch/jmeppley/seqdbs/PFAM/30.0/Pfam-A.hmm
+    PFAM8:
+        path: "../fragdb/pfam{N:05d}.hmm"
+        frags: 8
+    COG:
+        path: /lus/scratch/jmeppley/seqdbs/cdd/16_January_2015/COG/COG.hmm
+    TIGR:
+        path: /lus/scratch/jmeppley/seqdbs/TIGRFAM/15.0/TIGRFAMS_HMM
