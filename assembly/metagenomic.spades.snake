@@ -1,6 +1,12 @@
-import os, re, sys, glob, yaml, pandas, subprocess
+import os, re, sys, glob, yaml, pandas, subprocess, tempfile
 from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
-configfile: "./assembly_params.json"
+configfile: "./assembly.yaml"
+
+####
+# Required conda packages:
+#
+# snakemake bbmap infernal hmmer prodigal pandas biopython
+###
 
 snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
 if 'pymg_dir' not in config['system_paths']:
@@ -11,23 +17,6 @@ from edl import __version__ as PYMG_VERSION
 
 if 'models' not in config['system_paths']:
     config['system_paths']['models']=os.path.join(snakefile_path,'models')
-# Make sure we know where to find the necessary commands
-def set_binary_path(binary,paths):
-    if binary not in config['system_paths']:
-        for path in paths:
-            binary_full_path=os.path.join(path,binary)
-            binary_name=os.path.split(binary)[-1]
-            if os.path.exists(binary_full_path):
-                config["system_paths"][binary_name]=binary_full_path
-                break
-        else:
-            config["system_paths"][binary]=binary
-
-binaries=['miraconvert','seqtk','prinseq','prodigal',\
-          'filter_blast_m8.py','merge_gffs.py','cmsearch','bbduk.sh',\
-          'bwa','samtools']
-bin_dirs = config['system_paths']['bin_dirs']
-bin_dirs.append(config['system_paths']['pymg_dir'])
 if 'bbmap' not in config['system_paths']:
     try:
         cmd='find `which bbduk.sh | sed -r s/bbduk\.sh/../` ' + \
@@ -37,11 +26,6 @@ if 'bbmap' not in config['system_paths']:
                                                     .decode()
     except:
         print("Can't find bbmap resources, please set system_paths->bbmap in the snakemake config file")
-bin_dirs.append(config['system_paths']['bbmap'])
-
-for binary in binaries:
-    if binary not in config['system_paths']:
-        set_binary_path(binary,bin_dirs)
 
 # Define some global variables
 read_directions = ['R1','R2']
@@ -79,7 +63,7 @@ def get_version(command, version_flag='--version',
     if regular_expression given, the first captured group is returned.
     """
     out = subprocess.check_output(" ".join([cmd_prefix,
-                                            config['system_paths'][command],
+                                            command,
                                             version_flag,
                                             "; exit 0"]),
                                   stderr=subprocess.STDOUT,
@@ -195,7 +179,7 @@ rule interleave:
         get_version('seqtk','',
                     regular_expression=re.compile(r'Version:\s*(\S+)'))
     shell:
-        "{config[system_paths][seqtk]} mergepe {input} > {output}"
+        "seqtk mergepe {input} > {output}"
 
 rule merge_interleaved:
     """
@@ -232,7 +216,7 @@ rule trim_bbduk_adapters:
         adapter_file=config['system_paths']['bbmap'] \
                         + "/resources/adapters.fa"
     shell:
-        "{config[system_paths][bbduk.sh]} -Xmx{config[bbduk][ram]} \
+        "bbduk.sh -Xmx{config[bbduk][ram]} \
           in={input} out={output} \
           interleaved overwrite {config[bbduk][adapter_flags]} \
           ref={params.adapter_file} 2> {log}"
@@ -258,7 +242,7 @@ rule trim_bbduk_phix:
         phiX_file=config['system_paths']['bbmap'] \
                          + "/resources/phix174_ill.ref.fa.gz"
     shell:
-        "{config[system_paths][bbduk.sh]} -Xmx{config[bbduk][ram]} \
+        "bbduk.sh -Xmx{config[bbduk][ram]} \
           in={input} out={output[0]} gchist={output[1]} \
           interleaved overwrite {config[bbduk][phix_flags]} \
           ref={params.phiX_file} 2> {log}"
@@ -279,14 +263,20 @@ rule run_spades:
     params:
         ram_limit=config['spades']['ram'],
         kmers=config['spades']['kmers'],
+        tmp_dir=tempfile.TemporaryDirectory( \
+                                suffix=None, \
+                                prefix=None, \
+                                dir=config['spades'].get('tmp_dir',".")),
         continue_flags="--continue" if "continue_spades" in config else ""
     benchmark:
         "benchmarks/spades.txt"
     version:
-        get_version('spades.py', cmd_prefix='python')
+        get_version('spades.py')
     shell:
         """
-        python {config[system_paths][spades.py]} -m {params.ram_limit} -o spades -t {threads} -k {params.kmers} --pe1-12 {input} {params.continue_flags} --meta 
+        spades.py -m {params.ram_limit} -o spades -t {threads} \
+                  -k {params.kmers} --tmp-dir {params.tmp_dir.name} \
+                  --pe1-12 {input} {params.continue_flags} --meta 
         """
 
 rule contigs_fasta:
@@ -305,14 +295,15 @@ rule contigs_fasta:
         "biopython-{}".format(BIOPYTHON_VERSION)
     run:
         root_name = config['assembly_name']
-        with open(output[0], 'w') as OUTPUT:
-            for i, (title, sequence) \
-                in enumerate(SeqIO.FastaIO.SimpleFastaParser(input[0])):
+        with open(input[0]) as INPUT:
+            with open(output[0], 'w') as OUTPUT:
+                for i, (title, sequence) \
+                    in enumerate(SeqIO.FastaIO.SimpleFastaParser(INPUT)):
 
-                contig_name = "%s_c%d" % (root_name, i+1)
-                OUTPUT.write(">%s %s\n%s\n" % (contig_name,
-                                               title,
-                                               sequence))
+                    contig_name = "%s_c%d" % (root_name, i+1)
+                    OUTPUT.write(">%s %s\n%s\n" % (contig_name,
+                                                   title,
+                                                   sequence))
 
 rule prinseq_any:
     """ calculate basic stats for a fasta file """
@@ -338,7 +329,7 @@ rule prinseq_any:
         get_version('prinseq','-version')
     shell:
         "{params.cat} {input} | \
-        {config[system_paths][prinseq]} {params.input_flag} stdin \
+        prinseq {params.input_flag} stdin \
          -stats_len -stats_info {params.aa} > {output}"
 
 rule cmsearch:
@@ -366,7 +357,7 @@ rule cmsearch:
                 + " :: " + get_model_version(wildcards.molecule,
                                              config['system_paths']['models'])
     shell:
-        "{config[system_paths][cmsearch]} {params.flags} -o /dev/null --tblout {output} --cpu {threads} {params.cmfile} {input}"
+        "cmsearch {params.flags} -o /dev/null --tblout {output} --cpu {threads} {params.cmfile} {input}"
 
 rule cmsearch_tbl_to_gff:
     """
@@ -381,7 +372,7 @@ rule cmsearch_tbl_to_gff:
     version:
         get_version('filter_blast_m8.py')
     shell:
-        "{config[system_paths][filter_blast_m8.py]} -v -f cmsearch --gff -o {output} {input}"
+        "filter_blast_m8.py -v -f cmsearch --gff -o {output} {input}"
 
 rule prodigal:
     """ get gene predictions form prodigal """
@@ -394,7 +385,7 @@ rule prodigal:
     version:
         get_version('prodigal','-v')
     shell:
-        "{config[system_paths][prodigal]} -i {input} -f gff -o {output} -p meta -q"
+        "prodigal -i {input} -f gff -o {output} -p meta -q"
 
 rule merge_annotations:
     """ 
@@ -418,7 +409,7 @@ rule merge_annotations:
     version:
         get_version('merge_gffs.py')
     shell:
-        "{config[system_paths][merge_gffs.py]} -r {input.rrnas} -r {input.trnas} -c {input.genes} {input.contigs} {params.output_root}"
+        "merge_gffs.py -r {input.rrnas} -r {input.trnas} -c {input.genes} {input.contigs} {params.output_root}"
 
 rule index_contigs:
     """ prepare contigs for mapping with BWA """
@@ -435,7 +426,7 @@ rule index_contigs:
                     version_flag="", 
                     regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
     shell:
-        "{config[system_paths][bwa]} index -p mapping/contigs.index.bwa      {input} 2>&1 >  {log}"
+        "bwa index -p mapping/contigs.index.bwa      {input} 2>&1 >  {log}"
 
 rule combine_reads:
     """ combine paired and unpaired for BWA """
@@ -498,8 +489,8 @@ rule sam_to_bam:
     version:
         get_version('samtools', lines=0)
     shell:
-        "{config[system_paths][samtools]} view -b {input} \
-        | {config[system_paths][samtools]} sort -l 5 -@ {threads} -m 10G - \
+        "samtools view -b {input} \
+        | samtools sort -l 5 -@ {threads} -m 10G - \
         > {output}"
 
 rule index_bam:
@@ -512,7 +503,7 @@ rule index_bam:
     version:
         get_version('samtools', lines=0)
     shell:
-        "{config[system_paths][samtools]} index {input}"
+        "samtools index {input}"
 
 rule contig_mapped_read_counts:
     """ 
@@ -532,7 +523,7 @@ rule contig_mapped_read_counts:
     params:
         input="mapping/reads.vs.contigs.bam"
     shell:
-        "{config[system_paths][samtools]} view {params.input} \
+        "samtools view {params.input} \
          | cut -f 3 \
          | uniq -c \
          > {output}"
@@ -553,7 +544,7 @@ rule contig_mapped_read_depths:
     params:
         input="mapping/reads.vs.contigs.bam"
     shell:
-        "{config[system_paths][samtools]} depth {params.input} > {output}"
+        "samtools depth {params.input} > {output}"
 
 rule contig_stats_table:
     """
