@@ -5,10 +5,11 @@ configfile: "./assembly.yaml"
 ####
 # Required conda packages:
 #
-# snakemake bbmap infernal hmmer prodigal pandas biopython
+# snakemake bbmap infernal hmmer prodigal pandas biopython bfc (optional)
 ###
 
 snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
+config.setdefault('system_paths',{})
 if 'pymg_dir' not in config['system_paths']:
     config['system_paths']['pymg_dir']=snakefile_path
 else:
@@ -30,22 +31,24 @@ if 'bbmap' not in config['system_paths']:
 # Define some global variables
 read_directions = ['R1','R2']
 
+# which tool for error correction
+error_correction = config.get('error_correction','spades').lower()
+
 # default configuration
-if 'spades' not in config:
-    config['spades']={'ram':255,
-                      'threads':20,
-                      'kmers':'21,33,55,77,99,127'}
-if 'cmsearch' not in config:
-    config['cmsearch']={'threads':8}
-if 'bbduk' not in config:
-    config['bbduk']={'ram':'1g',
-      'adapter_flags':'ktrim=r k=23 mink=11 hdist=1 tbo tpe tbo tpe',
-      'phix_flags':'k=27 hdist=1 qtrim=rl trimq=17 cardinality=t mingc=0.05 maxgc=0.95'}
-if 'bfc' not in config:
-    config['bfc']={'ram':'5g',
-                   'threads':'20',
-                   'error_correction_params':'-k 55',
-                   'kmer_trimming_params':'-1 -k 21'}
+defaults={'spades':{'ram':255,
+                    'threads':20,
+                    'tmp_dir':'.',
+                    'kmers':'21,33,55,77,99,127'},
+          'cmsearch':{'threads':8},
+          'bbduk':{'ram':'1g',
+                   'adapter_flags':'ktrim=r k=23 mink=11 hdist=1 tbo tpe tbo tpe',
+                   'phix_flags':'k=27 hdist=1 qtrim=rl trimq=17 cardinality=t mingc=0.05 maxgc=0.95'},
+          'bfc':{'ram':'5g',
+                 'threads':20,
+                 'params':'-1 -k 21'}}
+for param, pdefaults in defaults.items():
+    for key, value in pdefaults.items():
+        config.setdefault(param,{}).setdefault(key,value)
 
 #######
 # Functions
@@ -134,8 +137,12 @@ if start == "raw":
     read_types=['raw','noadapt','cleaned']
 elif start == 'cleaned':
     read_types = ['cleaned']
+elif start == 'corrected':
+    read_types = ['corrected.{}'.format(error_correction)]
 else:
     read_types = []
+if 'cleaned' in read_types and error_correction!='spades':
+    read_types.append('corrected.{}'.format(error_correction))
 
 ############
 # RULES
@@ -247,13 +254,37 @@ rule trim_bbduk_phix:
           interleaved overwrite {config[bbduk][phix_flags]} \
           ref={params.phiX_file} 2> {log}"
 
+rule bfc_error_correction:
+    """
+    Use BFC to correct errors
+    """
+    input:
+        "reads.cleaned.fastq.gz"
+    output:
+        "reads.corrected.bfc.fastq.gz"
+    benchmark:
+        "benchmarks/reads.kmer_trimmed.txt"
+    log:
+        "logs/reads.kmer_trimmed.log"
+    version:
+        get_version('bfc','-v')
+    threads:
+        int(config['bfc']['threads'])
+    shell:
+        "bfc -s {config[bfc][ram]} {config[bfc][params]} \
+          -t {threads} {input} 2> {log} \
+          | seqtk dropse - \
+          | gzip -c > {output}"
+
 rule run_spades:
     """
     $(CONTIGS_LOCAL): $(R1_FASTQ) $(R2_FASTQ) | $(OUTPUT_DIR)
         $(SPADES) -m $(SPADES_RAM) -o $(OUTPUT_DIR)/spades --pe1-1 $(R1_FASTQ) --   pe1-2 $(R2_FASTQ) --only-assembler --meta
     """
     input:
-        "reads.cleaned.fastq.gz"
+        "reads.corrected.{}.fastq.gz".format(error_correction) \
+            if error_correction!='spades' \
+            else "reads.cleaned.fastq.gz"
     output:
         "spades/contigs.fasta"
     log:
@@ -264,10 +295,11 @@ rule run_spades:
         ram_limit=config['spades']['ram'],
         kmers=config['spades']['kmers'],
         tmp_dir=tempfile.TemporaryDirectory( \
-                                suffix=None, \
-                                prefix=None, \
-                                dir=config['spades'].get('tmp_dir',".")),
-        continue_flags="--continue" if "continue_spades" in config else ""
+                                suffix='tmp', \
+                                prefix='spades', \
+                                dir=config['spades']['tmp_dir']),
+        continue_flags="--continue" if "continue_spades" in config else "",
+        skip_ec='--only-assembler' if error_correction!='spades' else ""
     benchmark:
         "benchmarks/spades.txt"
     version:
@@ -276,7 +308,8 @@ rule run_spades:
         """
         spades.py -m {params.ram_limit} -o spades -t {threads} \
                   -k {params.kmers} --tmp-dir {params.tmp_dir.name} \
-                  --pe1-12 {input} {params.continue_flags} --meta 
+                  --pe1-12 {input} \
+                  {params.continue_flags} {params.skip_ec} --meta 
         """
 
 rule contigs_fasta:
