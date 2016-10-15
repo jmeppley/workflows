@@ -23,6 +23,14 @@ clade_rank=config.get('clade_rank', 'order')
 # Defaults to 8 for eveerything
 default_threads=config.setdefault('threads',{}).get('default', 3)
 #
+# pull out taxdb (usually refseq) and list of gene family dbs
+gene_family_dbs = []
+for db in config['dbs']:
+    if config['dbs'][db].get('istaxdb',False):
+        taxdb=db
+    else:
+        gene_family_dbs.append(db)
+#
 snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
 mgorfs=snakefile_path + "/mgorfs.pl"
 #
@@ -67,8 +75,8 @@ def get_version(command, version_flag='--version',
         return out.strip()
     else:
         return regular_expression.search(out).group(1)
-#
-def get_hit_table_nane_from_widlcards_db(wildcards):
+
+def get_hit_table_name_from_wildcards_db(wildcards):
     """
     Return the hit table name based on the db name using the db config info
     """
@@ -76,20 +84,28 @@ def get_hit_table_nane_from_widlcards_db(wildcards):
     db_type=config['dbs'][db].get('type','hmmer')
     if db_type=='hmmer':
         if 'frags' in config['dbs'][db]:
-            return "read_genes.vs.{db}.tbl.dbatch"
+            template = "read_genes.vs.{db}.tbl.dbatch"
         else:
-            return "read_genes.vs.{db}.tbl".format(**wildcards)
+            template = "read_genes.vs.{db}.tbl"
     elif db_type=='lastdb':
-        return "read_genes.vs.{db}.lastp".format(**wildcards)
+        template = "read_genes.vs.{db}.lastp"
+    else:
+        # Don't know what to do:
+        raise Exception("Unknown database type for {}: {}".format(db,db_type))
 
-    # Don't know what to do:
-    raise Exception("Unknown database type for {}: {}".format(db,db_type)
-#
-def get_gene_family_db_list():
+    return template.format(**wildcards)
+
+def get_db_assignment_params(wildcards):
     """
-    Return list of configured DBs that are not RefSeq
+    return the params needed to turn hits from the given db (wildcards.db) into gene family assignments 
+    using the assign_paths.py script
     """
-    return [db for db in config['dbs'] if db.upper()!="REFSEQ"]
+    assign_type = config['dbs'][wildcards.db].get('assign_type','hitid').lower()
+    if assign_type=='kegg':
+        return '-p hitid -M kegg -m %s.kos' % (config['dbs'].get('KEGG',{'path':''})['path'])
+    if assign_type=='pfam':
+        return '-p pfam'
+    return '-p hitid'
 #
 # End functions
 ##########
@@ -101,8 +117,8 @@ def get_gene_family_db_list():
 #  After the "all" target, it is generally laid out start to finish
 rule all:
     input:
-        expand("reads.annotations.%s.{db}.txt" % (clade_rank), 
-                db=get_db_list()),
+        expand("reads.annotations.%s.{db}.tsv" % (clade_rank), 
+                db=gene_family_dbs),
         "reads.fasta.stats",
         #"read_genes.mga.faa.stats",
         "read_genes.prodigal.faa.stats"
@@ -116,9 +132,9 @@ rule extract_reads:
     output:
         "reads.fasta"
     benchmark:
-        "benchmarks/extract_reads"
+        "benchmarks/extract_reads.time"
     log:
-        "logs/extract_reads"
+        "logs/extract_reads.log"
     version:
         get_version('samtools', lines=[0,])
     shell:
@@ -149,7 +165,7 @@ rule prinseq_any:
         cat=lambda wildcards:"gunzip -c" \
          if re.search(r'\.gz$',wildcards.ext) else "cat"
     benchmark:
-        "benchmarks/prinseq_{file_root}_{ext}.txt"
+        "benchmarks/prinseq_{file_root}_{ext}.time"
     version:
         get_version('prinseq-lite.pl','-version')
     shell:
@@ -166,9 +182,9 @@ rule predict_genes_prodigal:
     output:
         faa="read_genes.prodigal.faa"
     log:
-        "logs/predict_genes_prodigal"
+        "logs/predict_genes_prodigal.log"
     benchmark:
-        "benchmarks/predict_genes_prodigal"
+        "benchmarks/predict_genes_prodigal.time"
     version:
         get_version('batch_launcher.py') + '::' + \
         get_version('prodigal','-v')
@@ -188,12 +204,12 @@ rule predict_genes_mga:
     output:
         faa="read_genes.mga.faa"
     benchmark:
-        "benchmarks/predict_genes_mga"
+        "benchmarks/predict_genes_mga.time"
     version:
         get_version('batch_launcher.py') + '::' + \
         "mga + mgorfs (unversioned)"
     log:
-        "logs/predict_genes_mga"
+        "logs/predict_genes_mga.log"
     threads:
         config['threads'].get('mgorfs',default_threads)
     shell:
@@ -209,9 +225,9 @@ rule hmmer_stmp:
     output:
         "read_genes.vs.{db}.tbl.stmp"
     benchmark:
-        "benchmarks/hmmer.{db}.stmp"
+        "benchmarks/hmmer.{db}.stmp.time"
     log:
-        "logs/hmmer.{db}.stmp"
+        "logs/hmmer.{db}.stmp.log"
     version:
         get_version('hmmsearch','-h',lines=[1,])
     threads:
@@ -236,15 +252,15 @@ rule hmmer_tmp:
     output:
         "read_genes.vs.{db}.tbl.tmp"
     benchmark:
-        "benchmarks/hmmer.{db}.tmp"
+        "benchmarks/hmmer.{db}.tmp.time"
     log:
-        "logs/hmmer.{db}.tmp"
+        "logs/hmmer.{db}.tmp.log"
     version:
         get_version('hmmsearch','-h',lines=[1,])
     threads:
         lambda wildcards: config['threads'].get(wildcards.db,default_threads)
     params:
-        db_path=lambda wildcards: config['dbs'][wildcards.db]['path']
+        db_path=lambda wildcards: config['dbs'][wildcards.db]['path'],
         tmp_dir=tempfile.TemporaryDirectory(suffix=None, prefix=None, dir='/tmp')
     shell:
         """
@@ -263,15 +279,15 @@ rule hmmer_dbfrag:
     output:
         "read_genes.vs.{db}.{N}.tbl.dfrag"
     benchmark:
-        "benchmarks/hmmer.{db}.{N}"
+        "benchmarks/hmmer.{db}.{N}.time"
     log:
-        "logs/hmmer.{db}.{N}"
+        "logs/hmmer.{db}.{N}.log"
     version:
         get_version('hmmsearch','-h',lines=[1,])
     threads:
         lambda wildcards: config['threads'].get(wildcards.db,default_threads)
     params:
-        db_path=lambda wildcards: config['db_frag_paths'][wildcards.db].format(N=int(wildcards.N))
+        db_path=lambda wildcards: config['dbs'][wildcards.db]['path'].format(N=int(wildcards.N))
     shell:
         "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
         {params.db_path} {input}"
@@ -286,9 +302,9 @@ rule hmmer_fragdb:
     output:
         "read_genes.vs.{db}.tbl.dbatch"
     benchmark:
-        "benchmarks/hmmer.{db}.dbatch"
+        "benchmarks/hmmer.{db}.dbatch.time"
     log:
-        "logs/hmmer.{db}.dbatch"
+        "logs/hmmer.{db}.dbatch.log"
     version:
         get_version('sort',lines=[1,])
     shell:
@@ -303,9 +319,9 @@ rule hmmer:
     output:
         "read_genes.vs.{db}.tbl"
     benchmark:
-        "benchmarks/hmmer.{db}"
+        "benchmarks/hmmer.{db}.time"
     log:
-        "logs/hmmer.{db}"
+        "logs/hmmer.{db}.log"
     version:
         get_version('hmmsearch','-h',lines=[1,])
     threads:
@@ -325,9 +341,9 @@ rule lastal:
     output:
         "read_genes.vs.{db}.lastp"
     benchmark:
-        "benchmarks/lastal.{db}"
+        "benchmarks/lastal.{db}.time"
     log:
-        "logs/lastal.{db}"
+        "logs/lastal.{db}.log"
     version:
         get_version('lastal')
     threads:
@@ -351,16 +367,16 @@ rule assign_taxa:
     Uses sed to change gene names back into read names before the assignment script sets to work.
     """
     input:
-        "read_genes.vs.REFSEQ.lastp"
+        "read_genes.vs.{}.lastp".format(taxdb)
     output:
-        "reads.annotations.taxon_rank.{rank}.txt"
+        "reads.annotations.taxon_rank.{rank}.tsv"
     benchmark:
-        "benchmarks/assign_taxa.{rank}"
+        "benchmarks/assign_taxa.{rank}.time"
     log:
-        "logs/assign_taxa.{rank}"
+        "logs/assign_taxa.{rank}.log"
     params:
-        taxdump=os.path.split(config['dbs']['REFSEQ']['path'])[0],
-        taxmap=config['dbs']['REFSEQ']['path'] + ".tax"
+        taxdump=os.path.split(config['dbs'][taxdb]['path'])[0],
+        taxmap=config['dbs'][taxdb]['path'] + ".tax"
     version:
         get_version('assign_taxa.py')
     shell:
@@ -381,20 +397,17 @@ rule assign_paths:
         # function that returns search result file name based on DB name
         get_hit_table_name_from_wildcards_db
     output:
-        "reads.annotations.gene_family.{db}.txt"
+        "reads.annotations.gene_family.{db}.tsv"
     benchmark:
-        "benchmarks/assign_paths.{db}"
+        "benchmarks/assign_paths.{db}.time"
     log:
-        "logs/assign_paths.{db}"
+        "logs/assign_paths.{db}.log"
     version:
         get_version('assign_paths.py')
     params:
-        format=lambda w: 'blast' if w.db=='KEGG' else 'hmmsearchdom',
+        format=lambda w: 'blast' if config['dbs'][w.db].get('type','hmm')=='lastdb' else 'hmmsearchdom',
         # KEGG and PFAM need special handling
-        params=lambda w: {'KEGG':'-p hitid -M kegg -m %s.kos' \
-                                  % (config['dbs'].get('KEGG',{'path':''})['path']),
-                          'PFAM':'-p pfam',
-                         }.get(w.db,'-p hitid')
+        params=get_db_assignment_params
     shell:
          "cat {input} \
          | {strip_gene_numbers_with_sed} \
@@ -409,11 +422,11 @@ rule compile_counts:
         rules.assign_taxa.output,
         rules.assign_paths.output
     output:
-        "reads.annotations.{rank}.{db}.txt"
+        "reads.annotations.{rank}.{db}.tsv"
     benchmark:
-        "benchmarks/compile_counts.{rank}.{db}"
+        "benchmarks/compile_counts.{rank}.{db}.time"
     log:
-        "logs/compile_counts.{rank}.{db}"
+        "logs/compile_counts.{rank}.{db}.log"
     version:
         get_version('compile_hit_counts.py')
     params:
