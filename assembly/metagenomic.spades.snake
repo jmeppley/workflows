@@ -37,7 +37,7 @@ error_correction = config.get('error_correction','spades').lower()
 # default configuration
 defaults={'spades':{'ram':255,
                     'threads':20,
-                    'tmp_dir':None,
+                    'tmp_dir':'.',
                     'kmers':'21,33,55,77,99,127'},
           'cmsearch':{'threads':8},
           'bbduk':{'ram':'1g',
