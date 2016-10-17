@@ -24,7 +24,7 @@ if 'bbmap' not in config['system_paths']:
              '-name "adapters.fa" | sed -r s#/resources/adapters.fa##'
         config['system_paths']['bbmap'] = subprocess.check_output(cmd,
                                                                   shell=True)\
-                                                    .decode()
+                                                    .decode().strip()
     except:
         print("Can't find bbmap resources, please set system_paths->bbmap in the snakemake config file")
 
@@ -37,7 +37,7 @@ error_correction = config.get('error_correction','spades').lower()
 # default configuration
 defaults={'spades':{'ram':255,
                     'threads':20,
-                    'tmp_dir':'.',
+                    'tmp_dir':None,
                     'kmers':'21,33,55,77,99,127'},
           'cmsearch':{'threads':8},
           'bbduk':{'ram':'1g',
