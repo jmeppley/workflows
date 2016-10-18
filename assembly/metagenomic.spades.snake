@@ -217,8 +217,7 @@ rule trim_bbduk_adapters:
         "logs/reads.noadapt.log"
     version:
         get_version('bbduk.sh',
-                    regular_expression=\
-                        re.compile(r'^(.+[Vv]ersion\s*[^\n\r]+)'))
+                    lines=[1,],)
     params:
         adapter_file=config['system_paths']['bbmap'] \
                         + "/resources/adapters.fa"
@@ -243,8 +242,7 @@ rule trim_bbduk_phix:
         "logs/reads.cleaned.log"
     version:
         get_version('bbduk.sh',
-                    regular_expression=\
-                        re.compile(r'^(.+[Vv]ersion\s*[^\n\r]+)'))
+                    lines=[1,],)
     params:
         phiX_file=config['system_paths']['bbmap'] \
                          + "/resources/phix174_ill.ref.fa.gz"
@@ -598,21 +596,50 @@ rule contig_stats_table:
     shell:
         "python {config[system_paths][pymg_dir]}/edl/assembly.py get_contig_stats {input} {output} txt_width=75 log=True"
 
+rule ssu_report:
+    """
+    Look at the rRNA annotations and get table of nearly full length SSUs
+    """
+    input:
+        "contigs.annotations.rRNA.gff",
+        "contigs.stats.txt"
+    output:
+        "contigs.annotations.rRNA.SSU.gt1200.tsv"
+    params:
+        length=1200
+    run:
+        with open(output[0],'w') as OUTF:
+            OUTF.write("contig\tcoverage\tstart\tend\n")
+
+            from edl.util import parseMapFile
+            coverage_map = parseMapFile(input[1], valueCol=4, skipFirst=1, valueType=float)
+
+            from edl import blastm8
+            rrna_annots=blastm8.M8Stream(input[0])
+            params=blastm8.FilterParams(format='gff',length=params.length,sortReads=True,sort='score',nonoverlapping=True)
+            ssu_RE = re.compile(r'SSU')
+            for read, hits in blastm8.filterM8Stream(rrna_annots,options=params,returnLines=False):
+                 for hit in hits:
+                     if ssu_RE.search(hit.hit_type) is not None and abs(hit.mlen)>1000:
+                        OUTF.write("{}\t{}\t{}\t{}\n".format(hit.read,coverage_map[hit.read],hit.qstart,hit.qend))
+            rrna_annots.close()
+
 rule final_report:
     input:
-        expand("{sample}/reads.raw.fastq.stats",sample=config['inputs'].keys()),
-        "contigs.fasta.stats",
-        "contigs.annotations.faa.stats",
-        expand("reads.{read_type}.fastq.gz.stats", 
+        raw_read_stats=expand("{sample}/reads.raw.fastq.stats",sample=config['inputs'].keys()),
+        read_stats=expand("reads.{read_type}.fastq.gz.stats", 
                read_type=read_types),
-        'contigs.fasta.histograms'
+        contig_stats="contigs.fasta.stats",
+        gene_stats="contigs.annotations.faa.stats",
+        ssu_rrnas="contigs.annotations.rRNA.SSU.gt1200.tsv",
+        histograms='contigs.fasta.histograms'
     output:
         "contigs.report"
     run:
         read_stats={}
 
         # paired reads
-        for i in input:
+        for i in input.raw_read_stats + input.read_stats:
             m = re.search(r'reads\.([a-z]+)\.fastq\.(?:gz.)?stats',i)
             if m is None:
                 continue
@@ -629,20 +656,27 @@ rule final_report:
 
         # contigs
         contig_stats={}
-        stats = parse_stats('contigs.fasta.stats')
+        stats = parse_stats(input.contig_stats)
         contig_stats['contigs']=stats['reads']
         contig_stats['contig bases']=stats['bases']
 
         # N##
-        stats=pandas.read_table('contigs.fasta.histograms',sep=':',index_col='key', names=('key','value'),nrows=8)
+        stats=pandas.read_table(input.histograms,sep=':',index_col='key', names=('key','value'),nrows=8)
         stats=stats.set_index(stats.index.str.strip())['value']
         contig_stats['N50']=int(stats['N50'])
         contig_stats['N75']=int(stats['N75'])
         contig_stats['N90']=int(stats['N90'])
 
         # annotations
-        stats = parse_stats('contigs.annotations.faa.stats')
+        stats = parse_stats(input.gene_stats)
         contig_stats['genes']=stats['reads']
+        
+        # full length SSUs
+        ssu_count=-1
+        with open(input.ssu_rrnas) as INF:
+            for line in INF:
+                ssu_count+=1
+        contig_stats['SSUs']=ssu_count
 
         report={"reads":read_stats,"assembly":contig_stats}
         with open(output[0],'w') as OUTF:
