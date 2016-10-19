@@ -1,9 +1,17 @@
-configfile: "annotation.yaml"
-import tempfile
 # Python makefile to pull out reads from a BAM alignment 
 #  and use RefSeq, KEGG, PFAM, and others to annotate them
 # Annotations are generated as tables of gene_family counts 
 #  groupbed by taxonomic clade
+configfile: "annotation.yaml"
+import tempfile
+import sys
+import os
+import re
+snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
+sys.path[0]=os.path.join(snakefile_path,'..','python')
+from common import get_version
+from annotate import get_db_assignment_params,
+                     get_hit_table_name_from_wildcards_db
 
 #########
 # CONFIGURATION
@@ -24,90 +32,11 @@ clade_rank=config.get('clade_rank', 'order')
 default_threads=config.setdefault('threads',{}).get('default', 3)
 #
 # pull out taxdb (usually refseq) and list of gene family dbs
-gene_family_dbs = []
-for db in config['dbs']:
-    if config['dbs'][db].get('istaxdb',False):
-        taxdb=db
-    else:
-        gene_family_dbs.append(db)
+gene_family_dbs, taxdb = get_db_types(config)
 #
-snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
 mgorfs=snakefile_path + "/mgorfs.pl"
 #
 # End configuration
-##########
-
-#######
-# Functions
-import subprocess, re
-def get_version(command, version_flag='--version', 
-                cmd_prefix='',
-                lines=None,
-                regular_expression=None):
-    """
-    Gets the version string from a command
-
-    cmd_prefix is useful if you need an interpreter (bash, python, etc)
-    
-    lines can be a line number (int), a slice object, or an iterable indicating which lines of the output to grab
-
-    if regular_expression given, the first captured group is returned.
-    """
-    out = subprocess.check_output(" ".join([cmd_prefix,
-                                            command,
-                                            version_flag,
-                                            "; exit 0"]),
-                                  stderr=subprocess.STDOUT,
-                                  shell=True).decode()
-
-    # select specific lines
-    if lines is not None:
-        out_lines = out.split("\n")
-        if isinstance(lines,slice):
-            out = "\n".join(out_lines[lines])
-        elif isinstance(lines, int):
-            out = out_lines[lines]
-        else:
-            out = "\n".join(out_lines[i] for i in lines)
-
-    # apply regular expression if given
-    if regular_expression is None:
-        return out.strip()
-    else:
-        return regular_expression.search(out).group(1)
-
-def get_hit_table_name_from_wildcards_db(wildcards):
-    """
-    Return the hit table name based on the db name using the db config info
-    """
-    db=wildcards.db
-    db_type=config['dbs'][db].get('type','hmmer')
-    if db_type=='hmmer':
-        if 'frags' in config['dbs'][db]:
-            template = "read_genes.vs.{db}.tbl.dbatch"
-        else:
-            template = "read_genes.vs.{db}.tbl"
-    elif db_type=='lastdb':
-        template = "read_genes.vs.{db}.lastp"
-    else:
-        # Don't know what to do:
-        raise Exception("Unknown database type for {}: {}".format(db,db_type))
-
-    return template.format(**wildcards)
-
-def get_db_assignment_params(wildcards):
-    """
-    return the params needed to turn hits from the given db (wildcards.db) into gene family assignments 
-    using the assign_paths.py script
-    """
-    assign_type = config['dbs'][wildcards.db].get('assign_type','hitid').lower()
-    if assign_type=='kegg':
-        return '-p hitid -M kegg -m %s.kos' % (config['dbs'].get('KEGG',{'path':''})['path'])
-    if assign_type=='pfam':
-        return '-p pfam'
-    return '-p hitid'
-#
-# End functions
 ##########
 
 
@@ -277,7 +206,7 @@ rule hmmer_dbfrag:
     input:
         rules.predict_genes_prodigal.output.faa
     output:
-        "read_genes.vs.{db}.{N}.tbl.dfrag"
+        temp("read_genes.vs.{db}.{N}.tbl.dfrag")
     benchmark:
         "benchmarks/hmmer.{db}.{N}.time"
     log:
