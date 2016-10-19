@@ -1,0 +1,113 @@
+
+rule uncompress_file:
+    input:
+        "{file_root}.gz"
+    output:
+        temp("{file_root,[^z]$}")
+    benchmark:
+        "benchmarks/{file_root}.gunzip.time"
+    version:
+        get_version('gunzip', lines=0)
+    shell:
+        "gunzip -c {input} > {output}"
+
+rule prinseq_any:
+    """ calculate basic stats for a fasta file """
+    input:
+        "{file_root}.{ext}"
+    output:
+        "{file_root}.{ext,f.+}.stats"
+    log:
+        lambda wildcards: "logs/{file_root}.{ext}.stats.log"\
+                            .format(file_root=re.sub(r'/','_',\
+                                                     wildcards.file_root),
+                                    ext=wildcards.ext)
+    params:
+        input_flag=lambda wildcards:"-fastq" \
+         if re.search(r'q',wildcards.ext) else "-fasta",
+        aa=lambda wildcards:"-aa" \
+         if re.search(r'\bfaa\b',wildcards.ext) else "",
+        cat=lambda wildcards:"gunzip -c" \
+         if re.search(r'\.gz$',wildcards.ext) else "cat"
+    benchmark:
+        "benchmarks/prinseq_{file_root}_{ext}.time"
+    version:
+        get_version('prinseq','-version')
+    shell:
+        "{params.cat} {input} | \
+        prinseq {params.input_flag} stdin \
+         -stats_len -stats_info {params.aa} > {output}"
+
+
+#######
+# map reads to contigs with BWA:
+#  4 rules
+
+rule index_contigs:
+    """ prepare contigs for mapping with BWA """
+    input:
+        "contigs.fasta"
+    output:
+        "mapping/contigs.index.bwa.bwt"
+    log:
+        "logs/bwa_index.log"
+    benchmark:
+        "benchmarks/bwa_pre_index.txt"
+    version:
+        get_version('bwa', 
+                    version_flag="", 
+                    regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
+    shell:
+        "bwa index -p mapping/contigs.index.bwa      {input} 2>&1 >  {log}"
+
+rule map_sample_reads:
+    """
+    map cleaned reads onto contigs
+    """
+    input:
+        "mapping/contigs.index.bwa.bwt",
+        lambda w: config['reads'][w.sample]
+    output:
+        temp("mapping/{sample}.reads.vs.contigs.sam")
+    log:
+        "logs/{sample}.vs.contigs.bwa_mem.log"
+    benchmark:
+        "benchmarks/{sample}.vs.contigs.bwa_mem.time"
+    version:
+        get_version('bwa', 
+                    version_flag="", 
+                    regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
+    threads:
+        20
+    shell:
+        "bwa mem -t {threads} mapping/contigs.index.bwa {input[1]} 2> {log}  > {output}"
+
+
+rule sam_to_bam:
+    input:
+        "{root}.sam"
+    output:
+        "{root}.bam"
+    benchmark:
+        "benchmarks/{root}.bwa_sam_bam.time"
+    threads:
+        8
+    version:
+        get_version('samtools', lines=0)
+    shell:
+        "samtools view -b {input} \
+        | samtools sort -l 5 -@ {threads} -m 10G - \
+        > {output}"
+
+rule index_bam:
+    input:
+        "{root}.bam"
+    output:
+        "{root}.bam.bai"
+    benchmark:
+        "benchmarks/{root}.bwa_index_bam.txt"
+    version:
+        get_version('samtools', lines=0)
+    shell:
+        "samtools index {input}"
+
