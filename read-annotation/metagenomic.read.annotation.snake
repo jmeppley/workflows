@@ -10,7 +10,7 @@ import re
 snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
 sys.path[0]=os.path.join(snakefile_path,'..','python')
 from common import get_version
-from annotate import get_db_assignment_params,
+from annotate import get_db_assignment_params,get_db_types,\
                      get_hit_table_name_from_wildcards_db
 
 #########
@@ -324,7 +324,7 @@ rule assign_paths:
     input:
         #"read_genes.vs.{db}.tbl"
         # function that returns search result file name based on DB name
-        get_hit_table_name_from_wildcards_db
+        lambda w: get_hit_table_name_from_wildcards_db(w, config, name_root='read_genes')
     output:
         "reads.annotations.gene_family.{db}.tsv"
     benchmark:
@@ -336,7 +336,7 @@ rule assign_paths:
     params:
         format=lambda w: 'blast' if config['dbs'][w.db].get('type','hmm')=='lastdb' else 'hmmsearchdom',
         # KEGG and PFAM need special handling
-        params=get_db_assignment_params
+        params=lambda w: get_db_assignment_params(w, config)
     shell:
          "cat {input} \
          | {strip_gene_numbers_with_sed} \

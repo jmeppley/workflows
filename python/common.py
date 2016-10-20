@@ -1,16 +1,6 @@
 import subprocess
 
 
-def get_db_types(config):
-    gene_family_dbs = []
-    for db in config['dbs']:
-        if config['dbs'][db].get('istaxdb',False):
-            taxdb=db
-    else:
-        gene_family_dbs.append(db)
-    return (gene_family_dbs, taxdb)
-
-
 def get_version(command, version_flag='--version', 
                 cmd_prefix='',
                 lines=None,

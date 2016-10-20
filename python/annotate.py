@@ -3,6 +3,16 @@ Functions for the annotation workflows
 """
 
 
+def get_db_types(config):
+    gene_family_dbs = []
+    for db in config['dbs']:
+        if config['dbs'][db].get('istaxdb',False):
+            taxdb=db
+    else:
+        gene_family_dbs.append(db)
+    return (gene_family_dbs, taxdb)
+
+
 def get_hit_table_name_from_wildcards_db(wildcards, config, name_root='genes'):
     """
     Return the hit table name based on the db name using the db config info
