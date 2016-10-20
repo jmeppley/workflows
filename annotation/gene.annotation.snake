@@ -1,5 +1,12 @@
 configfile: "annotation.yaml"
-import tempfile
+import sys
+import os
+snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
+sys.path[0]=os.path.join(snakefile_path,'..','python')
+from common import get_version
+from annotate import get_db_assignment_params,get_db_types,\
+                     get_hit_table_name_from_wildcards_db
+
 # Python makefile to assign gene families and taxonomic ranks to
 # genes in an faa file using RefSeq, KEGG, PFAM and others.
 # Annotations are generated as tables of gene_family counts 
@@ -8,11 +15,13 @@ import tempfile
 #########
 # CONFIGURATION
 #
-# starting file
-genes_faa=config.get("genes_faa", 'genes.faa')
+# naming roots
+# source file is genes.faa and hit tables are genes.vs.XXX.ext
+config.setdefault('hit_table_prefix',"genes")
+config.setdefault('annotation_prefix',config['hit_table_prefix'])
 #
 # rank to collect taxa on (defaults to order)
-clade_rank=config.get('clade_rank', 'order')
+config.setdefault('clade_rank', 'order')
 #
 # threads per search are set in the threads: parameter
 # Either use the db name or "default". EG:
@@ -23,89 +32,13 @@ clade_rank=config.get('clade_rank', 'order')
 default_threads=config.setdefault('threads',{}).get('default', 3)
 #
 # pull out taxdb (usually refseq) and list of gene family dbs
-gene_family_dbs = []
-for db in config['dbs']:
-    if config['dbs'][db].get('istaxdb',False):
-        taxdb=db
-    else:
-        gene_family_dbs.append(db)
+gene_family_dbs, config['taxdb'] = get_db_types(config)
 #
 # End configuration
 ##########
 
-#######
-# Functions
-import subprocess, re
-def get_version(command, version_flag='--version', 
-                cmd_prefix='',
-                lines=None,
-                regular_expression=None):
-    """
-    Gets the version string from a command
-
-    cmd_prefix is useful if you need an interpreter (bash, python, etc)
-    
-    lines can be a line number (int), a slice object, or an iterable indicating which lines of the output to grab
-
-    if regular_expression given, the first captured group is returned.
-    """
-    out = subprocess.check_output(" ".join([cmd_prefix,
-                                            command,
-                                            version_flag,
-                                            "; exit 0"]),
-                                  stderr=subprocess.STDOUT,
-                                  shell=True).decode()
-
-    # select specific lines
-    if lines is not None:
-        out_lines = out.split("\n")
-        if isinstance(lines,slice):
-            out = "\n".join(out_lines[lines])
-        elif isinstance(lines, int):
-            out = out_lines[lines]
-        else:
-            out = "\n".join(out_lines[i] for i in lines)
-
-    # apply regular expression if given
-    if regular_expression is None:
-        return out.strip()
-    else:
-        return regular_expression.search(out).group(1)
-
-def get_hit_table_name_from_wildcards_db(wildcards):
-    """
-    Return the hit table name based on the db name using the db config info
-    """
-    db=wildcards.db
-    db_type=config['dbs'][db].get('type','hmmer')
-    if db_type=='hmmer':
-        if 'frags' in config['dbs'][db]:
-            template = "genes.vs.{db}.tbl.dbatch"
-        else:
-            template = "genes.vs.{db}.tbl"
-    elif db_type=='lastdb':
-        template = "genes.vs.{db}.lastp"
-    else:
-        # Don't know what to do:
-        raise Exception("Unknown database type for {}: {}".format(db,db_type))
-
-    return template.format(**wildcards)
-
-def get_db_assignment_params(wildcards):
-    """
-    return the params needed to turn hits from the given db (wildcards.db) into gene family assignments 
-    using the assign_paths.py script
-    """
-    assign_type = config['dbs'][wildcards.db].get('assign_type','hitid').lower()
-    if assign_type=='kegg':
-        return '-p hitid -M kegg -m %s.kos' % (config['dbs'].get('KEGG',{'path':''})['path'])
-    if assign_type=='pfam':
-        return '-p pfam'
-    return '-p hitid'
-
-#
-# End functions
-##########
+include: "../common/common.snake"
+include: "./common.snake"
 
 ##########
 # RULES:
@@ -115,184 +48,12 @@ localrules: all, clean
 
 rule all:
     input:
-        expand("genes.annotations.%s.{db}.txt" % (clade_rank),
+        expand("{annotation_prefix}.annotation.{clade_rank}.{{db}}.tsv".format(**config),
                 db=gene_family_dbs),
-        "{genes_faa}.stats".format(genes_faa=genes_faa)
-
-rule prinseq_any:
-    """ calculate basic stats for a fasta file """
-    input:
-        "{file_root}.{ext}"
-    output:
-        "{file_root}.{ext,f.+}.stats"
-    log:
-        lambda wildcards: "logs/{file_root}.{ext}.stats.log"\
-                            .format(file_root=re.sub(r'/','_',\
-                                                     wildcards.file_root),
-                                    ext=wildcards.ext)
-    params:
-        input_flag=lambda wildcards:"-fastq" \
-         if re.search(r'q',wildcards.ext) else "-fasta",
-        aa=lambda wildcards:"-aa" \
-         if re.search(r'\bfaa\b',wildcards.ext) else "",
-        cat=lambda wildcards:"gunzip -c" \
-         if re.search(r'\.gz$',wildcards.ext) else "cat"
-    benchmark:
-        "benchmarks/prinseq_{file_root}_{ext}.txt"
-    version:
-        get_version('prinseq-lite.pl','-version')
-    shell:
-        "{params.cat} {input} | \
-        prinseq-lite.pl {params.input_flag} stdin \
-         -stats_len -stats_info {params.aa} > {output}"
-
-rule hmmer_dbfrag:
-    """
-    Look for profile matches in the Nth fragment of a DB
-    """
-    input:
-        genes_faa
-    output:
-        temp("genes.vs.{db}.{N}.tbl.dfrag")
-    benchmark:
-        "benchmarks/hmmer.{db}.{N}.time"
-    log:
-        "logs/hmmer.{db}.{N}.log"
-    version:
-        get_version('hmmsearch','-h',lines=[1,])
-    threads:
-        lambda wildcards: config['threads'].get('hmmer',default_threads)
-    params:
-        db_path=lambda wildcards: config['dbs'][wildcards.db]['path'].format(N=int(wildcards.N))
-    shell:
-        "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
-        {params.db_path} {input}"
-
-rule hmmer_fragdb:
-    """
-    Look for profile matches in N fragments of a larger db. This rule just merges the N outputs of hmmer_dbfrag.
-    """
-    input:
-        lambda w: expand("genes.vs.{db}.{{N}}.tbl.dfrag".format(db=w.db), 
-                         N=range(1,1+config['dbs'][w.db]['frags']))
-    output:
-        "genes.vs.{db}.tbl.dbatch"
-    benchmark:
-        "benchmarks/hmmer.{db}.dbatch.time"
-    log:
-        "logs/hmmer.{db}.dbatch.log"
-    version:
-        get_version('sort',lines=[1,])
-    shell:
-        "cat {input} | grep -v '^#' | sort -k 1,1 > {output}"
-
-rule hmmer:
-    """
-    Look for profile matches
-    """
-    input:
-        genes_faa
-    output:
-        "genes.vs.{db}.tbl"
-    benchmark:
-        "benchmarks/hmmer.{db}.time"
-    log:
-        "logs/hmmer.{db}.log"
-    version:
-        get_version('hmmsearch','-h',lines=[1,])
-    threads:
-        lambda wildcards: config['threads'].get('hmmer',default_threads)
-    params:
-        db_path=lambda wildcards: config['dbs'][wildcards.db]['path']
-    shell:
-        "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
-        {params.db_path} {input}"
-
-rule lastal:
-    """
-    Look for matches in RefSeq for predicted genes
-    """
-    input:
-        genes_faa
-    output:
-        "genes.vs.{db}.lastp"
-    benchmark:
-        "benchmarks/lastal.{db}.time"
-    log:
-        "logs/lastal.{db}.log"
-    version:
-        get_version('lastal')
-    threads:
-        lambda wildcards: config['threads'].get('lastal',default_threads)
-    params:
-        db_path=lambda wildcards: config['dbs'][wildcards.db]['path']
-    shell:
-        "lastal -P {threads} -f BlastTab -b 1 -x 15 -y 7 -z 25 \
-         {params.db_path} {input} > {output}"
-
-rule assign_taxa:
-    """
-    Turn a hit table of genes vs RefSeq into a table of gene taxon assignments
-    """
-    input:
-        "genes.vs.{}.lastp".format(taxdb)
-    output:
-        "genes.annotations.taxon_rank.{rank}.txt"
-    benchmark:
-        "benchmarks/assign_taxa.{rank}"
-    log:
-        "logs/assign_taxa.{rank}"
-    params:
-        taxdump=os.path.split(config['dbs'][taxdb]['path'])[0],
-        taxmap=config['dbs'][taxdb]['path'] + ".tax"
-    shell:
-         " assign_taxa.py {input} -o {output} -r {wildcards.rank} \
-            -f blast -F 0 -C first -p accs \
-            -n {params.taxdump} -m {params.taxmap}"
-
-rule assign_paths:
-    """
-    Turn a hit table (from hmmer or lastal) into a one-to-many map from genes to gene families.
-    """
-    input:
-        get_hit_table_name_from_wildcards_db
-    output:
-        "genes.annotations.gene_family.{db}.txt"
-    benchmark:
-        "benchmarks/assign_paths.{db}"
-    log:
-        "logs/assign_paths.{db}"
-    version:
-        get_version('assign_paths.py')
-    params:
-        format=lambda w: 'blast' if config['dbs'][w.db].get('type','hmm')=='lastdb' else 'hmmsearchdom',
-        params=get_db_assignment_params
-    shell:
-         " assign_paths.py {input} -o {output} -C first -f {params.format} \
-         {params.params} "
-
-rule compile_counts:
-    """
-    Use clade assignments and gene family assignments to compile a table of gene family counts by clade.
-    """
-    input:
-        rules.assign_taxa.output,
-        rules.assign_paths.output
-    output:
-        "genes.annotations.{rank}.{db}.txt"
-    benchmark:
-        "benchmarks/compile_counts.{rank}.{db}"
-    log:
-        "logs/compile_counts.{rank}.{db}"
-    version:
-        get_version('compile_hit_counts.py')
-    params:
-        three_column_opt="-L" if config.get('output_style','default').lower() == 'long' else ""
-    shell:
-        "compile_hit_counts.py {params.three_column_opt} -1 {input[0]} -2 {input[1]} -o {output} -S"
+        "{hit_table_prefix}.faa.stats".format(**config)
 
 rule clean:
     """ remove all generated files """
     shell:
-        "rm -rf logs benchmarks genes.annotations.* genes.vs.*"
+        "rm -rf logs benchmarks {annotation_prefix}.annotation.* {hit_table_prefix}.*".format(**config)
 

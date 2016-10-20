@@ -9,7 +9,8 @@ sys.path[0]=os.path.join(snakefile_path,'..','python')
 from common import get_version
 configfile: "./pooled_assembly.yaml"
 
-include: "common.snake"
+include: "../common/common.snake"
+include: "../common/mapping_bwa.snake"
 
 ####
 # Required conda packages:

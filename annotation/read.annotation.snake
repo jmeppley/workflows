@@ -3,10 +3,8 @@
 # Annotations are generated as tables of gene_family counts 
 #  groupbed by taxonomic clade
 configfile: "annotation.yaml"
-import tempfile
 import sys
 import os
-import re
 snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
 sys.path[0]=os.path.join(snakefile_path,'..','python')
 from common import get_version
@@ -19,8 +17,13 @@ from annotate import get_db_assignment_params,get_db_types,\
 # bam file to start from
 bam_file_with_reads=config.get('bam_file','reads.vs.contigs.bam')
 #
+# naming roots
+# source file is genes.faa and hit tables are genes.vs.XXX.ext
+config.setdefault('hit_table_prefix',"reads.genes")
+config.setdefault('annotation_prefix','reads')
+#
 # rank to collect taxa on (defaults to order)
-clade_rank=config.get('clade_rank', 'order')
+config.setdefault('clade_rank', 'order')
 #
 # threads per search are set in the threads: parameter
 # Either use the db name or "default". EG:
@@ -32,13 +35,19 @@ clade_rank=config.get('clade_rank', 'order')
 default_threads=config.setdefault('threads',{}).get('default', 3)
 #
 # pull out taxdb (usually refseq) and list of gene family dbs
-gene_family_dbs, taxdb = get_db_types(config)
+gene_family_dbs, config['taxdb'] = get_db_types(config)
 #
 mgorfs=snakefile_path + "/mgorfs.pl"
+#
+# filter for assigment (so we count reads instead of genes)
+config['hit_table_filter']="sed -r 's/^(S+)_\d+(\s+#)/\1\2/'"
+#
 #
 # End configuration
 ##########
 
+include: "../common/common.snake"
+include: "./common.snake"
 
 ##########
 # RULES:
@@ -46,11 +55,11 @@ mgorfs=snakefile_path + "/mgorfs.pl"
 #  After the "all" target, it is generally laid out start to finish
 rule all:
     input:
-        expand("reads.annotations.%s.{db}.tsv" % (clade_rank), 
+        expand("{annotation_prefix}.annotation.{clade_rank}.{{db}}.tsv".format(**config), 
                 db=gene_family_dbs),
         "reads.fasta.stats",
         #"read_genes.mga.faa.stats",
-        "read_genes.prodigal.faa.stats"
+        "{hit_table_prefix}.faa.stats".format(**config)
 
 rule extract_reads:
     """
@@ -69,39 +78,6 @@ rule extract_reads:
     shell:
         "samtools fasta -0 {output} {input} > {log} 2>&1"
 
-rule prinseq_any:
-    """
-    calculate basic stats for a fasta or fastq file, gzipped or not 
-    """
-    input:
-        "{file_root}.{ext}"
-    output:
-        "{file_root}.{ext,f.+}.stats"
-    log:
-        # complicated lmbda to handle different input types
-        lambda wildcards: "logs/{file_root}.{ext}.stats.log"\
-                            .format(file_root=re.sub(r'/','_',\
-                                                     wildcards.file_root),
-                                    ext=wildcards.ext)
-    params:
-        # use "ext" wildcard to set sequence format (fasta or fastq)
-        input_flag=lambda wildcards:"-fastq" \
-         if re.search(r'q',wildcards.ext) else "-fasta",
-        # use -aa for .faa or .faa.gz files
-        aa=lambda wildcards:"-aa" \
-         if re.search(r'\bfaa\b',wildcards.ext) else "",
-        # uncompress ".gz" files
-        cat=lambda wildcards:"gunzip -c" \
-         if re.search(r'\.gz$',wildcards.ext) else "cat"
-    benchmark:
-        "benchmarks/prinseq_{file_root}_{ext}.time"
-    version:
-        get_version('prinseq-lite.pl','-version')
-    shell:
-        "{params.cat} {input} | \
-        prinseq-lite.pl {params.input_flag} stdin \
-         -stats_len -stats_info {params.aa} > {output}"
-
 rule predict_genes_prodigal:
     """
     Generate FAA (fasta of amino acid sequences) for genes predicted in reads
@@ -109,7 +85,7 @@ rule predict_genes_prodigal:
     input:
         "reads.fasta"
     output:
-        faa="read_genes.prodigal.faa"
+        faa="{hit_table_prefix}.faa".format(**config)
     log:
         "logs/predict_genes_prodigal.log"
     benchmark:
@@ -124,247 +100,8 @@ rule predict_genes_prodigal:
         "batch_launcher.py -N {threads} -i -i -o -a -T fasta -X local -v -- \
          prodigal -i {input} -a {output} -p meta -q -o /dev/null > {log} 2>&1 "
 
-rule predict_genes_mga:
-    """
-    Generate FAA (fasta of amino acid sequences) for genes predicted in reads
-    """
-    input:
-        "reads.fasta"
-    output:
-        faa="read_genes.mga.faa"
-    benchmark:
-        "benchmarks/predict_genes_mga.time"
-    version:
-        get_version('batch_launcher.py') + '::' + \
-        "mga + mgorfs (unversioned)"
-    log:
-        "logs/predict_genes_mga.log"
-    threads:
-        config['threads'].get('mgorfs',default_threads)
-    shell:
-        "batch_launcher.py -N {threads} -i -i -o -A -T fasta -X local -v -- \
-         {mgorfs} -i {input} -A {output}"
-
-rule hmmer_stmp:
-    """
-    Look for profile matches, but copy everything to /tmp first
-    """
-    input:
-        rules.predict_genes_prodigal.output.faa
-    output:
-        "read_genes.vs.{db}.tbl.stmp"
-    benchmark:
-        "benchmarks/hmmer.{db}.stmp.time"
-    log:
-        "logs/hmmer.{db}.stmp.log"
-    version:
-        get_version('hmmsearch','-h',lines=[1,])
-    threads:
-        lambda wildcards: config['threads'].get('hmmer',default_threads)
-    params:
-        db_path=lambda wildcards: config['dbs'][wildcards.db]['path'],
-        tmp_dir=tempfile.TemporaryDirectory(suffix=None, prefix=None, dir='/mnt/stmp')
-    shell:
-        """
-        for F in {params.db_path}.*; do cp $F {params.tmp_dir.name}/hmm.${{F##*.}}; done
-        cp {input} {params.tmp_dir.name}/input
-        hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
-        {params.tmp_dir.name}/hmm {params.tmp_dir.name}/input
-        """
-
-rule hmmer_tmp:
-    """
-    Look for profile matches, but copy everything to /tmp first
-    """
-    input:
-        rules.predict_genes_prodigal.output.faa
-    output:
-        "read_genes.vs.{db}.tbl.tmp"
-    benchmark:
-        "benchmarks/hmmer.{db}.tmp.time"
-    log:
-        "logs/hmmer.{db}.tmp.log"
-    version:
-        get_version('hmmsearch','-h',lines=[1,])
-    threads:
-        lambda wildcards: config['threads'].get('hmmer',default_threads)
-    params:
-        db_path=lambda wildcards: config['dbs'][wildcards.db]['path'],
-        tmp_dir=tempfile.TemporaryDirectory(suffix=None, prefix=None, dir='/tmp')
-    shell:
-        """
-        for F in {params.db_path}.*; do cp $F {params.tmp_dir.name}/hmm.${{F##*.}}; done
-        cp {input} {params.tmp_dir.name}/input
-        hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
-        {params.tmp_dir.name}/hmm {params.tmp_dir.name}/input
-        """
-
-rule hmmer_dbfrag:
-    """
-    Look for profile matches in the Nth fragment of a DB
-    """
-    input:
-        rules.predict_genes_prodigal.output.faa
-    output:
-        temp("read_genes.vs.{db}.{N}.tbl.dfrag")
-    benchmark:
-        "benchmarks/hmmer.{db}.{N}.time"
-    log:
-        "logs/hmmer.{db}.{N}.log"
-    version:
-        get_version('hmmsearch','-h',lines=[1,])
-    threads:
-        lambda wildcards: config['threads'].get('hmmer',default_threads)
-    params:
-        db_path=lambda wildcards: config['dbs'][wildcards.db]['path'].format(N=int(wildcards.N))
-    shell:
-        "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
-        {params.db_path} {input}"
-
-rule hmmer_fragdb:
-    """
-    Look for profile matches in N fragments of a larger db. This rule just merges the N outputs of hmmer_dbfrag.
-    """
-    input:
-        lambda w: expand("read_genes.vs.{db}.{{N}}.tbl.dfrag".format(db=w.db), 
-                         N=range(1,1+config['dbs'][w.db]['frags']))
-    output:
-        "read_genes.vs.{db}.tbl.dbatch"
-    benchmark:
-        "benchmarks/hmmer.{db}.dbatch.time"
-    log:
-        "logs/hmmer.{db}.dbatch.log"
-    version:
-        get_version('sort',lines=[1,])
-    shell:
-        "cat {input} | grep -v '^#' | sort -k 1,1 > {output}"
-
-rule hmmer:
-    """
-    Look for profile matches
-    """
-    input:
-        rules.predict_genes_prodigal.output.faa
-    output:
-        "read_genes.vs.{db}.tbl"
-    benchmark:
-        "benchmarks/hmmer.{db}.time"
-    log:
-        "logs/hmmer.{db}.log"
-    version:
-        get_version('hmmsearch','-h',lines=[1,])
-    threads:
-        lambda wildcards: config['threads'].get('hmmer',default_threads)
-    params:
-        db_path=lambda wildcards: config['dbs'][wildcards.db]['path']
-    shell:
-        "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
-        {params.db_path} {input}"
-
-rule lastal:
-    """
-    Look for matches in RefSeq for predicted genes
-    """
-    input:
-        rules.predict_genes_prodigal.output.faa
-    output:
-        "read_genes.vs.{db}.lastp"
-    benchmark:
-        "benchmarks/lastal.{db}.time"
-    log:
-        "logs/lastal.{db}.log"
-    version:
-        get_version('lastal')
-    threads:
-        lambda wildcards: config['threads'].get('lastal',default_threads)
-    params:
-        db_path=lambda wildcards: config['dbs'][wildcards.db]['path']
-    shell:
-        "lastal -P {threads} -f BlastTab -b 1 -x 15 -y 7 -z 25 \
-         {params.db_path} {input} > {output}"
-
-# remove gene suffixes, so we are counting reads
-# for prodigal
-strip_gene_numbers_with_sed="sed -r 's/^(S+)_\d+(\s+#)/\1\2/'"
-# for mga/mgorfs
-#strip_gene_numbers_with_sed="sed -r 's/^(S+)_GENE_\d+\b/\1/'"
-
-rule assign_taxa:
-    """
-    Turn a hit table of predicted genes vs RefSeq into a table of reads
-
-    Uses sed to change gene names back into read names before the assignment script sets to work.
-    """
-    input:
-        "read_genes.vs.{}.lastp".format(taxdb)
-    output:
-        "reads.annotations.taxon_rank.{rank}.tsv"
-    benchmark:
-        "benchmarks/assign_taxa.{rank}.time"
-    log:
-        "logs/assign_taxa.{rank}.log"
-    params:
-        taxdump=os.path.split(config['dbs'][taxdb]['path'])[0],
-        taxmap=config['dbs'][taxdb]['path'] + ".tax"
-    version:
-        get_version('assign_taxa.py')
-    shell:
-         "cat {input} \
-         | {strip_gene_numbers_with_sed} \
-         | assign_taxa.py -o {output} -r {wildcards.rank} \
-            -f blast -F 0 -C first -p accs \
-            -n {params.taxdump} -m {params.taxmap}"
-
-rule assign_paths:
-    """
-    Turn a hit table (from hmmer or lastal) into a one-to-many map from reads to gene families.
-
-    Uses sed to change gene names back into read names before the assignment script sets to work.
-    """
-    input:
-        #"read_genes.vs.{db}.tbl"
-        # function that returns search result file name based on DB name
-        lambda w: get_hit_table_name_from_wildcards_db(w, config, name_root='read_genes')
-    output:
-        "reads.annotations.gene_family.{db}.tsv"
-    benchmark:
-        "benchmarks/assign_paths.{db}.time"
-    log:
-        "logs/assign_paths.{db}.log"
-    version:
-        get_version('assign_paths.py')
-    params:
-        format=lambda w: 'blast' if config['dbs'][w.db].get('type','hmm')=='lastdb' else 'hmmsearchdom',
-        # KEGG and PFAM need special handling
-        params=lambda w: get_db_assignment_params(w, config)
-    shell:
-         "cat {input} \
-         | {strip_gene_numbers_with_sed} \
-         | assign_paths.py -o {output} -C first -f {params.format} {params.params} \
-         "
-
-rule compile_counts:
-    """
-    Use clade assignments and gene family assignments to compile a table of gene family counts by clade.
-    """
-    input:
-        rules.assign_taxa.output,
-        rules.assign_paths.output
-    output:
-        "reads.annotations.{rank}.{db}.tsv"
-    benchmark:
-        "benchmarks/compile_counts.{rank}.{db}.time"
-    log:
-        "logs/compile_counts.{rank}.{db}.log"
-    version:
-        get_version('compile_hit_counts.py')
-    params:
-        three_column_opt="-L" if config.get('output_style','default').lower() == 'long' else ""
-    shell:
-        "compile_hit_counts.py {params.three_column_opt} -1 {input[0]} -2 {input[1]} -o {output} -S "
-
 rule clean:
     """ remove all generated files """
     shell:
-        "rm -rf logs benchmarks spades reads.fasta reads.annotations.* read_genes.*"
+        "rm -rf logs benchmarks reads.fasta {annotation_prefix}.annotation.* {hit_table_prefix}.*".format(**config)
 

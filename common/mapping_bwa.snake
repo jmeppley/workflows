@@ -1,0 +1,73 @@
+
+#######
+# map reads to contigs with BWA:
+#  4 rules
+
+rule index_contigs:
+    """ prepare contigs for mapping with BWA """
+    input:
+        "contigs.fasta"
+    output:
+        "mapping/contigs.index.bwa.bwt"
+    log:
+        "logs/bwa_index.log"
+    benchmark:
+        "benchmarks/bwa_pre_index.txt"
+    version:
+        get_version('bwa', 
+                    version_flag="", 
+                    regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
+    shell:
+        "bwa index -p mapping/contigs.index.bwa      {input} 2>&1 >  {log}"
+
+rule map_sample_reads:
+    """
+    map cleaned reads onto contigs
+    """
+    input:
+        "mapping/contigs.index.bwa.bwt",
+        lambda w: config['reads'][w.sample]
+    output:
+        temp("mapping/{sample}.reads.vs.contigs.sam")
+    log:
+        "logs/{sample}.vs.contigs.bwa_mem.log"
+    benchmark:
+        "benchmarks/{sample}.vs.contigs.bwa_mem.time"
+    version:
+        get_version('bwa', 
+                    version_flag="", 
+                    regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
+    threads:
+        20
+    shell:
+        "bwa mem -t {threads} mapping/contigs.index.bwa {input[1]} 2> {log}  > {output}"
+
+
+rule sam_to_bam:
+    input:
+        "{root}.sam"
+    output:
+        "{root}.bam"
+    benchmark:
+        "benchmarks/{root}.bwa_sam_bam.time"
+    threads:
+        8
+    version:
+        get_version('samtools', lines=0)
+    shell:
+        "samtools view -b {input} \
+        | samtools sort -l 5 -@ {threads} -m 10G - \
+        > {output}"
+
+rule index_bam:
+    input:
+        "{root}.bam"
+    output:
+        "{root}.bam.bai"
+    benchmark:
+        "benchmarks/{root}.bwa_index_bam.txt"
+    version:
+        get_version('samtools', lines=0)
+    shell:
+        "samtools index {input}"
+

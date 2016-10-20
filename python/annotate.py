@@ -10,10 +10,14 @@ def get_db_types(config):
             taxdb=db
     else:
         gene_family_dbs.append(db)
-    return (gene_family_dbs, taxdb)
+    try:
+        return (gene_family_dbs, taxdb)
+    except NameError:
+        raise Exception("No taxonomic db found. One of your configured annotation"
+                        " databases must have 'istaxdb' set to True!")
 
 
-def get_hit_table_name_from_wildcards_db(wildcards, config, name_root='genes'):
+def get_hit_table_name_from_wildcards_db(wildcards, config):
     """
     Return the hit table name based on the db name using the db config info
     """
@@ -30,6 +34,8 @@ def get_hit_table_name_from_wildcards_db(wildcards, config, name_root='genes'):
         # Don't know what to do:
         raise Exception("Unknown database type for {}: {}".format(db,db_type))
 
+    name_root=config['hit_table_prefix']
+    print(template)
     return template.format(name_root=name_root, **wildcards)
 
 

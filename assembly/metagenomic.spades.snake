@@ -1,7 +1,9 @@
 import os, re, sys, glob, yaml, pandas, subprocess, tempfile
 from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
 configfile: "./assembly.yaml"
-include: "common.snake"
+
+include: "../common/common.snake"
+include: "../common/mapping_bwa.snake"
 
 ####
 # Required conda packages:

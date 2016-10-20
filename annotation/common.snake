@@ -1,0 +1,160 @@
+
+rule hmmer_dbfrag:
+    """
+    Look for profile matches in the Nth fragment of a DB
+    """
+    input:
+        "{file_root}.faa"
+    output:
+        temp("{file_root}.vs.{db}.{N}.tbl.dfrag")
+    benchmark:
+        "benchmarks/hmmer.{file_root}.vs.{db}.{N}.time"
+    log:
+        "logs/hmmer.{file_root}.vs.{db}.{N}.log"
+    version:
+        get_version('hmmsearch','-h',lines=[1,])
+    threads:
+        lambda wildcards: config['threads'].get('hmmer',default_threads)
+    params:
+        db_path=lambda wildcards: config['dbs'][wildcards.db]['path'].format(N=int(wildcards.N))
+    shell:
+        "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
+        {params.db_path} {input}"
+
+rule hmmer_fragdb:
+    """
+    Look for profile matches in N fragments of a larger db. This rule just merges the N outputs of hmmer_dbfrag.
+    """
+    input:
+        lambda w: expand("{file_root}.vs.{db}.{{N}}.tbl.dfrag".format(db=w.db,
+                                                                      file_root=w.file_root), 
+                         N=range(1,1+config['dbs'][w.db]['frags']))
+    output:
+        "{file_root}.vs.{db}.tbl.dbatch"
+    benchmark:
+        "benchmarks/hmmer.{file_root}.vs.{db}.dbatch.time"
+    log:
+        "logs/hmmer.{file_root}.vs.{db}.dbatch.log"
+    version:
+        get_version('sort',lines=[1,])
+    shell:
+        "cat {input} | grep -v '^#' | sort -k 1,1 > {output}"
+
+rule hmmer:
+    """
+    Look for profile matches
+    """
+    input:
+        "{file_root}.faa"
+    output:
+        "{file_root}.vs.{db}.tbl"
+    benchmark:
+        "benchmarks/hmmer.{file_root}.vs.{db}.time"
+    log:
+        "logs/hmmer.{file_root}.vs.{db}.log"
+    version:
+        get_version('hmmsearch','-h',lines=[1,])
+    threads:
+        lambda wildcards: config['threads'].get('hmmer',default_threads)
+    params:
+        db_path=lambda wildcards: config['dbs'][wildcards.db]['path']
+    shell:
+        "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
+        {params.db_path} {input}"
+
+rule lastal:
+    """
+    Look for matches in RefSeq for predicted genes
+    """
+    input:
+        "{file_root}.faa"
+    output:
+        "{file_root}.vs.{db}.lastp"
+    benchmark:
+        "benchmarks/lastal.{db}.time"
+    log:
+        "logs/lastal.{db}.log"
+    version:
+        get_version('lastal')
+    threads:
+        lambda wildcards: config['threads'].get('lastal',default_threads)
+    params:
+        db_path=lambda wildcards: config['dbs'][wildcards.db]['path']
+    shell:
+        "lastal -P {threads} -f BlastTab -b 1 -x 15 -y 7 -z 25 \
+         {params.db_path} {input} > {output}"
+
+rule assign_taxa:
+    """
+    Turn a hit table of predicted genes vs RefSeq into a table of reads
+
+    Uses sed to change gene names back into read names before the assignment script sets to work.
+    """
+    input:
+        "{hit_table_prefix}.vs.{taxdb}.lastp".format(**config)
+    output:
+        "{annotation_prefix}.annotation.taxon_rank.{{rank}}.tsv".format(**config)
+    benchmark:
+        "benchmarks/assign_taxa.{rank}.time"
+    log:
+        "logs/assign_taxa.{rank}.log"
+    params:
+        taxdump=os.path.split(config['dbs'][config['taxdb']]['path'])[0],
+        taxmap=config['dbs'][config['taxdb']]['path'] + ".tax",
+        hit_table_filter=config.get('hit_table_filter','cat')
+    version:
+        get_version('assign_taxa.py')
+    shell:
+         "cat {input} \
+         | {params.hit_table_filter} \
+         | assign_taxa.py -o {output} -r {wildcards.rank} \
+            -f blast -F 0 -C first -p accs \
+            -n {params.taxdump} -m {params.taxmap}"
+
+rule assign_paths:
+    """
+    Turn a hit table (from hmmer or lastal) into a one-to-many map from reads to gene families.
+
+    Uses sed to change gene names back into read names before the assignment script sets to work.
+    """
+    input:
+        lambda w: get_hit_table_name_from_wildcards_db(w, config)
+    output:
+        "{annotation_prefix}.annotation.gene_family.{{db}}.tsv".format(**config)
+    benchmark:
+        "benchmarks/assign_paths.{db}.time"
+    log:
+        "logs/assign_paths.{db}.log"
+    version:
+        get_version('assign_paths.py')
+    params:
+        format=lambda w: 'blast' if config['dbs'][w.db].get('type','hmm')=='lastdb' else 'hmmsearchdom',
+        # KEGG and PFAM need special handling
+        params=lambda w: get_db_assignment_params(w, config),
+        hit_table_filter=config.get('hit_table_filter','cat')
+    shell:
+         "cat {input} \
+         | {params.hit_table_filter} \
+         | assign_paths.py -o {output} -C first -f {params.format} {params.params} \
+         "
+
+rule compile_counts:
+    """
+    Use clade assignments and gene family assignments to compile a table of gene family counts by clade.
+    """
+    input:
+        rules.assign_taxa.output,
+        rules.assign_paths.output
+    output:
+        "{annotation_prefix}.annotation.{{rank}}.{{db}}.tsv".format(**config)
+    benchmark:
+        "benchmarks/compile_counts.{rank}.{db}"
+    log:
+        "logs/compile_counts.{rank}.{db}"
+    version:
+        get_version('compile_hit_counts.py')
+    params:
+        three_column_opt="-L" if config.get('output_style','default').lower() == 'long' else ""
+    shell:
+        "compile_hit_counts.py {params.three_column_opt} -1 {input[0]} -2 {input[1]} -o {output} -S"
+

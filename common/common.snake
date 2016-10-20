@@ -1,0 +1,41 @@
+
+rule uncompress_file:
+    input:
+        "{file_root}.gz"
+    output:
+        temp("{file_root,[^z]$}")
+    benchmark:
+        "benchmarks/{file_root}.gunzip.time"
+    version:
+        get_version('gunzip', lines=0)
+    shell:
+        "gunzip -c {input} > {output}"
+
+rule prinseq_any:
+    """ calculate basic stats for a fasta file """
+    input:
+        "{file_root}.{ext}"
+    output:
+        "{file_root}.{ext,f.+}.stats"
+    log:
+        lambda wildcards: "logs/{file_root}.{ext}.stats.log"\
+                            .format(file_root=re.sub(r'/','_',\
+                                                     wildcards.file_root),
+                                    ext=wildcards.ext)
+    params:
+        input_flag=lambda wildcards:"-fastq" \
+         if re.search(r'q',wildcards.ext) else "-fasta",
+        aa=lambda wildcards:"-aa" \
+         if re.search(r'\bfaa\b',wildcards.ext) else "",
+        cat=lambda wildcards:"gunzip -c" \
+         if re.search(r'\.gz$',wildcards.ext) else "cat"
+    benchmark:
+        "benchmarks/prinseq_{file_root}_{ext}.time"
+    version:
+        get_version('prinseq','-version')
+    shell:
+        "{params.cat} {input} | \
+        prinseq {params.input_flag} stdin \
+         -stats_len -stats_info {params.aa} > {output}"
+
+
