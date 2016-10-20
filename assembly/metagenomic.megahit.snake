@@ -58,7 +58,7 @@ rule megahit:
     input:
         [reads for sample,reads in config['reads'].items()]
     output:
-        "megahit-{params}/megahit.contigs.fasta"
+        "megahit-{params}/megahit.contigs.fa"
     log:
         "logs/megahit-{params}.log"
     benchmark:
@@ -78,7 +78,7 @@ rule megahit:
 
 rule contigs:
     input:
-        "megahit-{params}/megahit.contigs.fasta".format(params=config['megahit']['preset'])
+        "megahit-{params}/megahit.contigs.fa".format(params=config['megahit']['preset'])
     output:
         "contigs.fasta"
     shell:
