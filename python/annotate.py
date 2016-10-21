@@ -8,8 +8,9 @@ def get_db_types(config):
     for db in config['dbs']:
         if config['dbs'][db].get('istaxdb',False):
             taxdb=db
-    else:
-        gene_family_dbs.append(db)
+        else:
+            gene_family_dbs.append(db)
+    # return, but make sure we found a tax db
     try:
         return (gene_family_dbs, taxdb)
     except NameError:
@@ -35,7 +36,6 @@ def get_hit_table_name_from_wildcards_db(wildcards, config):
         raise Exception("Unknown database type for {}: {}".format(db,db_type))
 
     name_root=config['hit_table_prefix']
-    print(template)
     return template.format(name_root=name_root, **wildcards)
 
 
