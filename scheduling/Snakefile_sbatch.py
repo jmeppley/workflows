@@ -2,7 +2,25 @@
 """
 Submit this clustering script for sbatch to snakemake with:
 
-    snakemake -j 99 --debug --immediate-submit --cluster 'Snakefile-sbatch.py  -t {threads} {dependencies}'
+    snakemake -j 99 --debug --immediate-submit --cluster 'Snakefile-sbatch.py [-c CONFIG_FILE}] -t {threads} {dependencies}'
+
+The sbatch config file should have values for sbatch options keyed byb snakemake rule name. A "default" rule cofig can be specified. EG:
+
+default:
+    --time: 0-5:0
+    --cpus-per-task: 1
+    --mem-per-cpu: 1G
+    --partition: scope-shared.q
+heavy-rule:
+    --time: 14-0
+    --partition: lm.q
+    --cpus-per-task: 40
+    --mem-per-cpu: 0
+ram-only-rule:
+    --mem-per-cpu: 100G
+
+Any rule (or the defualt) can have a "freeform" key with options to pass
+
 """
 import argparse
 import sys
@@ -11,6 +29,8 @@ import os
 import math
 import errno
 import json
+import yaml
+import re
 from snakemake.utils import read_job_properties
 
 def make_dir(directory):
@@ -29,7 +49,7 @@ class SnakeJob:
     def __init__(self, snakebashfile, \
                  threads=1, \
                  dependencies=None, \
-                 config=None):
+                 config={}):
         self.scriptname = snakebashfile
         job_properties = read_job_properties(snakebashfile)
         self.rule = job_properties['rule']
@@ -43,7 +63,15 @@ class SnakeJob:
             # expects snakemake like list of numbers
             self.dependencies = dependencies
             assert len(self.dependencies) >= 1
-        self.config = config
+
+        # get config for this rule, falling back to any defaults
+        self.config = config.get('default',{})
+        self.config.update(config.get(self.rule,{}))
+
+class UndefinedSbatchFlag(Exception):
+    """Exception in case a rule is configred to use a flag that doesn't exist"""
+    def __init__(self, msg):
+        self.msg = msg
 
 class UndefinedJobRule(Exception):
     """Exception in case an sbatch job has no defined resource usage in the
@@ -51,6 +79,65 @@ class UndefinedJobRule(Exception):
     def __init__(self, msg):
         self.msg = msg
 
+sbatch_flags=set((
+        '--account',
+        '--array',
+        '--bb',
+        '--begin',
+        '--clusters',
+        '--comment',
+        '--constraint',
+        '--core-spec',
+        '--cores-per-socket',
+        '--cpu-freq',
+        '--deadline',
+        '--dependency',
+        '--distribution',
+        '--error',
+        '--exclude',
+        '--export-file',
+        '--extra-node-info',
+        '--gid',
+        '--gres',
+        '--gres-flags',
+        '--hint',
+        '--input',
+        '--jobid',
+        '--job-name',
+        '--licenses',
+        '--mail-type',
+        '--mail-user',
+        '--mcs-label',
+        '--mem',
+        '--mem_bind',
+        '--mem-per-cpu',
+        '--mincpus',
+        '--nodefile',
+        '--nodelist',
+        '--nodes',
+        '--ntasks',
+        '--ntasks-per-core',
+        '--ntasks-per-node',
+        '--ntasks-per-socket',
+        '--output',
+        '--partition',
+        '--power',
+        '--priority',
+        '--profile',
+        '--qos',
+        '--reservation',
+        '--signal',
+        '--sockets-per-node',
+        '--switches',
+        '--thread-spec',
+        '--threads-per-core',
+        '--time',
+        '--time-min',
+        '--tmp',
+        '--uid',
+        '--wckey',
+        '--workdir',
+))
 
 class SnakeJobSbatch(SnakeJob):
     def __init__(self, snakebashfile, \
@@ -75,49 +162,42 @@ class SnakeJobSbatch(SnakeJob):
                 outfile=self.ofiles[0] +'-slurm.out'
                 outdir,outname=os.path.split(outfile)
                 if len(outdir.strip())==0:
-                    self.log_file=os.path.join('logs',outfile)
+                    self.log_file=os.path.join('logs',outname)
                 else:
-                    self.log_file=os.path.join(outdir,'logs',outfile)
+                    self.log_file=os.path.join(outdir,'logs',outname)
             else: 
                 # a reasonable default for other rules
                 self.log_file='logs/snakemake-{0}-slurm.out'.format(self.rule)
+        else:
+            # add slurm suffix so we don't collide with snakemake's use of log
+            self.log_file+="-slurm.out"
+        print(self.log_file)
         # directory must exist, though:
         make_dir(os.path.dirname(os.path.abspath(self.log_file)))
 
-        schedule_rule = "schedule_{0}".format(self.rule)
-        if schedule_rule in self.config:
-            rule_conf = self.config[schedule_rule]
-            # If rule_conf is referring to another scheduling rule, use those
-            # resources instead
-            try:
-                if rule_conf.startswith("schedule_"):
-                    rule_conf = self.config[rule_conf]
-            except KeyError:
-                raise UndefinedJobRule('No schedule config found for {0}'.format(rule_conf))
-            except AttributeError:
-                pass
+        # options from config file
+        configured_options=""
+        for key, value in self.config.items():
+            if key=='freeform':
+                configured_options += " " + value
+            else:
+                flag = key
+                # validate flags?
+                #if flag not in sbatch_flags:
+                #    raise UndefinedSbatchFlag("{} is not a recognized flag for sbatch")
+                #    return 2
+                configured_options += " " + flag + " " + value
 
-            
-
-            attributes = {
-                    'dep_str': self.dep_str,
-                    'job_name': 'snakemake_{0}'.format(self.rule),
-                    'sbatch_job_path': self.config['sbatch_general']['wrapper_script'],
-                    'script_name': self.scriptname,
-                    'days': rule_conf['days'],
-                    'hours': rule_conf['hours'],
-                    'minutes': rule_conf['minutes'],
-                    'partition': rule_conf['partition'],
-                    'cores': rule_conf.get('cores',self.threads),
-                    'account': self.config['sbatch_general']['account'],
-                    'log_file': self.log_file,
-                    'extra_parameters': rule_conf.get('extra_parameters', "")
-            }
-            sbatch_cmd = """sbatch --open-mode=append --output={log_file} {dep_str} -A {account} -p {partition} -n {cores} -t {days}-{hours}:{minutes}:00 \
-                    '{script_name}'""".format(**attributes)
-        else:
-            raise UndefinedJobRule('No schedule config found for schedule_{0}'.format(self.rule))
-            return 2
+        attributes = {
+                'dep_str': self.dep_str,
+                'job_name': 'snakemake_{0}'.format(self.rule),
+                'script_name': self.scriptname,
+                'log_file': self.log_file,
+                'configured_options': configured_options,
+        }
+        sbatch_cmd = """sbatch --open-mode=append --output={log_file} \
+                -J {job_name} {dep_str} {configured_options} \
+                '{script_name}'""".format(**attributes)
 
         print(sbatch_cmd, file=sys.stderr)
         popenrv = subprocess.Popen(sbatch_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True).communicate()
@@ -136,6 +216,13 @@ class SnakeJobSbatch(SnakeJob):
             JIDOUT.write(str(slurm_job_id))
             JIDOUT.write('\n')
 
+def load_config(configfile):
+    with open(configfile) as CONFIG:
+        if os.path.splitext(configfile)[-1]=='.yaml':
+            return yaml.load(CONFIG)
+        else:
+            return json.load(CONFIG)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
             formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -151,10 +238,11 @@ if __name__ == '__main__':
 
     #print("Passed bidniz:", args.snakescript, args.dependencies, file=sys.stderr)
     #print("Passed args:", args, file=sys.stderr)
+    config=load_config(args.configfile)
     sj = SnakeJobSbatch(args.snakescript, \
                         threads=args.threads,\
                         dependencies=args.dependencies, \
-                        config=json.load(open(args.configfile)))
+                        config=config)
     try:
         sj.schedule()
     except UndefinedJobRule as err:
