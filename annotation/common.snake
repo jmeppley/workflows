@@ -1,3 +1,30 @@
+import sys
+import os
+snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
+sys.path[0]=os.path.join(snakefile_path,'..','python')
+from common import get_version
+from annotate import get_db_assignment_params,get_db_types,\
+                     get_hit_table_name_from_wildcards_db
+configfile: "annotation.yaml"
+#########
+# CONFIGURATION
+#
+# rank to collect taxa on (defaults to order)
+config.setdefault('clade_ranks', ['order'])
+#
+# threads per search are set in the threads: parameter
+# Either use the db name or "default". EG:
+# threads:
+#   default: 5
+#   lastal: 20
+# Defaults to 8 for eveerything
+default_threads=config.setdefault('threads',{}).get('default', 3)
+#
+# pull out taxdb (usually refseq) and list of gene family dbs
+gene_family_dbs, config['taxdb'] = get_db_types(config)
+#
+# End configuration
+##########
 
 rule hmmer_dbfrag:
     """
@@ -64,12 +91,13 @@ rule hmmer:
 
 rule lastal:
     """
-    Look for matches in RefSeq for predicted genes
+    Look for matches in RefSeq or KEGG
     """
     input:
-        "{file_root}.faa"
+        lambda w: "{file_root}.{ext}".format(file_root=w.file_root,
+                                        ext="faa" if w.alg == 'p' else "ffn")
     output:
-        "{file_root}.vs.{db}.lastp"
+        "{file_root}.vs.{db}.last{alg}"
     benchmark:
         "benchmarks/lastal.{db}.time"
     log:
@@ -79,9 +107,10 @@ rule lastal:
     threads:
         lambda wildcards: config['threads'].get('lastal',default_threads)
     params:
-        db_path=lambda wildcards: config['dbs'][wildcards.db]['path']
+        db_path=lambda w: config['dbs'][w.db]['path'],
+        fshift=lambda w: "-F 15" if w.alg=='x' else "",
     shell:
-        "lastal -P {threads} -f BlastTab -b 1 -x 15 -y 7 -z 25 \
+        "lastal -P {threads} {params.fshift} -f BlastTab -b 1 -x 15 -y 7 -z 25 \
          {params.db_path} {input} > {output}"
 
 rule assign_taxa:
@@ -91,16 +120,21 @@ rule assign_taxa:
     Uses sed to change gene names back into read names before the assignment script sets to work.
     """
     input:
-        "{hit_table_prefix}.vs.{taxdb}.lastp".format(**config)
+        lambda w: "{hit_table_prefix}.vs.{taxdb}.{lastalg}".format(
+                    hit_table_prefix = config['annotation_hit_table_map']\
+                                                    .get(w.annotation_prefix,
+                                                         w.annotation_prefix),
+                    **w)
+        #"{hit_table_prefix}.vs.{taxdb}.lastp".format(**config)
     output:
-        "{annotation_prefix}.annotation.taxon_rank.{{rank}}.tsv".format(**config)
+        "{annotation_prefix}.annotation.{taxdb}.{lastalg}.{rank}.tsv"
     benchmark:
-        "benchmarks/assign_taxa.{rank}.time"
+        "benchmarks/assign_taxa.{rank}.{taxdb}.{lastal}.time"
     log:
-        "logs/assign_taxa.{rank}.log"
+        "logs/assign_taxa.{rank}.{taxdb}.{lastal}.log"
     params:
-        taxdump=os.path.split(config['dbs'][config['taxdb']]['path'])[0],
-        taxmap=config['dbs'][config['taxdb']]['path'] + ".tax",
+        taxdump=lambda w: os.path.split(config['dbs'][w.taxdb]['path'])[0],
+        taxmap=lambda w: config['dbs'][w.taxdb]['path'] + ".tax",
         hit_table_filter=config.get('hit_table_filter','cat')
     version:
         get_version('assign_taxa.py')
@@ -120,7 +154,7 @@ rule assign_paths:
     input:
         lambda w: get_hit_table_name_from_wildcards_db(w, config)
     output:
-        "{annotation_prefix}.annotation.gene_family.{{db}}.tsv".format(**config)
+        "{annotation_prefix}.annotation.gene_family.{db}.tsv"
     benchmark:
         "benchmarks/assign_paths.{db}.time"
     log:
@@ -146,7 +180,7 @@ rule compile_counts:
         rules.assign_taxa.output,
         rules.assign_paths.output
     output:
-        "{annotation_prefix}.annotation.{{rank}}.{{db}}.tsv".format(**config)
+        "{annotation_prefix}.annotation.{rank}.{db}.tsv"
     benchmark:
         "benchmarks/compile_counts.{rank}.{db}"
     log:

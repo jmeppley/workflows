@@ -1,44 +1,13 @@
-configfile: "annotation.yaml"
-import sys
-import os
-snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
-sys.path[0]=os.path.join(snakefile_path,'..','python')
-from common import get_version
-from annotate import get_db_assignment_params,get_db_types,\
-                     get_hit_table_name_from_wildcards_db
-
 # Python makefile to assign gene families and taxonomic ranks to
 # genes in an faa file using RefSeq, KEGG, PFAM and others.
 # Annotations are generated as tables of gene_family counts 
 #  groupbed by taxonomic clade
 
-#########
-# CONFIGURATION
-#
-# naming roots
-# source file is genes.faa and hit tables are genes.vs.XXX.ext
-config.setdefault('hit_table_prefix',"genes")
-config.setdefault('annotation_prefix',config['hit_table_prefix'])
-#
-# rank to collect taxa on (defaults to order)
-config.setdefault('clade_rank', 'order')
-#
-# threads per search are set in the threads: parameter
-# Either use the db name or "default". EG:
-# threads:
-#   default: 5
-#   lastal: 20
-# Defaults to 8 for eveerything
-default_threads=config.setdefault('threads',{}).get('default', 3)
-#
-# pull out taxdb (usually refseq) and list of gene family dbs
-gene_family_dbs, config['taxdb'] = get_db_types(config)
-#
-# End configuration
-##########
-
 include: "../common/common.snake"
 include: "./common.snake"
+
+# it is assumed that the file {prefix}.faa exists and contains protein seqs
+config.setdefault('prefix','genes')
 
 ##########
 # RULES:
@@ -48,9 +17,9 @@ localrules: all, clean
 
 rule all:
     input:
-        expand("{annotation_prefix}.annotation.{clade_rank}.{{db}}.tsv".format(**config),
+        expand("{prefix}.annotation.{clade_rank}.{{db}}.tsv".format(**config),
                 db=gene_family_dbs),
-        "{hit_table_prefix}.faa.stats".format(**config)
+        "{prefix}.faa.stats".format(**config)
 
 rule clean:
     """ remove all generated files """

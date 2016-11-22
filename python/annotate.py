@@ -35,7 +35,10 @@ def get_hit_table_name_from_wildcards_db(wildcards, config):
         # Don't know what to do:
         raise Exception("Unknown database type for {}: {}".format(db,db_type))
 
-    name_root=config['hit_table_prefix']
+    name_root = config['annotation_hit_table_map']\
+                        .get(wildcards.annotation_prefix,
+                             wildcards.annotation_prefix)
+
     return template.format(name_root=name_root, **wildcards)
 
 

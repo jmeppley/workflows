@@ -1,4 +1,6 @@
 import subprocess
+import glob
+import re
 
 
 def get_version(command, version_flag='--version', 
@@ -36,3 +38,29 @@ def get_version(command, version_flag='--version',
         return out.strip()
     else:
         return regular_expression.search(out).group(1)
+
+
+def collect_sample_reads(config):
+    """
+    If there is not already a "reads" dict in config, build it from the samples
+    pattern
+    """
+    if 'reads' not in config:
+        try:
+            samples_pattern = config['samples_pattern']
+        except:
+            raise Exception("Please supply list of samples or patterns to find"
+                            "them with") 
+        reads = config.setdefault('reads',{})
+        sample_RE = re.compile(samples_pattern.get('re',
+                                                   r'/([^/]+)/[^/]+$'))
+        #print(sample_RE.pattern)
+        for read_file in glob.glob(samples_pattern.get('glob',
+                                                       './*/reads.cleaned.fastq.gz')):
+            # print(read_file)
+            sample = sample_RE.search(read_file).group(1)
+            # sanitize sample name
+            sample = re.sub(r'[^A-Za-z0-9_]','_',sample)
+            # print(sample)
+            reads[sample]=read_file
+#

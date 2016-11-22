@@ -8,6 +8,7 @@ dbs:
     RefSeq: 
         path: /lus/scratch/jmeppley/seqdbs/RefSeq/78/RefSeq-78.AllProteins.faa.ldb/lastdb
         type: lastdb
+        istaxdb: True
     KEGG: 
         path: /lus/scratch/jmeppley/seqdbs/KEGG/KeggGene.pep.20160919/lastdb
         type: lastdb

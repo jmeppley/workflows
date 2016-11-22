@@ -2,46 +2,24 @@
 #  and use RefSeq, KEGG, PFAM, and others to annotate them
 # Annotations are generated as tables of gene_family counts 
 #  groupbed by taxonomic clade
-configfile: "annotation.yaml"
 import sys
 import os
 snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
 sys.path[0]=os.path.join(snakefile_path,'..','python')
 from common import get_version
-from annotate import get_db_assignment_params,get_db_types,\
-                     get_hit_table_name_from_wildcards_db
 
 #########
 # CONFIGURATION
 #
-# bam file to start from
-bam_file_with_reads=config.get('bam_file','reads.vs.contigs.bam')
-#
-# naming roots
-# source file is genes.faa and hit tables are genes.vs.XXX.ext
-config.setdefault('hit_table_prefix',"reads.genes")
-config.setdefault('annotation_prefix','reads')
-#
-# rank to collect taxa on (defaults to order)
-config.setdefault('clade_rank', 'order')
-#
-# threads per search are set in the threads: parameter
-# Either use the db name or "default". EG:
-# threads:
-#   default: 5
-#   lastal: 20
-#   prodigal:   10
-# Defaults to 8 for eveerything
-default_threads=config.setdefault('threads',{}).get('default', 3)
-#
-# pull out taxdb (usually refseq) and list of gene family dbs
-gene_family_dbs, config['taxdb'] = get_db_types(config)
-#
-mgorfs=snakefile_path + "/mgorfs.pl"
+config.setdefault('annotation_hit_table_map',{})
+config.setdefault('bam_file_prefix_map',{}.setdefault('reads','reads.vs.contigs.bam')
+config['hit_table_map']={}
+for prefix in config['bam_file_prefix_map']:
+    config['annotation_hit_table_map'].setdefault(prefix,prefix+".genes")
+    config['hit_table_map'][config['annotation_hit_table_map'][prefix]]=prefix
 #
 # filter for assigment (so we count reads instead of genes)
 config['hit_table_filter']="sed -r 's/^(S+)_\d+(\s+#)/\1\2/'"
-#
 #
 # End configuration
 ##########
@@ -55,20 +33,23 @@ include: "./common.snake"
 #  After the "all" target, it is generally laid out start to finish
 rule all:
     input:
-        expand("{annotation_prefix}.annotation.{clade_rank}.{{db}}.tsv".format(**config), 
-                db=gene_family_dbs),
-        "reads.fasta.stats",
-        #"read_genes.mga.faa.stats",
-        "{hit_table_prefix}.faa.stats".format(**config)
+        expand("{prefix}.annotation.{clade_rank}.{db}.tsv",
+                db=gene_family_dbs,
+                prefix=config['bam_file_prefix_map'],
+                clade_rank=config['clade_ranks'],
+                ),
+        expand("{reads}.fasta.stats", reads=config['bam_file_prefix_map')
+        expand("{hit_table_prefix}.faa.stats",
+               hit_table_prefix=config['hit_table_map'])
 
 rule extract_reads:
     """
     Pull reads out of BAM file
     """
     input:
-        bam_file_with_reads
+        lambda w: config['bam_file_prefix_map'][w.annotation_prefix]
     output:
-        "reads.fasta"
+        "{annotation_prefix}.fasta"
     benchmark:
         "benchmarks/extract_reads.time"
     log:
@@ -83,13 +64,13 @@ rule predict_genes_prodigal:
     Generate FAA (fasta of amino acid sequences) for genes predicted in reads
     """
     input:
-        "reads.fasta"
+        lambda w: "{reads}.fasta".format(reads=config['hit_table_map'][w.hit_table_prefix])
     output:
-        faa="{hit_table_prefix}.faa".format(**config)
+        faa="{hit_table_prefix}.faa"
     log:
-        "logs/predict_genes_prodigal.log"
+        "logs/{hit_table+prefix}.predict_genes_prodigal.log"
     benchmark:
-        "benchmarks/predict_genes_prodigal.time"
+        "benchmarks/{hit_table+prefix}.predict_genes_prodigal.time"
     version:
         get_version('batch_launcher.py') + '::' + \
         get_version('prodigal','-v')

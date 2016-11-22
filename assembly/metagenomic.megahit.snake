@@ -2,13 +2,12 @@
 Python Makefile to assemble reads from multiple samples into a single assembly
 with megahit.
 """
-import glob
-import re
+import os
+import sys
 snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
 sys.path[0]=os.path.join(snakefile_path,'..','python')
-from common import get_version
+from common import get_version, collect_sample_reads
 configfile: "./pooled_assembly.yaml"
-
 include: "../common/common.snake"
 include: "../common/mapping_bwa.snake"
 
@@ -25,37 +24,22 @@ include: "../common/mapping_bwa.snake"
 config.setdefault('megahit',{}).setdefault('preset','meta')
 # 
 # Get sample reads from dir and pattern if not provided
-if 'reads' not in config:
-    try:
-        samples_pattern = config['samples_pattern']
-    except:
-        raise Exception("Please supply list of samples or patterns to find"
-                        "them with") 
-    reads = config.setdefault('reads',{})
-    sample_RE = re.compile(samples_pattern.get('re',
-                                               r'/([^/]+)/[^/]+$'))
-    print(sample_RE.pattern)
-    for read_file in glob.glob(samples_pattern.get('glob',
-                                                   './*/reads.cleaned.fastq.gz')):
-        print(read_file)
-        sample = sample_RE.search(read_file).group(1)
-        reads[sample]=read_file
+collect_sample_reads(config)
 #
-# End Configuration
+# Configuration
 ######################
 
 
 ######################
 # Rules
-
-
 rule all:
     input:
         "contigs.fasta.stats",
-        expand("mapping/{sample}.reads.vs.contigs.bam.bai",
-                sample=config['reads'])
 
 rule megahit:
+    """
+    requires "reads" dictionary in config with map from sample names to list of fastq files of prepped reads for each sample
+    """
     input:
         [reads for sample,reads in config['reads'].items()]
     output:
