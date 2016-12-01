@@ -12,7 +12,7 @@ from common import get_version
 # CONFIGURATION
 #
 config.setdefault('annotation_hit_table_map',{})
-config.setdefault('bam_file_prefix_map',{}.setdefault('reads','reads.vs.contigs.bam')
+config.setdefault('bam_file_prefix_map',{}).setdefault('reads','reads.vs.contigs.bam')
 config['hit_table_map']={}
 for prefix in config['bam_file_prefix_map']:
     config['annotation_hit_table_map'].setdefault(prefix,prefix+".genes")
@@ -27,6 +27,9 @@ config['hit_table_filter']="sed -r 's/^(S+)_\d+(\s+#)/\1\2/'"
 include: "../common/common.snake"
 include: "./common.snake"
 
+# make sure read extraction comes from sam, not a nonexistent fastq:
+ruleorder: extract_reads > fastq_to_fasta
+
 ##########
 # RULES:
 #  This lays out the dependencies and logic of the workflow
@@ -38,7 +41,7 @@ rule all:
                 prefix=config['bam_file_prefix_map'],
                 clade_rank=config['clade_ranks'],
                 ),
-        expand("{reads}.fasta.stats", reads=config['bam_file_prefix_map')
+        expand("{reads}.fasta.stats", reads=config['bam_file_prefix_map']),
         expand("{hit_table_prefix}.faa.stats",
                hit_table_prefix=config['hit_table_map'])
 
@@ -83,6 +86,11 @@ rule predict_genes_prodigal:
 
 rule clean:
     """ remove all generated files """
+    params:
+        anns=" ".join(expand("{annotation_prefix}.annotation.*",
+                    annotation_prefix=config['bam_file_prefix_map'].values())),
+        hits=" ".join(expand("{hit_table_prefix}.*",
+                    hit_table_prefix=[config['annotation_hit_table_map'].get(a) for a in config['bam_file_prefix_map'].values()]))
     shell:
-        "rm -rf logs benchmarks reads.fasta {annotation_prefix}.annotation.* {hit_table_prefix}.*".format(**config)
+        "rm -rf logs benchmarks reads.fasta {params.anns} {params.hits}"
 
