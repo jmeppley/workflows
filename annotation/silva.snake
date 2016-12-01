@@ -1,0 +1,60 @@
+import re
+
+include: "../annotation/common.snake"
+
+silva_algs={}
+for db, db_data in config['dbs'].items():
+    if re.search('^silva', db, re.I):
+        if db_data['type']=='lastdb':
+            alg = 'lastn'
+        elif db_data['type']=='bwadb':
+            alg = 'sam'
+        else:
+            raise Exception("Unknown type {} for db {}".format(db_data['type'],
+                                                               db))
+        silva_algs[db]=alg
+
+
+rule all:
+    input:
+        expand("{file_root}.annotation.{db_dot_alg}.{rank}.count.tsv",
+               file_root=config.get('file_root','reads'),
+               rank=config.get('clade_ranks',['order']),
+               db_dot_alg=['{}.{}'.format(d,a) for d,a in silva_algs.items()])
+
+rule map_reads_to_bwadb:
+    """
+    map reads to BWA db
+    """
+    input:
+        "{file_root}.fastq"
+    output:
+        ("{file_root}.vs.{db}.sam")
+    log:
+        "logs/{file_root}.vs.{db}.sam.log"
+    benchmark:
+        "benchmarks/{file_root}.vs.{db}.sam.time"
+    version:
+        get_version('bwa', 
+                    version_flag="", 
+                    regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
+    threads:
+        lambda w: config['threads'].get('bwa',default_threads)
+    params:
+        db_path=lambda w: config['dbs'][w.db]['path'],
+    shell:
+        "bwa mem -t {threads} {params.db_path} {input} 2> {log}  > {output}"
+
+rule count_tax_hits:
+    input:
+        "{hit_table_prefix}.annotation.{db}.{alg}.{rank}.tsv"
+    output:
+        "{hit_table_prefix}.annotation.{db}.{alg}.{rank}.count.tsv"
+    benchmark:
+        "benchmarks/{hit_table_prefix}.{db}.{alg}.{rank}.count.time"
+    log:
+        "logs/{hit_table_prefix}.{db}.{alg}.{rank}.count.log"
+    shell:
+        "count_hits.py -v -i {input} -H 1 -a portion\
+        > {output} 2> {log}"
+

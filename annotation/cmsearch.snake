@@ -1,0 +1,86 @@
+import os
+import sys
+snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
+sys.path[0]=os.path.join(snakefile_path,'..','python')
+from common import get_version
+
+config.setdefault('threads',{})
+config.setdefault('cmsearch_models',
+                  os.path.join(snakefile_path,"..","annotation",'models'))
+
+def get_cm_model_version(models_dir):
+    """
+    Gets the version of the cm and hmm models used from a "VERSION"
+    file in the models folder.
+
+    Returns "Unknown" if the version file is missing.
+    """
+
+    # Look for a VERSION file
+    version_file = os.path.join(models_dir,'VERSION')
+    if os.path.exists(version_file):
+        with open(version_file) as VF:
+            return next(VF).strip()
+
+    # Fall back to README file
+    readme_file = os.path.join(models_dir,'README') 
+    if os.path.exists(readme_file):
+        with open(readme_file) as RMF:
+            for line in RMF:
+                if re.search('r(Release\s*[0-9.]+)',line):
+                    return "RFAM " + line.strip()
+
+    # Fallback to unknown
+    return "Unknown"
+
+rule cmsearch_default_all:
+    input: 
+        "reads.rRNA.cmsearch.gff",
+        "reads.tRNA.cmsearch.gff"
+
+rule cmsearch:
+    """ 
+    Find likely tRNA or rRNA genes using cmsearch and RFAM models
+    """
+    input:
+        "{file_root}.fasta"
+    output:
+        temp("{file_root}.{molecule}.cmsearch.tbl")
+    benchmark:
+        "benchmarks/contigs.annotations.{molecule}.tbl.txt"
+    threads:
+        int(config['threads'].get('cmsearch',20))
+    version:
+        lambda wildcards:\
+            get_version('cmsearch',
+                        '-h',
+                        lines=1) + " :: " + \
+                get_cm_model_version(config['cmsearch_models'])
+    params:
+        cmfile=os.path.join(config['cmsearch_models'],'{molecule}.cm'),
+        flags=lambda wildcards:\
+          "--hmmonly" if wildcards.molecule=='rRNA' else ""
+    shell:
+        "cmsearch {params.flags} \
+            -o /dev/null --tblout {output} --cpu {threads} \
+            {params.cmfile} {input}"
+
+rule hit_table_to_gff:
+    """
+    convert cmsearch output to gff
+    can be extended to other formats by adding logic to the params declartion
+    """
+    input:
+        "{file_root}.{tool}.tbl"
+    output:
+        "{file_root}.{tool}.gff"
+    benchmark:
+        "benchmarks/{file_root}.{tool}.gff.time"
+    version:
+        get_version('filter_blast_m8.py')
+    params:
+        format=lambda w: w.tool
+    shell:
+        "filter_blast_m8.py -v -f {params.format} --gff -o {output} {input}"
+
+

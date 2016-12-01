@@ -139,7 +139,7 @@ rule assign_taxa:
         taxdump=lambda w: os.path.split(config['dbs'][w.taxdb]['path'])[0],
         taxmap=lambda w: config['dbs'][w.taxdb]['path'] + ".tax",
         hit_table_filter=config.get('hit_table_filter','cat'),
-        format=lambda w: 'blast' if re.search(r'^b?last[pnx]$', w.lastalg) else w.alg
+        format=lambda w: 'blast' if re.search(r'^b?last[pnx]$', w.lastalg) else w.lastalg
     version:
         get_version('assign_taxa.py')
     shell:

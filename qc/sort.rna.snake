@@ -1,0 +1,37 @@
+include: "../annotation/cmsearch.snake"
+include: "../common/common.snake"
+
+import os
+import sys
+snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
+sys.path[0]=os.path.join(snakefile_path,'..','python')
+from common import get_version
+
+rule sort_rna_default_all:
+    input:
+        expand("{file_root}.{type}.fastq",
+               file_root=config.get('file_root','reads'),
+               type=['rRNA','non-rRNA'])
+
+rule filter_nonrrna_or_rrna:
+    """
+    Pull non-rRNA reads out of a fastq file using cmsearch hits
+    """
+    input:
+        reads="{file_root}.{ext}",
+        hits="{file_root}.rRNA.cmsearch.gff"
+    output:
+        "{file_root}.{type}.{ext,fast[aq]}"
+    benchmark:
+        "benchmarks/{file_root}.{type}.time"
+    log:
+        "logs/{file_root}.{type}.log"
+    version:
+        get_version("screen_list.py")
+    params:
+        keep=lambda w: "-k" if w.type=='rRNA' else ""
+    shell:
+        "screen_list.py {params.keep} -l {input.hits} -C 0 \
+                        -f {wildcards.ext} -v {input.reads} \
+                        > {output} 2> {log}"
+
