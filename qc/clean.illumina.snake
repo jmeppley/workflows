@@ -6,6 +6,7 @@ We are starting with the old recipe from illuminaPrep:
  * pandaseq to join and screen
  * trimmomatic again to trim ends and windows
 """
+import re
 import os
 import sys
 
@@ -35,6 +36,11 @@ if 'sample_id' not in config:
 sample=config['sample_id']
 reads_stats_files = [t.format(sample=sample) for t in reads_stats_templates]
 
+from snakemake.remote.SFTP import RemoteProvider
+if 'SFTP' in config:
+    # get pysftp params from config (usu 'username' and 'private_key')
+    SFTP = RemoteProvider(**config['SFTP'])
+
 rule clean_illumina_all:
     input:
         reads_stats_files,
@@ -42,7 +48,7 @@ rule clean_illumina_all:
 rule raw_reads:
     """Creates temporary link to raw reads"""
     input:
-        lambda w: config['samples'][w.sample][w.dir]
+        lambda w: SFTP.remote(config['samples'][w.sample][w.dir]) if config['samples'][w.sample].get('remote',False) else config['samples'][w.sample][w.dir]
     output:
         temp("{sample}_reads.{dir,R[12]}.fastq")
     shell:
