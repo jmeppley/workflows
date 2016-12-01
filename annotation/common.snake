@@ -166,7 +166,7 @@ rule assign_paths:
     version:
         get_version('assign_paths.py')
     params:
-        format=lambda w: 'blast' if config['dbs'][w.db].get('type','hmm')=='lastdb' else 'hmmsearchdom',
+        format=lambda w: 'blast' if config['dbs'][w.db].get('format','hmmer')=='lastdb' else 'hmmsearchdom',
         # KEGG and PFAM need special handling
         params=lambda w: get_db_assignment_params(w, config),
         hit_table_filter=config.get('hit_table_filter','cat')

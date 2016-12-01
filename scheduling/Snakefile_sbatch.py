@@ -52,6 +52,7 @@ class SnakeJob:
                  ):
         self.scriptname = snakebashfile
         job_properties = read_job_properties(snakebashfile)
+        print(job_properties, file=sys.stderr)
         self.rule = job_properties['rule']
         self.ifiles = job_properties['input']
         self.ofiles = job_properties['output']
@@ -170,18 +171,20 @@ class SnakeJobSbatch(SnakeJob):
         else:
             # add slurm suffix so we don't collide with snakemake's use of log
             self.log_file+="-slurm.out"
-        print(self.log_file, file=sys.stderr)
+        print("logging to {}".format(self.log_file), file=sys.stderr)
         # directory must exist, though:
         make_dir(os.path.dirname(os.path.abspath(self.log_file)))
 
         # options from config file
         configured_options=""
+        # print(str(self.config), file=sys.stderr)
         for key, value in self.config.items():
             if key=='freeform':
                 configured_options += " " + value
             else:
                 flag = key
-                configured_options += " " + flag + " " + value
+                configured_options += " " + flag + " " + str(value)
+                # print("Adding {}:{}".format(key,value),file=sys.stderr)
 
         attributes = {
                 'dep_str': self.dep_str,

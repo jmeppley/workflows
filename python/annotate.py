@@ -6,9 +6,10 @@ Functions for the annotation workflows
 def get_db_types(config):
     gene_family_dbs = []
     for db in config['dbs']:
-        if config['dbs'][db].get('istaxdb',False):
+        db_type = config['dbs'][db].get('type','gene')
+        if db_type == 'tax':
             taxdb=db
-        else:
+        elif db_type == 'gene':
             gene_family_dbs.append(db)
     # return, but make sure we found a tax db
     try:
@@ -23,17 +24,17 @@ def get_hit_table_name_from_wildcards_db(wildcards, config):
     Return the hit table name based on the db name using the db config info
     """
     db=wildcards.db
-    db_type=config['dbs'][db].get('type','hmmer')
-    if db_type=='hmmer':
+    db_format=config['dbs'][db].get('format','hmmer')
+    if db_format=='hmmer':
         if 'frags' in config['dbs'][db]:
             template = "{name_root}.vs.{db}.tbl.dbatch"
         else:
             template = "{name_root}.vs.{db}.tbl"
-    elif db_type=='lastdb':
+    elif db_format=='lastdb':
         template = "{name_root}.vs.{db}.lastp"
     else:
         # Don't know what to do:
-        raise Exception("Unknown database type for {}: {}".format(db,db_type))
+        raise Exception("Unknown database format for {}: {}".format(db,db_format))
 
     name_root = config['annotation_hit_table_map']\
                         .get(wildcards.annotation_prefix,

@@ -11,10 +11,18 @@ from common import get_version
 #########
 # CONFIGURATION
 #
+# defaults for basic operation
 config.setdefault('annotation_hit_table_map',{})
-config.setdefault('bam_file_prefix_map',{}).setdefault('reads','reads.vs.contigs.bam')
+# create reads.fasta from reads.vs.contigs.bam unless something else is set
+bam_file_prefix_map=config.setdefault('bam_file_prefix_map',{})
+default_annotation_prefix = config.get('annotation_prefix','reads')
+bam_file_prefix_map.\
+    setdefault(default_annotation_prefix,
+               '{}.vs.contigs.bam'.format(default_annotation_prefix))
+
+# create maps back and forth between annotation and hit table prefixes
 config['hit_table_map']={}
-for prefix in config['bam_file_prefix_map']:
+for prefix in bam_file_prefix_map:
     config['annotation_hit_table_map'].setdefault(prefix,prefix+".genes")
     config['hit_table_map'][config['annotation_hit_table_map'][prefix]]=prefix
 #
@@ -50,7 +58,8 @@ rule extract_reads:
     Pull reads out of BAM file
     """
     input:
-        lambda w: config['bam_file_prefix_map'][w.annotation_prefix]
+        lambda w: bam_file_prefix_map.get(w.annotation_prefix,
+                                                    w.annotation_prefix)
     output:
         "{annotation_prefix}.fasta"
     benchmark:

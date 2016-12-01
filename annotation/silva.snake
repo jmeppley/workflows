@@ -4,13 +4,14 @@ include: "../annotation/common.snake"
 
 silva_algs={}
 for db, db_data in config['dbs'].items():
-    if re.search('^silva', db, re.I):
-        if db_data['type']=='lastdb':
+    if db_data.get('type')=='rrna':
+        db_format = db_data.get('format','lastdb')
+        if db_format == 'lastdb':
             alg = 'lastn'
-        elif db_data['type']=='bwadb':
+        elif db_format == 'bwadb':
             alg = 'sam'
         else:
-            raise Exception("Unknown type {} for db {}".format(db_data['type'],
+            raise Exception("Unknown type {} for db {}".format(db_format,
                                                                db))
         silva_algs[db]=alg
 
