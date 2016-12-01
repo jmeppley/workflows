@@ -1,0 +1,57 @@
+"""
+Snakefile to clean and join illumina reads for read-based analysis
+
+We are starting with the old recipe from illuminaPrep:
+ * trimmomatic to remove primers
+ * pandaseq to join and screen
+ * trimmomatic again to trim ends and windows
+"""
+import os
+import sys
+
+snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
+sys.path[0]=os.path.join(snakefile_path,'..','python')
+from common import get_version
+configfile: "./annotate-illumina.yaml"
+
+####
+# INCLUDES and CONFIG
+#
+# samples
+if 'sample_id' not in config:
+    if len(config['samples'])==1:
+        config['sample_id']=next(iter(config['samples'].keys()))
+    else:
+        raise Exception("Please specify a sample to process using the 'sample_id' config variable")
+# do a single sample in this dir
+sample_prefix_list = config['sample_id']
+#
+# illumina cleaning
+# this should read sample list and data from illumina.yaml
+include: "../qc/clean.illumina.snake"
+#
+# split out rRNA
+include: "../qc/sort.rna.snake"
+#
+# get read anotation workflow to annotate non rRNA reads
+# set the annotation prefixes...
+config['annotation_prefixes']=\
+        expand("{sample}_reads.clipped.joined.trimmed.non-rRNA",
+               sample=sample_prefix_list)
+# ... and the read annotation snakefile should set up everything else
+include: "../annotation/read.annotation.snake"
+
+# This prefix will cause the necessary cleaning to happen
+silva_prefixes = expand("{sample}_reads.clipped.joined.trimmed.rRNA",
+                        sample=sample_prefix_list)
+include: "../annotation/silva.snake"
+
+rule all:
+    input:
+        reads_stats_files,     # from clean.illumina.snake
+        annotation_file_list,  # from read.annotation.snake
+        expand("{prefix}.annotation.{db_dot_alg}.{rank}.count.tsv",
+               prefix=silva_prefixes,
+               rank=config['clade_ranks'],
+               db_dot_alg=['{}.{}'.format(d,a) for d,a in silva_algs.items()])
+

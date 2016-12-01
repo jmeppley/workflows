@@ -7,6 +7,8 @@ snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
 sys.path[0]=os.path.join(snakefile_path,'..','python')
 from common import get_version
 
+ruleorder: filter_nonrrna_or_rrna > fastq_to_fasta
+
 rule sort_rna_default_all:
     input:
         expand("{file_root}.{type}.fastq",
@@ -21,7 +23,7 @@ rule filter_nonrrna_or_rrna:
         reads="{file_root}.{ext}",
         hits="{file_root}.rRNA.cmsearch.gff"
     output:
-        "{file_root}.{type}.{ext,fast[aq]}"
+        "{file_root}.{type,(non-)?rRNA}.{ext,fast[aq]}"
     benchmark:
         "benchmarks/{file_root}.{type}.time"
     log:

@@ -16,7 +16,7 @@ for db, db_data in config['dbs'].items():
         silva_algs[db]=alg
 
 
-rule all:
+rule silva_all:
     input:
         expand("{file_root}.annotation.{db_dot_alg}.{rank}.count.tsv",
                file_root=config.get('file_root','reads'),
