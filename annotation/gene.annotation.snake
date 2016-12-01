@@ -23,6 +23,10 @@ rule all:
 
 rule clean:
     """ remove all generated files """
+    params:
+        anns="{prefix}.annotation.*".format(**config),
+        hits=" ".join(expand("{hit_table_prefix}.vs.* {hit_table_prefix}.faa.stats",
+                    hit_table_prefix=[config.get('annotation_hit_table_map',{}).get(config['prefix'],config['prefix']),]))
     shell:
-        "rm -rf logs benchmarks {annotation_prefix}.annotation.* {hit_table_prefix}.*".format(**config)
+        "rm -rf logs benchmarks {params.anns} {params.hits}"
 

@@ -22,7 +22,9 @@ default_threads=config.setdefault('threads',{}).get('default', 3)
 #
 # pull out taxdb (usually refseq) and list of gene family dbs
 gene_family_dbs, config['taxdb'] = get_db_types(config)
+config['taxalg']='lastp'
 #
+config.setdefault('annotation_hit_table_map',{})
 # End configuration
 ##########
 
@@ -116,7 +118,7 @@ rule lastal:
 rule assign_taxa:
     """
     Turn a hit table of predicted genes vs RefSeq into a table of reads
-
+    
     Uses sed to change gene names back into read names before the assignment script sets to work.
     """
     input:
@@ -124,25 +126,27 @@ rule assign_taxa:
                     hit_table_prefix = config['annotation_hit_table_map']\
                                                     .get(w.annotation_prefix,
                                                          w.annotation_prefix),
-                    **w)
-        #"{hit_table_prefix}.vs.{taxdb}.lastp".format(**config)
+                    taxdb=w.taxdb,
+                    lastalg=w.lastalg)
+        #"{annotation_prefix}.vs.{taxdb}.{lastalg}"
     output:
         "{annotation_prefix}.annotation.{taxdb}.{lastalg}.{rank}.tsv"
     benchmark:
-        "benchmarks/assign_taxa.{rank}.{taxdb}.{lastal}.time"
-    log:
-        "logs/assign_taxa.{rank}.{taxdb}.{lastal}.log"
+        "benchmarks/assign_taxa.{rank}.{taxdb}.{lastalg}.time"
+    #log:
+    #    "logs/assign_taxa.{rank}.{taxdb}.{lastalg}.log"
     params:
         taxdump=lambda w: os.path.split(config['dbs'][w.taxdb]['path'])[0],
         taxmap=lambda w: config['dbs'][w.taxdb]['path'] + ".tax",
-        hit_table_filter=config.get('hit_table_filter','cat')
+        hit_table_filter=config.get('hit_table_filter','cat'),
+        format=lambda w: 'blast' if re.search(r'^b?last[pnx]$', w.lastalg) else w.alg
     version:
         get_version('assign_taxa.py')
     shell:
          "cat {input} \
          | {params.hit_table_filter} \
          | assign_taxa.py -o {output} -r {wildcards.rank} \
-            -f blast -F 0 -C first -p accs \
+            -f {params.format} -F 0 -C first -p accs \
             -n {params.taxdump} -m {params.taxmap}"
 
 rule assign_paths:
@@ -177,8 +181,9 @@ rule compile_counts:
     Use clade assignments and gene family assignments to compile a table of gene family counts by clade.
     """
     input:
-        rules.assign_taxa.output,
-        rules.assign_paths.output
+        lambda w: "{annotation_prefix}.annotation.{taxdb}.{taxalg}.{rank}.tsv"\
+            .format(taxdb=config['taxdb'], taxalg=config['taxalg'], **w),
+        "{annotation_prefix}.annotation.gene_family.{db}.tsv"
     output:
         "{annotation_prefix}.annotation.{rank}.{db}.tsv"
     benchmark:
