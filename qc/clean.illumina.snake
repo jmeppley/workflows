@@ -13,17 +13,20 @@ import sys
 snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
 sys.path[0]=os.path.join(snakefile_path,'..','python')
 from common import get_version
-configfile: "./illumina.yaml"
+#configfile: "./illumina.yaml"
 include: "../common/common.snake"
 
 reads_stats_templates = [
         "{sample}_reads.clipped.joined.trimmed.fastq.stats",
+        "{sample}_reads.clipped.joined.trimmed.fastq.hist",
         "{sample}_reads.clipped.paired.joined.fastq.stats",
-        "{sample}_reads.clipped.paired.joined.fastq.stats"] + \
-        expand("{{sample}}_reads.clipped.{dir}.{state}.fastq.stats",
+        "{sample}_reads.clipped.paired.joined.fastq.hist"] + \
+        expand("{{sample}}_reads.clipped.{dir}.{state}.fastq.{ext}",
+               ext=['stats','hist'],
                dir=['R1','R2'],
                state=['paired','unpaired'],) + \
-        expand("{{sample}}_reads.{dir}.fastq.stats",
+        expand("{{sample}}_reads.{dir}.fastq.{ext}",
+               ext=['stats','hist'],
                dir=['R1','R2'],)
 
 

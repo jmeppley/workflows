@@ -7,7 +7,7 @@ import os
 snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
 sys.path[0]=os.path.join(snakefile_path,'..','python')
 from common import get_version
-configfile: 'annotation.yaml'
+#configfile: 'annotation.yaml'
 
 #########
 # CONFIGURATION
@@ -47,16 +47,17 @@ include: "./common.snake"
 ruleorder: extract_reads > fastq_to_fasta
 
 # set up list of files to create
-annotation_file_list = []
-annotation_file_list.extend(expand("{prefix}.annotation.{clade_rank}.{db}.tsv",
-                db=gene_family_dbs,
-                prefix=config['bam_file_prefix_map'],
-                clade_rank=config['clade_ranks'],
-                ))
-annotation_file_list.extend(expand("{prefix}.fasta.stats",
-                prefix=config['bam_file_prefix_map']))
-annotation_file_list.extend(expand("{hit_table_prefix}.faa.stats",
-               hit_table_prefix=hit_table_map))
+annotation_file_list = \
+                expand("{prefix}.annotation.{clade_rank}.{db}.tsv",
+                       db=gene_family_dbs,
+                       prefix=config['bam_file_prefix_map'],
+                       clade_rank=config['clade_ranks'],) + \
+                expand("{prefix}.fasta.{ext}", 
+                       ext=['stats','hist'],
+                       prefix=config['bam_file_prefix_map'],) + \
+                expand("{hit_table_prefix}.faa.{ext}",
+                       ext=['stats','hist'],
+                       hit_table_prefix=hit_table_map)
 
 
 ##########
