@@ -33,9 +33,8 @@ for prefix in annotation_prefixes:
     annotation_hit_table_map.setdefault(prefix,prefix+".genes")
     # map back from hit table names
     hit_table_map[annotation_hit_table_map[prefix]]=prefix
-#
-# filter for assigment (so we count reads instead of genes)
-config['hit_table_filter']="sed -r 's/^(S+)_\d+(\s+#)/\1\2/'"
+    # filter for assigment (so we count reads instead of genes)
+    config.setdefault('hit_table_filter',{})[prefix]="sed -r 's/^(S+)_\d+(\s+#)/\1\2/'"
 #
 # End configuration
 ##########

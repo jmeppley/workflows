@@ -1,6 +1,7 @@
 import subprocess
 import glob
 import re
+import pandas
 
 
 def get_version(command, version_flag='--version', 
@@ -38,6 +39,15 @@ def get_version(command, version_flag='--version',
         return out.strip()
     else:
         return regular_expression.search(out).group(1)
+
+
+def parse_stats(stats_file):
+    """
+    pull out the read and base counts from a prinseq output file.
+    Returns a two item dict with integer values and keys: 'reads', 'bases'
+    """
+    stats = pandas.read_table(stats_file,names=('module','key','value'),index_col=1)['value']
+    return {k:int(stats[k]) for k in ['reads','bases']}
 
 
 def collect_sample_reads(config):

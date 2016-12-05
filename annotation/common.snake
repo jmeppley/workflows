@@ -138,8 +138,10 @@ rule assign_taxa:
     params:
         taxdump=lambda w: os.path.split(config['dbs'][w.taxdb]['path'])[0],
         taxmap=lambda w: config['dbs'][w.taxdb]['path'] + ".tax",
-        hit_table_filter=config.get('hit_table_filter','cat'),
-        format=lambda w: 'blast' if re.search(r'^b?last[pnx]$', w.lastalg) else w.lastalg
+        hit_table_filter=lambda w: config.get('hit_table_filter',{})\
+                                         .get(w.annotation_prefix,'cat'),
+        format=lambda w: 'blast' if re.search(r'^b?last[pnx]$', w.lastalg)\
+                                 else w.lastalg
     version:
         get_version('assign_taxa.py')
     shell:
@@ -169,7 +171,8 @@ rule assign_paths:
         format=lambda w: 'blast' if config['dbs'][w.db].get('format','hmmer')=='lastdb' else 'hmmsearchdom',
         # KEGG and PFAM need special handling
         params=lambda w: get_db_assignment_params(w, config),
-        hit_table_filter=config.get('hit_table_filter','cat')
+        hit_table_filter=lambda w: config.get('hit_table_filter',{})\
+                                         .get(w.annotation_prefix,'cat'),
     shell:
          "cat {input} \
          | {params.hit_table_filter} \

@@ -11,7 +11,7 @@ import sys
 
 snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
 sys.path[0]=os.path.join(snakefile_path,'..','python')
-from common import get_version
+from common import get_version, parse_stats
 
 ####
 # INCLUDES and CONFIG
@@ -35,18 +35,126 @@ config['annotation_prefixes']=\
 include: "../annotation/read.annotation.snake"
 #
 # This prefix will cause the necessary cleaning to happen
-silva_prefixes = expand("{sample}_reads.clipped.joined.trimmed.rRNA",
+clean_prefixes = expand("{sample}_reads.clipped.joined.trimmed",
                         sample=sample_prefix_list)
 include: "../annotation/silva.snake"
 #
 ####
 
-rule all:
+rule report_all:
+    """
+    This rule is both the "all" target that defines what to do,
+    and it generates a final report that should give a useful summary 
+    of the results and make apparent any massive failures in processing
+    """
     input:
-        reads_stats_files,     # from clean.illumina.snake
-        annotation_file_list,  # from read.annotation.snake
-        expand("{prefix}.annotation.{db_dot_alg}.{rank}.count.tsv",
-               prefix=silva_prefixes,
-               rank=config['clade_ranks'],
-               db_dot_alg=['{}.{}'.format(d,a) for d,a in silva_algs.items()])
+        # from clean.illumina.snake
+        clean_stats=[f for f in reads_stats_files if re.search(r'\.stats$',f)],
+        clean_hists=[f for f in reads_stats_files if re.search(r'\.hist$',f)],
+        # from read.annotation.snake
+        annot_stats=[f for f in annotation_file_list if re.search(r'\.stats$',f)],
+        annot_hists=[f for f in annotation_file_list if re.search(r'\.hist$',f)],
+        annot_tabs=[f for f in annotation_file_list if re.search(r'\.tsv$',f)],
+        # rrna counts
+        rrna_counts=\
+            expand("{prefix}.rRNA.annotation.{db_dot_alg}.{rank}.count.tsv",
+                prefix=clean_prefixes,
+                rank=config['clade_ranks'],
+                db_dot_alg=['{}.{}'.format(d,a) for d,a in silva_algs.items()]),
+        rrna_stats=expand("{prefix}.{type}.fastq.{ext}",
+                prefix=clean_prefixes,
+                ext=['stats',],
+                type=['rRNA','non-rRNA']),
+        rrna_hists=expand("{prefix}.{type}.fastq.{ext}",
+                prefix=clean_prefixes,
+                ext=['hist',],
+                type=['rRNA','non-rRNA'])
+    output:
+        "{sample}_reads.annotation.report".format(sample=config['sample_id'])
+    run:
+        import pandas, re
+        with open(output[0],'w') as OUT:
+            # cleaned read counts (step by step)
+            OUT.write("== Read ==\nstep\treads\tbases\n")
+            stats_files = sorted(input.clean_stats, 
+                                 key=lambda f: os.stat(f).st_mtime) + \
+                          sorted(input.rrna_stats, 
+                                 key=lambda f: os.stat(f).st_mtime) + \
+                          sorted(input.annot_stats, 
+                                 key=lambda f: os.stat(f).st_mtime)
+            for input_file in stats_files:
+                stats = parse_stats(input_file)
+                stats['step']=re.sub(r'^{}_reads\.'.format(config['sample_id']),
+                                     '',
+                                     re.sub(r'\.f[a-z](\.gz)?\.stats$',
+                                            '',
+                                            input_file))
+                OUT.write("{step}\t{reads}\t{bases}\n".format(**stats))
+            OUT.write("//\n")
+
+            # flag any empty histograms
+            for input_file in input.clean_hists + \
+                    input.rrna_hists + \
+                    input.annot_hists:
+                if os.stat(input_file).st_size==0:
+                    OUT.write("WARNING: empty histogram: {}\n"\
+                                .format(input_file))
+            OUT.write('\n')
+
+            # check Silva counts
+            OUT.write("== Taxon counts found by rank in Silva ==\n")
+            OUT.write("Silva DB\trank\ttaxon count\tread count\n")
+            for input_file in input.rrna_counts:
+                db, rank = re.search(r'annotation\.Silva([LS]SU)\.sam\.([a-z]+)\.count\.tsv', input_file).groups()
+                read_counts = pandas.read_table(input_file,
+                                                header=None, 
+                                                index_col=0, 
+                                                names=['read_count'])\
+                                .read_count
+                taxon_count = int(read_counts.count())
+                read_count = int(read_counts.sum())
+                OUT.write("{db}\t{rank}\t{taxon_count}\t{read_count}\n"\
+                           .format(**vars()))
+            OUT.write("//\n\n")
+
+            # check gene counts
+            OUT.write("== Read counts by gene and taxon ==\n")
+            OUT.write("table\ttaxa\tgenes\treads\n")
+            for input_file in input.annot_tabs:
+                counts = pandas.read_table(input_file,
+                                           header=0,
+                                           names=['taxon','gene','count'])
+                name = re.search(r'non-rRNA\.annotation\.(.+)\.tsv$',
+                                 input_file).group(1)
+                taxon_counts = counts.groupby('taxon').sum()
+                taxon_count = int(taxon_counts.count())
+                read_count = int(taxon_counts.sum())
+                gene_count = int(counts.groupby('gene').sum().count())
+                OUT.write('{}\t{}\t{}\t{}\n'.format(name,
+                                                    taxon_count,
+                                                    gene_count,
+                                                    read_count))
+            OUT.write("//\n")
+
+"""
+        seq_stats_files=
+        seq_hist_files=[]
+        gene_tables=[]
+        rna_tax_counts=[]
+        other_inputs=[]
+        for input_file in input:
+            if re.search(r'\.stats$', input_file):
+                seq_stats_files.append(input_file)
+            elif re.search(r'\.hist$', input_file):
+                seq_hist_files.append(input_file)
+            elif re.search(r'\.rRNA\.annotation.+count\.tsv$', input_file):
+                # pull out rrna tvss first or theyll match the gene tsvs below
+                rna_tax_counts.append(input_file)
+            elif re.searchr(r'\.annotation\..+\..+\.tsv$', input_file):
+                gene_tables.append(input_file)
+            else:
+                other_inputs.append(input_file)
+                """
+    
+        
 

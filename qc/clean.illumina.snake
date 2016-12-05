@@ -39,9 +39,20 @@ if 'sample_id' not in config:
 sample=config['sample_id']
 reads_stats_files = [t.format(sample=sample) for t in reads_stats_templates]
 
-from snakemake.remote.SFTP import RemoteProvider
 if 'SFTP' in config:
+    import paramiko
+    from snakemake.remote.SFTP import RemoteProvider
     # get pysftp params from config (usu 'username' and 'private_key')
+    if 'private_key' in config['SFTP']:
+        # if private_key starts with "agent:" look for key in ssh-agent by name
+        private_key = config['SFTP']['private_key']
+        m = re.search(r'^agent:(.+)', private_key)
+        if m is not None:
+            agent_key_name = m.group(1)
+            agent_keys = paramiko.agent.Agent().get_keys()
+            config['SFTP']['private_key'] = \
+                [k for k in agent_keys if k.name==agent_key_name][0]
+    # setup connection
     SFTP = RemoteProvider(**config['SFTP'])
 
 rule clean_illumina_all:
@@ -51,18 +62,22 @@ rule clean_illumina_all:
 rule raw_reads:
     """Creates temporary link to raw reads"""
     input:
-        lambda w: SFTP.remote(config['samples'][w.sample][w.dir]) if config['samples'][w.sample].get('remote',False) else config['samples'][w.sample][w.dir]
+        lambda w: SFTP.remote(config['samples'][w.sample][w.dir], keep_local=True) if config['samples'][w.sample].get('remote',False) else config['samples'][w.sample][w.dir]
     output:
-        temp("{sample}_reads.{dir,R[12]}.fastq")
+        "{sample}_reads.{dir,R[12]}.fastq"
+    params:
+        # if we are pulling from a remote server, just move the downloaded file into place
+        cmd=lambda w: "mv" if config['samples'][w.sample].get('remote',False) else "ln -s"
     shell:
-        "ln -s {input} {output}"
+        "{params.cmd} {input} {output}"
 
 rule trimmomatic_adapters:
     """
     Generates fasta file with adapters for trimming
     """
     input:
-        lambda w: config['samples'][w.sample]['sample_sheet']
+        #lambda w: config['samples'][w.sample]['sample_sheet']
+        lambda w: SFTP.remote(config['samples'][w.sample]['sample_sheet'], keep_local=True) if config['samples'][w.sample].get('remote',False) else config['samples'][w.sample]['sample_sheet']
     output:
         "{sample}_adapters.fa"
     log:
