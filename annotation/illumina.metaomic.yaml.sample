@@ -1,0 +1,191 @@
+clade_ranks:
+    - order
+    - family
+    - genus
+output_style: long
+threads:
+    hmmer:    2
+    lastal:   10
+    prodigal: 20
+    bwa:      10
+dbs:
+    SilvaSSU:
+        path: /home/jmeppley/lus/seqdbs/Silva/123_1/Silva_123_SSURef_NR99/bwadb
+        format: bwadb
+        type: rrna
+    SilvaLSU:
+        path: /home/jmeppley/lus/seqdbs/Silva/123_1/Silva_123_LSURef/bwadb
+        format: bwadb
+        type: rrna
+    RefSeq: 
+        path: /lus/scratch/jmeppley/seqdbs/RefSeq/78/RefSeq-78.AllProteins.faa.ldb/lastdb
+        format: lastdb
+        type: tax
+    KEGG: 
+        path: /lus/scratch/jmeppley/seqdbs/KEGG/KeggGene.pep.20160919/lastdb
+        format: lastdb
+        assign_type: kegg
+    PFAM:
+        path: /lus/scratch/jmeppley/seqdbs/PFAM/30.0/Pfam-A.hmm
+        assign_type: pfam
+    COG:
+        path: /lus/scratch/jmeppley/seqdbs/cdd/16_January_2015/COG/COG.hmm
+    TIGR:
+        path: /lus/scratch/jmeppley/seqdbs/TIGRFAM/15.0/TIGRFAMS_HMM
+samples:
+  150115-MSMBEADBLANK: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/150115-MSMBEADBLANK_S1_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/150115-MSMBEADBLANK_S1_L001_R2_001.fastq,
+    sample_num: 1, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  150115-MSMREAGENTBLANK: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/150115-MSMREAGENTBLANK_S22_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/150115-MSMREAGENTBLANK_S22_L001_R2_001.fastq,
+    sample_num: 22, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KM272-cDNA-01-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/1/KM272-cDNA-01-a_S1_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/1/KM272-cDNA-01-a_S1_R2_001.fastq,
+    sample_num: 1, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-02-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/2/KM272-cDNA-02-a_S2_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/2/KM272-cDNA-02-a_S2_R2_001.fastq,
+    sample_num: 2, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-03-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/3/KM272-cDNA-03-a_S3_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/3/KM272-cDNA-03-a_S3_R2_001.fastq,
+    sample_num: 3, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-04-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/4/KM272-cDNA-04-a_S4_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/4/KM272-cDNA-04-a_S4_R2_001.fastq,
+    sample_num: 4, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-05-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/5/KM272-cDNA-05-a_S5_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/5/KM272-cDNA-05-a_S5_R2_001.fastq,
+    sample_num: 5, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-06-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/6/KM272-cDNA-06-a_S6_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/6/KM272-cDNA-06-a_S6_R2_001.fastq,
+    sample_num: 6, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-19-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/7/KM272-cDNA-19-a_S7_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/7/KM272-cDNA-19-a_S7_R2_001.fastq,
+    sample_num: 7, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-20-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/8/KM272-cDNA-20-a_S8_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/8/KM272-cDNA-20-a_S8_R2_001.fastq,
+    sample_num: 8, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-21-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/9/KM272-cDNA-21-a_S9_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/9/KM272-cDNA-21-a_S9_R2_001.fastq,
+    sample_num: 9, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-22-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/10/KM272-cDNA-22-a_S10_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/10/KM272-cDNA-22-a_S10_R2_001.fastq,
+    sample_num: 10, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-23-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/11/KM272-cDNA-23-a_S11_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/11/KM272-cDNA-23-a_S11_R2_001.fastq,
+    sample_num: 11, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-24-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/12/KM272-cDNA-24-a_S12_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/12/KM272-cDNA-24-a_S12_R2_001.fastq,
+    sample_num: 12, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-25-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/13/KM272-cDNA-25-a_S13_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/13/KM272-cDNA-25-a_S13_R2_001.fastq,
+    sample_num: 13, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-26-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/14/KM272-cDNA-26-a_S14_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/14/KM272-cDNA-26-a_S14_R2_001.fastq,
+    sample_num: 14, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-27-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/15/KM272-cDNA-27-a_S15_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/15/KM272-cDNA-27-a_S15_R2_001.fastq,
+    sample_num: 15, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-28-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/16/KM272-cDNA-28-a_S16_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/16/KM272-cDNA-28-a_S16_R2_001.fastq,
+    sample_num: 16, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-29-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/17/KM272-cDNA-29-a_S17_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/17/KM272-cDNA-29-a_S17_R2_001.fastq,
+    sample_num: 17, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-30-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/18/KM272-cDNA-30-a_S18_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/18/KM272-cDNA-30-a_S18_R2_001.fastq,
+    sample_num: 18, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-31-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/19/KM272-cDNA-31-a_S19_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/19/KM272-cDNA-31-a_S19_R2_001.fastq,
+    sample_num: 19, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-32-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/20/KM272-cDNA-32-a_S20_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/20/KM272-cDNA-32-a_S20_R2_001.fastq,
+    sample_num: 20, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-33-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/21/KM272-cDNA-33-a_S21_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/21/KM272-cDNA-33-a_S21_R2_001.fastq,
+    sample_num: 21, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-34-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/22/KM272-cDNA-34-a_S22_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/22/KM272-cDNA-34-a_S22_R2_001.fastq,
+    sample_num: 22, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-35-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/23/KM272-cDNA-35-a_S23_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/23/KM272-cDNA-35-a_S23_R2_001.fastq,
+    sample_num: 23, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-36-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/24/KM272-cDNA-36-a_S24_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/24/KM272-cDNA-36-a_S24_R2_001.fastq,
+    sample_num: 24, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-37-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/25/KM272-cDNA-37-a_S25_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/25/KM272-cDNA-37-a_S25_R2_001.fastq,
+    sample_num: 25, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-38-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/26/KM272-cDNA-38-a_S26_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/26/KM272-cDNA-38-a_S26_R2_001.fastq,
+    sample_num: 26, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-39-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/27/KM272-cDNA-39-a_S27_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/27/KM272-cDNA-39-a_S27_R2_001.fastq,
+    sample_num: 27, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-40-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/28/KM272-cDNA-40-a_S28_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/28/KM272-cDNA-40-a_S28_R2_001.fastq,
+    sample_num: 28, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-41-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/29/KM272-cDNA-41-a_S29_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/29/KM272-cDNA-41-a_S29_R2_001.fastq,
+    sample_num: 29, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KM272-cDNA-42-a: {R1: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/30/KM272-cDNA-42-a_S30_R1_001.fastq,
+    R2: ../150908_NS500472_0022_AHH3WVBGXX/Data/Intensities/BaseCalls/BPS-KM272/30/KM272-cDNA-42-a_S30_R2_001.fastq,
+    sample_num: 30, sample_sheet: ../150908_NS500472_0022_AHH3WVBGXX/SampleSheet.csv}
+  KMC19-01: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-01_S2_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-01_S2_L001_R2_001.fastq,
+    sample_num: 2, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KMC19-02: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-02_S3_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-02_S3_L001_R2_001.fastq,
+    sample_num: 3, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KMC19-03: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-03_S4_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-03_S4_L001_R2_001.fastq,
+    sample_num: 4, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KMC19-04: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-04_S5_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-04_S5_L001_R2_001.fastq,
+    sample_num: 5, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KMC19-05: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-05_S6_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-05_S6_L001_R2_001.fastq,
+    sample_num: 6, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KMC19-06: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-06_S7_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-06_S7_L001_R2_001.fastq,
+    sample_num: 7, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KMC19-07: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-07_S8_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-07_S8_L001_R2_001.fastq,
+    sample_num: 8, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KMC19-08: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-08_S9_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-08_S9_L001_R2_001.fastq,
+    sample_num: 9, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KMC19-09: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-09_S10_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-09_S10_L001_R2_001.fastq,
+    sample_num: 10, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KMC19-10: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-10_S11_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-10_S11_L001_R2_001.fastq,
+    sample_num: 11, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KMC19-11: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-11_S12_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-11_S12_L001_R2_001.fastq,
+    sample_num: 12, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KMC19-12: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-12_S13_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-12_S13_L001_R2_001.fastq,
+    sample_num: 13, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KMC19-13: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-13_S14_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-13_S14_L001_R2_001.fastq,
+    sample_num: 14, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KMC19-14: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-14_S15_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-14_S15_L001_R2_001.fastq,
+    sample_num: 15, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KMC19-15: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-15_S16_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-15_S16_L001_R2_001.fastq,
+    sample_num: 16, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KMC19-16: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-16_S17_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-16_S17_L001_R2_001.fastq,
+    sample_num: 17, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KMC19-17: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-17_S18_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-17_S18_L001_R2_001.fastq,
+    sample_num: 18, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KMC19-18: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-18_S19_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-18_S19_L001_R2_001.fastq,
+    sample_num: 19, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KMC19-19: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-19_S20_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-19_S20_L001_R2_001.fastq,
+    sample_num: 20, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}
+  KMC19-20: {R1: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-20_S21_L001_R1_001.fastq,
+    R2: ../150123_M02545_0010_000000000-A91V6/Data/Intensities/BaseCalls/KMC19-20_S21_L001_R2_001.fastq,
+    sample_num: 21, sample_sheet: ../150123_M02545_0010_000000000-A91V6/SampleSheet.csv}

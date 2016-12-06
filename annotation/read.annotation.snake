@@ -75,7 +75,7 @@ rule extract_reads:
         lambda w: bam_file_prefix_map.get(w.annotation_prefix,
                                                     w.annotation_prefix)
     output:
-        "{annotation_prefix}.fasta"
+        temp("{annotation_prefix}.fasta")
     benchmark:
         "benchmarks/extract_reads.time"
     log:
@@ -93,7 +93,7 @@ rule predict_genes_prodigal:
         lambda w: "{}.fasta".format(hit_table_map.get(w.hit_table_prefix,
                                                       w.hit_table_prefix))
     output:
-        faa="{hit_table_prefix}.faa"
+        faa=temp("{hit_table_prefix}.faa")
     log:
         "logs/{hit_table_prefix}.predict_genes_prodigal.log"
     benchmark:

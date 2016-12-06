@@ -16,6 +16,8 @@ from common import get_version, parse_stats
 ####
 # INCLUDES and CONFIG
 #
+if 'samples' not in config or 'dbs' not in config:
+    raise Exception("You need to supply sample source files and annotation dbs to proceed. Check out the example YAML files")
 # illumina cleaning
 # this should read sample list and data from illumina.yaml
 include: "../qc/clean.illumina.snake"
@@ -33,6 +35,11 @@ config['annotation_prefixes']=\
                sample=sample_prefix_list)
 # ... and the read annotation snakefile should set up everything else
 include: "../annotation/read.annotation.snake"
+# ... add slightly different set of hit table entries so we can do lastx in parallel
+for prefix in sample_prefix_list:
+    lastx_prefix = prefix + "_reads.cleaned.non-rRNA"
+    hit_table_map[lastx_prefix]=lastx_prefix
+    annotation_hit_table_map[lastx_prefix]=lastx_prefix
 #
 # This prefix will cause the necessary cleaning to happen
 clean_prefixes = expand("{sample}_reads.clipped.joined.trimmed",
@@ -55,6 +62,11 @@ rule report_all:
         annot_stats=[f for f in annotation_file_list if re.search(r'\.stats$',f)],
         annot_hists=[f for f in annotation_file_list if re.search(r'\.hist$',f)],
         annot_tabs=[f for f in annotation_file_list if re.search(r'\.tsv$',f)],
+        # lastx searches
+        tax_counts=expand("{prefix}_reads.cleaned.non-rRNA.annotation.{taxdb}.lastx.{rank}.count.tsv",
+                          prefix=sample_prefix_list,
+                          rank=config['clade_ranks'],
+                          taxdb=[config['taxdb']]),
         # rrna counts
         rrna_counts=\
             expand("{prefix}.rRNA.annotation.{db_dot_alg}.{rank}.count.tsv",
@@ -117,6 +129,22 @@ rule report_all:
                            .format(**vars()))
             OUT.write("//\n\n")
 
+            # check lastx tax counts
+            OUT.write("== Taxon counts found by rank in RefSeq (lastx) ==\n")
+            OUT.write("rank\ttaxon count\tread count\n")
+            for input_file in input.tax_counts:
+                rank = re.search(r'\.lastx\.([a-z]+)\.count\.tsv', input_file).group(1)
+                read_counts = pandas.read_table(input_file,
+                                                header=None, 
+                                                index_col=0, 
+                                                names=['read_count'])\
+                                .read_count
+                taxon_count = int(read_counts.count())
+                read_count = int(read_counts.sum())
+                OUT.write("{rank}\t{taxon_count}\t{read_count}\n"\
+                           .format(**vars()))
+            OUT.write("//\n\n")
+
             # check gene counts
             OUT.write("== Read counts by gene and taxon ==\n")
             OUT.write("table\ttaxa\tgenes\treads\n")
@@ -136,25 +164,12 @@ rule report_all:
                                                     read_count))
             OUT.write("//\n")
 
-"""
-        seq_stats_files=
-        seq_hist_files=[]
-        gene_tables=[]
-        rna_tax_counts=[]
-        other_inputs=[]
-        for input_file in input:
-            if re.search(r'\.stats$', input_file):
-                seq_stats_files.append(input_file)
-            elif re.search(r'\.hist$', input_file):
-                seq_hist_files.append(input_file)
-            elif re.search(r'\.rRNA\.annotation.+count\.tsv$', input_file):
-                # pull out rrna tvss first or theyll match the gene tsvs below
-                rna_tax_counts.append(input_file)
-            elif re.searchr(r'\.annotation\..+\..+\.tsv$', input_file):
-                gene_tables.append(input_file)
-            else:
-                other_inputs.append(input_file)
-                """
-    
-        
+rule dummy_reads:
+    """
+    create link to non rrna reads so that we can do lastx annotations in parallel with different naming prefix
 
+    NOTE: this hack is relying on the count_tax_hits rule from silva.snake
+    """
+    input: "{prefix}_reads.clipped.joined.trimmed.non-rRNA.fastq"
+    output: temp("{prefix}_reads.cleaned.non-rRNA.fastq")
+    shell: "ln -s {input} {output}"

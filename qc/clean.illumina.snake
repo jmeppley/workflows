@@ -64,7 +64,7 @@ rule raw_reads:
     input:
         lambda w: SFTP.remote(config['samples'][w.sample][w.dir], keep_local=True) if config['samples'][w.sample].get('remote',False) else config['samples'][w.sample][w.dir]
     output:
-        "{sample}_reads.{dir,R[12]}.fastq"
+        temp("{sample}_reads.{dir,R[12]}.fastq")
     params:
         # if we are pulling from a remote server, just move the downloaded file into place
         cmd=lambda w: "mv" if config['samples'][w.sample].get('remote',False) else "ln -s"
@@ -177,7 +177,7 @@ rule merge_paired_unpaired:
         "{file_root}.clipped.R1.unpaired.fastq",
         "{file_root}.clipped.R2.unpaired.fastq",
     output:
-        "{file_root}.clipped.joined.trimmed.fastq"
+        temp("{file_root}.clipped.joined.trimmed.fastq")
     shell:
         """
         cat {input} > {output}

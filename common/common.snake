@@ -18,7 +18,7 @@ rule uncompress_file:
 
 rule fastq_to_fasta:
     input: "{file_root}.fastq"
-    output: "{file_root}.fasta"
+    output: temp("{file_root}.fasta")
     benchmark: "benchmarks/{file_root}.fasta.time"
     version: get_version("seqtk", "", lines=2)
     shell:

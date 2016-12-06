@@ -97,9 +97,9 @@ rule lastal:
     """
     input:
         lambda w: "{file_root}.{ext}".format(file_root=w.file_root,
-                                        ext="faa" if w.alg == 'p' else "ffn")
+                ext="faa" if w.alg=='p' else 'fasta' if w.alg=='x' else 'ffn')
     output:
-        "{file_root}.vs.{db}.last{alg}"
+        "{file_root}.vs.{db}.last{alg,[xpn]}"
     benchmark:
         "benchmarks/lastal.{db}.time"
     log:
@@ -130,7 +130,7 @@ rule assign_taxa:
                     lastalg=w.lastalg)
         #"{annotation_prefix}.vs.{taxdb}.{lastalg}"
     output:
-        "{annotation_prefix}.annotation.{taxdb}.{lastalg}.{rank}.tsv"
+        temp("{annotation_prefix}.annotation.{taxdb}.{lastalg}.{rank}.tsv")
     benchmark:
         "benchmarks/assign_taxa.{rank}.{taxdb}.{lastalg}.time"
     #log:
@@ -160,7 +160,7 @@ rule assign_paths:
     input:
         lambda w: get_hit_table_name_from_wildcards_db(w, config)
     output:
-        "{annotation_prefix}.annotation.gene_family.{db}.tsv"
+        temp("{annotation_prefix}.annotation.gene_family.{db}.tsv")
     benchmark:
         "benchmarks/assign_paths.{db}.time"
     log:

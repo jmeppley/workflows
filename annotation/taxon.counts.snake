@@ -1,0 +1,169 @@
+"""
+Workflow to compile hit tables from multiple samples into a set of count tables
+
+ * hit id counts by sample (with a column for taxid)
+ * taxid counts by sample (with columns for named ranks (phylum ... genus, speies, org$)
+ * optional counts by ranked taxa (eg: order)
+"""
+import re
+import glob
+import pandas
+import os
+import sys
+import edl.taxon
+
+snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
+sys.path[0]=os.path.join(snakefile_path,'..','python')
+from common import get_version, parse_stats
+
+config.setdefault('lineage_ranks',
+    ['domain', 'phylum', 'class', 'order', 'family', 'genus', 'species'])
+config.setdefault('count_ranks',
+    ['phylum', 'order', 'genus'])
+
+if 'acc_to_taxid_map' not in config:
+    try:
+        config['acc_to_taxid_map']=config['dbs']['RefSeq']['path'] + ".tax"
+    except:
+        raise Exception("You must provide a path to the RefSeq accession to taxid map as --config acc_to_taxid_map=XXX")
+
+if 'collections' not in config:
+    # set up default collections hash with a single collection
+    config.setdefault('collections',{})[config.get('collection',
+                                                   'compiled')]={}
+
+for collection in config['collections']:
+    for collection in config['collections']:
+        # build map from stats files to sample names using supplied 
+        # glob (to find files) and reg exp (to pull out sample name)
+        read_stats_samples = {}
+        file_glob = config['collections'][collection].get('read_stats_glob',
+                              '*/*_reads.clipped.joined.trimmed.fastq.stats')
+        file_re = config['collections'][collection].get('read_stats_re',
+                                              '^([^/]+)/')
+        for stats_file in glob.glob(file_glob):
+            sample = re.search(file_re, stats_file).group(1)
+            read_stats_samples[stats_file]=sample
+        
+        config['collections'][collection]['read_stats_samples'] = \
+                                                    read_stats_samples
+        
+        # build map from hit_tables to sample names using
+        # supplied glob and re
+        hit_table_samples = {}
+        file_glob = config['collections'][collection].get('hit_table_glob',
+              '*/*_reads.cleaned.non-rRNA.vs.RefSeq.lastx')
+        file_re = config['collections'][collection].get('hit_table_re',
+                                              '^([^/]+)/')
+        for hit_table in glob.glob(file_glob):
+            sample = re.search(file_re, hit_table).group(1)
+            hit_table_samples[sample]=hit_table
+    
+        config['collections'][collection]['hit_table_samples'] = \
+                                                    hit_table_samples
+
+rule all:
+    input:
+        expand("{collection}/counts.raw.reads.tsv",
+                collection=config['collections']),
+        expand("{collection}/counts.hitids.taxids.tsv",
+                collection=config['collections']),
+        expand("{collection}/counts.taxids.lineage.tsv",
+                collection=config['collections']),
+        expand("{collection}/counts.by.{rank}.tsv",
+               collection=config['collections'],
+               rank=config.get('count_ranks'))
+
+rule count_by_rank:
+    """
+    Collpase taxond counts by taxon at given rank
+    """
+    input: "{collection}/counts.taxids.lineage.tsv"
+    output: "{collection}/counts.by.{rank}.tsv"
+    run:
+        # read in taxon table
+        tax_counts = pandas.read_table(input[0], index_col=0)
+        # collapse at rank
+        rank_counts = tax_counts.groupby(wildcards.rank).sum()
+        # write to output file
+        rank_counts.to_csv(output[0], sep='\t')
+
+rule taxid_count_table:
+    """
+    Collapse counts by taxid and add lineage info
+    """
+    input: "{collection}/counts.hitids.taxids.tsv"
+    output: "{collection}/counts.taxids.lineage.tsv"
+    run:
+        # read in the hit id table
+        hit_counts = pandas.read_table(input[0], index_col=0).fillna(0)
+        # collapse on taxids
+        taxid_counts = hit_counts.groupby('taxid').sum()
+
+        # get taxa from taxids
+        taxdir = os.path.split(config['acc_to_taxid_map'])[0]
+        taxonomy = edl.taxon.readTaxonomy(taxdir)
+        taxid_counts['taxon'] = [taxonomy.idMap[t] for t in taxid_counts.index]
+
+        # add lineage info
+        for rank in config['lineage_ranks']:
+            taxid_counts[rank] = \
+                [t.getAncestorClosestToRank(rank) for t in taxid_counts.taxon]
+
+        # write new table
+        taxid_counts.to_csv(output[0], sep='\t')
+
+rule remove_comments:
+    """
+    Remove comment lines (they mess up the redistribute algorithm)
+    """
+    input:
+        lambda w: config['collections'][w.collection]['hit_table_samples'][w.sample]
+    output:
+        temp("{collection}/{sample}.vs.RefSeq.nocomments.lastx")
+    shell:
+        "grep -v '^#' {input} > {output}"
+
+rule hitid_count_table:
+    """
+    consolodate hit tables into count table by hit id
+    """
+    input: 
+        lambda w: expand("{collection}/{sample}.vs.RefSeq.nocomments.lastx",
+                        collection=w.collection,
+                        sample=list(config['collections'][w.collection]\
+                                     ['hit_table_samples'].keys()))
+    output:
+        "{collection}/counts.hitids.taxids.tsv"
+    log:
+        "{collection}/counts.hitids.taxids.tsv.log"
+    params:
+        # count_taxa lets us put column names before input files
+        input_map=lambda w: " ".join(\
+                    ["{0}={1}/{0}.vs.RefSeq.nocomments.lastx"\
+                                        .format(s,w.collection) \
+                      for s in config['collections']\
+                                     [w.collection]\
+                                     ['hit_table_samples'].keys()])
+    shell:
+        "count_taxa.py {params.input_map} -p accs -c 0 -a all -C tophit -F 0 -f blast | translate_column.py -m {config[acc_to_taxid_map]} -c 1 -f taxid > {output} 2> {log}"
+
+rule raw_read_counts:
+    """
+    loop over read ststs files and generate table of read counts by sample
+    """
+    input: 
+        lambda w: list(config['collections'][w.collection]['read_stats_samples'].keys())
+    output:
+        "{collection}/counts.raw.reads.tsv"
+    run:
+        with open(output[0], 'w') as OUT:
+            OUT.write("sample\tread count\n")
+            for stats_file in input:
+                stats = parse_stats(stats_file)
+                sample = config['collections']\
+                               [wildcards.collection]\
+                               ['read_stats_samples']\
+                               [stats_file]
+                OUT.write("{}\t{}\n".format(sample,stats['reads']))
+                
