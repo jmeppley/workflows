@@ -1,9 +1,7 @@
 """
 Workflow to compile hit tables from multiple samples into a set of count tables
 
- * hit id counts by sample (with a column for taxid)
- * taxid counts by sample (with columns for named ranks (phylum ... genus, speies, org$)
- * optional counts by ranked taxa (eg: order)
+ * hit id counts by sample (with a column for ko)
 """
 import re
 import glob
@@ -16,16 +14,8 @@ snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
 sys.path[0]=os.path.join(snakefile_path,'..','python')
 from common import get_version, parse_stats
 
-config.setdefault('lineage_ranks',
-    ['domain', 'phylum', 'class', 'order', 'family', 'genus', 'species'])
-config.setdefault('count_ranks',
-    ['phylum', 'order', 'genus'])
-
-if 'acc_to_taxid_map' not in config:
-    try:
-        config['acc_to_taxid_map']=config['dbs']['RefSeq']['path'] + ".tax"
-    except:
-        raise Exception("You must provide a path to the RefSeq accession to taxid map as --config acc_to_taxid_map=XXX")
+if 'ko_map' not in config:
+	raise Exception("You must provide a path to the KEGG hit id to KO map as --config ko_map=XXX")
 
 if 'collections' not in config:
     # set up default collections hash with a single collection
@@ -38,7 +28,7 @@ for collection in config['collections']:
         # glob (to find files) and reg exp (to pull out sample name)
         read_stats_samples = {}
         file_glob = config['collections'][collection].get('read_stats_glob',
-                              '*/*_reads.clipped.joined.trimmed.fastq.stats')
+                              '*/*_reads.clipped.joined.trimmed.non-rRNA.genes. faa.stats')
         file_re = config['collections'][collection].get('read_stats_re',
                                               '^([^/]+)/')
         for stats_file in glob.glob(file_glob):
@@ -52,7 +42,7 @@ for collection in config['collections']:
         # supplied glob and re
         hit_table_samples = {}
         file_glob = config['collections'][collection].get('hit_table_glob',
-              '*/*_reads.cleaned.non-rRNA.vs.RefSeq.lastx')
+              '*/*_reads.clipped.joined.trimmed.non-rRNA.genes.  vs.KEGG.lastp')
         file_re = config['collections'][collection].get('hit_table_re',
                                               '^([^/]+)/')
         for hit_table in glob.glob(file_glob):
@@ -64,55 +54,10 @@ for collection in config['collections']:
 
 rule all:
     input:
-        expand("{collection}/counts.raw.reads.tsv",
+        expand("{collection}/kegg.counts.genes.tsv",
                 collection=config['collections']),
-        expand("{collection}/counts.hitids.taxids.tsv",
+        expand("{collection}/kegg.counts.hitids.kos.tsv",
                 collection=config['collections']),
-        expand("{collection}/counts.taxids.lineage.tsv",
-                collection=config['collections']),
-        expand("{collection}/counts.by.{rank}.tsv",
-               collection=config['collections'],
-               rank=config.get('count_ranks'))
-
-rule count_by_rank:
-    """
-    Collpase taxond counts by taxon at given rank
-    """
-    input: "{collection}/counts.taxids.lineage.tsv"
-    output: "{collection}/counts.by.{rank}.tsv"
-    run:
-        # read in taxon table
-        tax_counts = pandas.read_table(input[0], index_col=0)
-        # collapse at rank
-        rank_counts = tax_counts.groupby(wildcards.rank).sum()
-        # write to output file
-        rank_counts.to_csv(output[0], sep='\t')
-
-rule taxid_count_table:
-    """
-    Collapse counts by taxid and add lineage info
-    """
-    input: 
-        table="{collection}/counts.hitids.taxids.tsv",
-        taxdir=os.path.split(config['acc_to_taxid_map'])[0],
-    output: "{collection}/counts.taxids.lineage.tsv"
-    run:
-        # read in the hit id table
-        hit_counts = pandas.read_table(input.table, index_col=0).fillna(0)
-        # collapse on taxids
-        taxid_counts = hit_counts.groupby('taxid').sum()
-
-        # get taxa from taxids
-        taxonomy = edl.taxon.readTaxonomy(input.taxdir)
-        taxid_counts['taxon'] = [taxonomy.idMap[int(t)] if t != 'taxid' else 'Unknown' for t in taxid_counts.index]
-
-        # add lineage info
-        for rank in config['lineage_ranks']:
-            taxid_counts[rank] = \
-                [t.getAncestorClosestToRank(rank) if t!='Unknown' else t for t in taxid_counts.taxon]
-
-        # write new table
-        taxid_counts.to_csv(output[0], sep='\t')
 
 rule remove_comments:
     """
@@ -121,7 +66,7 @@ rule remove_comments:
     input:
         lambda w: config['collections'][w.collection]['hit_table_samples'][w.sample]
     output:
-        temp("{collection}/{sample}.vs.RefSeq.nocomments.lastx")
+        temp("{collection}/{sample}.vs.RefSeq.nocomments")
     shell:
         "grep -v '^#' {input} > {output}"
 
@@ -130,27 +75,26 @@ rule hitid_count_table:
     consolodate hit tables into count table by hit id
     """
     input: 
-        lastx=lambda w: expand("{collection}/{sample}.vs.RefSeq.nocomments.lastx",
+        last=lambda w: expand("{collection}/{sample}.vs.RefSeq.nocomments",
                         collection=w.collection,
                         sample=list(config['collections'][w.collection]\
                                      ['hit_table_samples'].keys())),
-        taxmap=config["acc_to_taxid_map"]
-
+        ko_map=config["ko_map"]
     output:
-        "{collection}/counts.hitids.taxids.tsv"
+        "{collection}/kegg.counts.hitids.kos.tsv"
     log:
-        "{collection}/counts.hitids.taxids.tsv.log"
+        "{collection}/kegg.counts.hitids.kos.tsv.log"
     params:
         # count_taxa lets us put column names before input files,
         #  so we use this mapping instead of the input list
         input_map=lambda w: " ".join(\
-                    ["{0}={1}/{0}.vs.RefSeq.nocomments.lastx"\
+                    ["{0}={1}/{0}.vs.RefSeq.nocomments"\
                                         .format(s,w.collection) \
                       for s in config['collections']\
                                      [w.collection]\
                                      ['hit_table_samples'].keys()])
     shell:
-        "count_taxa.py {params.input_map} -p accs -c 0 -a all -C tophit -F 0 -f blast | translate_column.py -m {input.taxmap} -c 1 -f taxid > {output} 2> {log}"
+        "count_paths.py {params.input_map} -p hitid -c 0 -a all -C tophit -F 0 -f blast | translate_column.py -m {input.ko_map} -c 1 -f ko > {output} 2> {log}"
 
 rule raw_read_counts:
     """
@@ -159,7 +103,7 @@ rule raw_read_counts:
     input: 
         lambda w: list(config['collections'][w.collection]['read_stats_samples'].keys())
     output:
-        "{collection}/counts.raw.reads.tsv"
+        "{collection}/kegg.counts.genes.tsv"
     run:
         with open(output[0], 'w') as OUT:
             OUT.write("sample\tread count\n")
@@ -171,3 +115,4 @@ rule raw_read_counts:
                                [stats_file]
                 OUT.write("{}\t{}\n".format(sample,stats['reads']))
                 
+

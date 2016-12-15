@@ -111,9 +111,14 @@ rule lastal:
     params:
         db_path=lambda w: config['dbs'][w.db]['path'],
         fshift=lambda w: "-F 15" if w.alg=='x' else "",
+        opts=lambda w: "" if w.alg=='n' else "-b 1 -x 15 -y 7 -z 25",
+        keep=config.get('last_filter','-F 5')
     shell:
-        "lastal -P {threads} {params.fshift} -f BlastTab -b 1 -x 15 -y 7 -z 25 \
-         {params.db_path} {input} > {output}"
+        "lastal -P {threads} {params.fshift} -f BlastTab {params.opts} \
+         {params.db_path} {input} \
+         | grep -v '^#'  \
+         | filter_blast_m8.py -f blast {params.keep} \
+         > {output}"
 
 rule assign_taxa:
     """
@@ -199,4 +204,19 @@ rule compile_counts:
         three_column_opt="-L" if config.get('output_style','default').lower() == 'long' else ""
     shell:
         "compile_hit_counts.py {params.three_column_opt} -1 {input[0]} -2 {input[1]} -o {output} -S"
+
+rule count_tax_hits:
+    input:
+        "{hit_table_prefix}.annotation.{db}.{alg}.{rank}.tsv"
+    output:
+        "{hit_table_prefix}.annotation.{db}.{alg}.{rank}.count.tsv"
+    benchmark:
+        "benchmarks/{hit_table_prefix}.{db}.{alg}.{rank}.count.time"
+    log:
+        "logs/{hit_table_prefix}.{db}.{alg}.{rank}.count.log"
+    version:
+        get_version("count_hits.py")
+    shell:
+        "count_hits.py -v -i {input} -H 1 -a portion\
+        > {output} 2> {log}"
 

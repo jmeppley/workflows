@@ -46,6 +46,7 @@ rule map_reads_to_bwadb:
     shell:
         "bwa mem -t {threads} {params.db_path} {input} 2> {log}  > {output}"
 
+"""
 rule count_tax_hits:
     input:
         "{hit_table_prefix}.annotation.{db}.{alg}.{rank}.tsv"
@@ -58,4 +59,5 @@ rule count_tax_hits:
     shell:
         "count_hits.py -v -i {input} -H 1 -a portion\
         > {output} 2> {log}"
+"""
 
