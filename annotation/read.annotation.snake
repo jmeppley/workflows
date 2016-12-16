@@ -39,7 +39,7 @@ for prefix in annotation_prefixes:
 # End configuration
 ##########
 
-include: "../common/common.snake"
+include: "../common/common.genes.snake"
 include: "./common.snake"
 
 # make sure read extraction comes from sam, not a nonexistent fastq:

@@ -12,6 +12,7 @@ import sys
 snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
 sys.path[0]=os.path.join(snakefile_path,'..','python')
 from common import get_version, parse_stats
+from annotate import get_db_dot_fmt_strings
 
 ####
 # INCLUDES and CONFIG
@@ -33,20 +34,18 @@ include: "../qc/sort.rna.snake"
 config['annotation_prefixes']=\
         expand("{sample}_reads.clipped.joined.trimmed.non-rRNA",
                sample=sample_prefix_list)
-# ... and the read annotation snakefile should set up everything else
-include: "../annotation/read.annotation.snake"
-# ... add slightly different set of hit table entries so we can do lastx in parallel
-for prefix in sample_prefix_list:
-    lastx_prefix = prefix + "_reads.cleaned.non-rRNA"
-    hit_table_map[lastx_prefix]=lastx_prefix
-    annotation_hit_table_map[lastx_prefix]=lastx_prefix
 #
 # This prefix will cause the necessary cleaning to happen
 clean_prefixes = expand("{sample}_reads.clipped.joined.trimmed",
                         sample=sample_prefix_list)
 include: "../annotation/silva.snake"
 #
+# get special list for building file names
+gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs, config)
+#
 ####
+
+ruleorder: remove_colons > fastq_to_fasta
 
 rule report_all:
     """
@@ -58,21 +57,30 @@ rule report_all:
         # from clean.illumina.snake
         clean_stats=[f for f in reads_stats_files if re.search(r'\.stats$',f)],
         clean_hists=[f for f in reads_stats_files if re.search(r'\.hist$',f)],
-        # from read.annotation.snake
-        annot_stats=[f for f in annotation_file_list if re.search(r'\.stats$',f)],
-        annot_hists=[f for f in annotation_file_list if re.search(r'\.hist$',f)],
-        annot_tabs=[f for f in annotation_file_list if re.search(r'\.tsv$',f)],
-        # lastx searches
-        tax_counts=expand("{prefix}_reads.cleaned.non-rRNA.annotation.{taxdb}.lastx.{rank}.count.tsv",
-                          prefix=sample_prefix_list,
-                          rank=config['clade_ranks'],
-                          taxdb=[config['taxdb']]),
+        # from common.sixframe.snake
+        annot_stats=expand("{prefix}.{type}.stats",
+                           prefix=config['annotation_prefixes'], 
+                           type=['fasta','sixframe.faa']),
+        annot_hists=expand("{prefix}.{type}.hist",
+                           prefix=config['annotation_prefixes'], 
+                           type=['fasta','sixframe.faa']),
+        annot_tabs=\
+            expand("{prefix}.annot.{taxdb}.lastx.{clade}.vs.{db_dot_fmt}.tsv",
+                       taxdb=config['taxdb'],
+                       db_dot_fmt=gene_family_db_dot_fmts,
+                       prefix=config['annotation_prefixes'],
+                       clade=config['clade_ranks'],),
+        tax_counts=\
+            expand("{prefix}.nocolon.annot.{taxdb}.lastx.{clade}.count.tsv",
+                   prefix=config['annotation_prefixes'],
+                   taxdb=config['taxdb'],
+                   clade=config['clade_ranks']),
         # rrna counts
         rrna_counts=\
-            expand("{prefix}.rRNA.annotation.{db_dot_alg}.{rank}.count.tsv",
+            expand("{prefix}.rRNA.annot.{db_dot_fmt}.{rank}.count.tsv",
                 prefix=clean_prefixes,
                 rank=config['clade_ranks'],
-                db_dot_alg=['{}.{}'.format(d,a) for d,a in silva_algs.items()]),
+                db_dot_fmt=['{}.{}'.format(d,a) for d,a in silva_fmts.items()]),
         rrna_stats=expand("{prefix}.{type}.fastq.{ext}",
                 prefix=clean_prefixes,
                 ext=['stats',],
@@ -82,7 +90,7 @@ rule report_all:
                 ext=['hist',],
                 type=['rRNA','non-rRNA'])
     output:
-        "{sample}_reads.annotation.report".format(sample=config['sample_id'])
+        "{sample}_reads.annot.report".format(sample=config['sample_id'])
     run:
         import pandas, re
         with open(output[0],'w') as OUT:
@@ -117,7 +125,7 @@ rule report_all:
             OUT.write("== Taxon counts found by rank in Silva ==\n")
             OUT.write("Silva DB\trank\ttaxon count\tread count\n")
             for input_file in input.rrna_counts:
-                db, rank = re.search(r'annotation\.Silva([LS]SU)\.sam\.([a-z]+)\.count\.tsv', input_file).groups()
+                db, rank = re.search(r'annot\.Silva([LS]SU)\.sam\.([a-z]+)\.count\.tsv', input_file).groups()
                 read_counts = pandas.read_table(input_file,
                                                 header=None, 
                                                 index_col=0, 
@@ -152,7 +160,7 @@ rule report_all:
                 counts = pandas.read_table(input_file,
                                            header=0,
                                            names=['taxon','gene','count'])
-                name = re.search(r'non-rRNA\.annotation\.(.+)\.tsv$',
+                name = re.search(r'non-rRNA\.annot\.(.+)\.tsv$',
                                  input_file).group(1)
                 taxon_counts = counts.groupby('taxon').sum()
                 taxon_count = int(taxon_counts.count())

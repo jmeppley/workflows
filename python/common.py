@@ -2,6 +2,7 @@ import subprocess
 import glob
 import re
 import pandas
+import os
 
 
 def get_version(command, version_flag='--version', 
@@ -46,6 +47,11 @@ def parse_stats(stats_file):
     pull out the read and base counts from a prinseq output file.
     Returns a two item dict with integer values and keys: 'reads', 'bases'
     """
+
+    # if the file is empty, so was the fasta/fastq file
+    if os.stat(stats_file).st_size==0:
+        return {'reads':0,'bases':0}
+
     stats = pandas.read_table(stats_file,names=('module','key','value'),index_col=1)['value']
     return {k:int(stats[k]) for k in ['reads','bases']}
 

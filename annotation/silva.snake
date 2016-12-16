@@ -1,27 +1,20 @@
 import re
 
-include: "../annotation/common.snake"
+include: "../annotation/common.sixframe.snake"
 
-silva_algs={}
+silva_fmts={}
 for db, db_data in config['dbs'].items():
     if db_data.get('type')=='rrna':
-        db_format = db_data.get('format','lastdb')
-        if db_format == 'lastdb':
-            alg = 'lastn'
-        elif db_format == 'bwadb':
-            alg = 'sam'
-        else:
-            raise Exception("Unknown type {} for db {}".format(db_format,
-                                                               db))
-        silva_algs[db]=alg
+        fmt = db_data.get('format','lastdb')
+        silva_fmts[db]=fmt
 
 
 rule silva_all:
     input:
-        expand("{file_root}.annotation.{db_dot_alg}.{rank}.count.tsv",
+        expand("{file_root}.annot.{db_dot_fmt}.{rank}.count.tsv",
                file_root=config.get('file_root','reads'),
                rank=config.get('clade_ranks',['order']),
-               db_dot_alg=['{}.{}'.format(d,a) for d,a in silva_algs.items()])
+               db_dot_fmt=['{}.{}'.format(d,a) for d,a in silva_fmts.items()])
 
 rule map_reads_to_bwadb:
     """
@@ -49,9 +42,9 @@ rule map_reads_to_bwadb:
 """
 rule count_tax_hits:
     input:
-        "{hit_table_prefix}.annotation.{db}.{alg}.{rank}.tsv"
+        "{hit_table_prefix}.annot.{db}.{alg}.{rank}.tsv"
     output:
-        "{hit_table_prefix}.annotation.{db}.{alg}.{rank}.count.tsv"
+        "{hit_table_prefix}.annot.{db}.{alg}.{rank}.count.tsv"
     benchmark:
         "benchmarks/{hit_table_prefix}.{db}.{alg}.{rank}.count.time"
     log:
