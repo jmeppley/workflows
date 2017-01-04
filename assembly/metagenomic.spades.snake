@@ -37,6 +37,9 @@ if 'bbmap' not in config['system_paths']:
 read_directions = ['R1','R2']
 
 # which tool for error correction
+if 'bfc' in config:
+    # use BFC if configured and nothing else pecified
+    config.setdefault('error_correction','bfc')
 error_correction = config.get('error_correction','spades').lower()
 
 # default configuration
@@ -426,7 +429,9 @@ rule map_reads:
     """
     input:
         "mapping/contigs.index.bwa.bwt",
-        "reads.cleaned.fastq"
+        "reads.corrected.{}.fastq".format(error_correction) \
+            if error_correction!='spades' \
+            else "reads.cleaned.fastq"
     output:
         temp("mapping/reads.vs.contigs.sam")
     log:

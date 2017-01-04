@@ -8,7 +8,9 @@ rule uncompress_file:
     input:
         "{file_root}.gz"
     output:
-        temp("{file_root,[^z]$}")
+        temp("{file_root}")
+    wildcard_constraints:
+        file_root=r'.+(?<!\.gz)$'
     benchmark:
         "benchmarks/{file_root}.gunzip.time"
     version:
