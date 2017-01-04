@@ -1,0 +1,21 @@
+
+rule anvio_profile:
+    input:
+        "anvio/status/contig-db",
+        "mapping/{sample}.reads.vs.contigs.bam.bai"
+    output:
+        "anvio/profile-{sample}/RUNINFO.cp"
+    log:
+        "logs/anvio-profile-{sample}"
+    benchmark:
+        "benchmarks/anvio-profile-{sample}.time"
+    version:
+        get_version("anvi-profile",lines=[1,])
+    params:
+        bam=lambda w: "mapping/{sample}.reads.vs.contigs.bam".format(sample=w.sample)
+    shell:
+        """source activate anvio
+           rm -rf anvio/profile-{wildcards.sample}
+           anvi-profile -i {params.bam} -c contigs.db -S {wildcards.sample} \
+           -o anvio/profile-{wildcards.sample}"""
+

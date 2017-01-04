@@ -1,0 +1,64 @@
+"""
+Python Makefile to assemble reads from multiple samples into a single assembly
+with megahit.
+"""
+import os
+import sys
+snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
+sys.path[0]=os.path.join(snakefile_path,'..','python')
+from common import get_version
+configfile: "./pooled_assembly.yaml"
+
+include: "../assembly/metagenomic.megahit.snake"
+include: "anvio.contigs.snake"
+include: "anvio.profiles.snake"
+
+######################
+# Configuration
+#
+#  setup from megahit assemnbly is just fine
+#
+# End Configuration
+######################
+
+
+######################
+# Rules
+
+
+rule anvio_all:
+    input:
+        "contigs.fasta.stats",
+        "anvio/status/contig-hmms",
+        "anvio/samples-merged",
+        "anvio/status/contig-tax"
+
+rule anvio_contigs:
+    input:
+        "megahit-{params}/megahit.contigs.fa".format(params=config['megahit']['preset'])
+    output:
+        "contigs.fa"
+    version:
+        get_version('sed', lines=[1,])
+    log:
+        "logs/simplify-contig-names"
+    benchmark:
+        "benchmarks/simplify-contig-names.time"
+    shell:
+        'cat {input} | sed -r "s/^>(\S+)\s*.*$/>\\1/" > {output}'
+
+rule anvio_merge_profiles:
+    input:
+        profiles=expand("anvio/profile-{sample}/RUNINFO.cp",
+                    sample=config['reads']),
+        contigs_tax="anvio/status/contig-tax"
+    output:
+        "anvio/samples-merged"
+    log:
+        "logs/anvio-merged"
+    benchmark:
+        "benchmarks/anvio.merge.time"
+    shell:
+        """source activate anvio
+           anvi-merge {input.profiles} -c contigs.db -o {output}"""
+

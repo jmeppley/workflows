@@ -1,0 +1,76 @@
+include: "../annotation/common.snake"
+
+rule contig_db:
+    input:
+        "contigs.fasta"
+    output:
+        "anvio/status/contig-db"
+    log:
+        "logs/anvio-contig-db"
+    benchmark:
+        "benchmarks/anvio-contig-db.time"
+    version:
+        get_version("anvi-profile",lines=[1,])
+    shell:
+        """source activate anvio
+           rm -f contigs.db contigs.h5
+           anvi-gen-contigs-database -f {input} -o contigs.db
+           touch {output}"""
+
+rule anvio_hmms:
+    input:
+        "anvio/status/contig-db"
+    output:
+        "anvio/status/contig-hmms"
+    benchmark:
+        "benchmarks/contigs.hmms.time"
+    log:
+        "logs/contigs.hmms"
+    threads:
+        20
+    shell:
+        """source activate anvio
+           anvi-run-hmms -c contigs.db --num-threads {threads}
+           touch {output}"""
+
+rule anvio_genes:
+    input:
+        "anvio/status/contig-db"
+    output:
+        "contigs.genes.ffn"
+    benchmark:
+        "benchmarks/contigs.genes.time"
+    log:
+        "logs/contigs.genes"
+    shell:
+        """source activate anvio
+           anvi-get-dna-sequences-for-gene-calls -c contigs.db -o {output}"""
+
+rule contigs_tax_table:
+    input:
+        "contigs.genes.vs.RefSeq.lastx",
+    output:
+        "contigs.annotation.tax_matrix.tsv"
+    log:
+        "logs/contigs_tax_table"
+    benchmark:
+        "benchmarks/contigs.tax.table.time"
+    params:
+        taxdump=os.path.split(config['dbs']["RefSeq"]['path'])[0],
+        taxmap=config['dbs']['RefSeq']['path'] + ".tax",
+    shell:
+        """cat "gene_callers_id\tt_phylum\tt_class\tt_order\tt_family\tt_genus\tt_species" > {output}
+           assign_taxa.py -r species -R phylum -R class -R order -R family\
+           -R genus -f blast -F 0 -C toporg -p accs -n {params.taxdump}\
+           -m {params.taxmap} >> {output}"""
+
+rule anvio_gene_taxa:
+    input:
+        "contigs.annotation.tax_matrix.tsv",
+        "anvio/status/contig-db"
+    output:
+        "anvio/status/contig-tax"
+    shell:
+        """source activate anvio
+           anvi-import-taxonomy -c contigs.db -i {input[0]} -p default_matrix"""
+
