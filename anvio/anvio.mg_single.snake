@@ -17,7 +17,7 @@ include: "../common/common.snake"
 ####
 # Required conda packages:
 #
-# snakemake bwa prinseq pandas
+# snakemake bwa prinseq pandas last
 # 
 # also need a conda environment for AnVio 
 #    (config['anvio_env'] defaults to "anvio")

@@ -65,10 +65,10 @@ rule prinseq_any:
         cat=lambda wildcards:"gunzip -c" \
          if re.search(r'\.gz$',wildcards.ext) else "cat"
     version:
-        get_version('prinseq','-version')
+        get_version('prinseq-lite.pl','-version')
     shell:
         "{params.cat} {input} | \
-        prinseq {params.input_flag} stdin \
+        prinseq-lite.pl {params.input_flag} stdin \
          -stats_len -stats_info {params.aa} > {output}"
 
 

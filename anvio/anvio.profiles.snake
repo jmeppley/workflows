@@ -1,3 +1,6 @@
+"""
+Collection of rules from setting up AnVio profiles
+"""
 
 rule anvio_profile:
     input:

@@ -1,6 +1,6 @@
 """
-Python Makefile to assemble reads from multiple samples into a single assembly
-with megahit.
+Python Makefile to process multiple samples via megahit and AnVio per:
+http://merenlab.org/2016/06/22/anvio-tutorial-v2/
 """
 import os
 import sys
