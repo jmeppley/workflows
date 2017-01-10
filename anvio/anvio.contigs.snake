@@ -159,9 +159,9 @@ rule contigs_tax_table_lastal:
     version:
         get_version('assign_taxa.py')
     shell:
-        """cat "gene_callers_id\tt_phylum\tt_class\tt_order\tt_family\tt_genus\tt_species" > {output}
+        """echo "gene_callers_id\tt_phylum\tt_class\tt_order\tt_family\tt_genus\tt_species" > {output}
            assign_taxa.py -r species -R phylum -R class -R order -R family\
-           -R genus -f blast -F 0 -C toporg -p accs -n {params.taxdump}\
+           -R genus -f blast -F 0 -C first -p accs -n {params.taxdump}\
            -m {params.taxmap} >> {output}"""
 
 rule contigs_tax_table_centrifuge:
