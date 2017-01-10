@@ -27,3 +27,25 @@ rule anvio_profile:
             -o anvio/profile-{wildcards.sample} \
             --min-contig-length {params.min_len}"""
 
+rule anvio_merge_profiles:
+    """ Merge all the AnVio profiles """
+    input:
+        profiles=expand("anvio/profile-{sample}/RUNINFO.cp",
+                    sample=config['reads']),
+        contigs_tax="anvio/status/contig-tax",
+    output:
+        "anvio/status/samples-merged"
+    log:
+        "logs/anvio-merged"
+    benchmark:
+        "benchmarks/anvio.merge.time"
+    version:
+        get_version("anvi-profile",
+                    cmd_prefix="source activate anvio \n",
+                    lines=[1,],
+                    regular_expression=r'(\d.+)')
+    shell:
+        """source activate anvio
+           anvi-merge {input.profiles} -c contigs.db -o anvio/samples-merged
+           touch {output}"""
+

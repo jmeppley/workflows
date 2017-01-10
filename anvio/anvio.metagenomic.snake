@@ -16,7 +16,11 @@ include: "anvio.profiles.snake"
 ######################
 # Configuration
 #
-#  setup from megahit assemnbly is just fine
+#  setup from megahit assemnbly is just fine for assembly
+#
+# let anvio rules know where to start
+config['contig_fasta'] = "megahit-{params}/megahit.contigs.fa"\
+                            .format(params=config['megahit']['preset'])
 #
 # End Configuration
 ######################
@@ -30,35 +34,7 @@ rule anvio_all:
     input:
         "contigs.fasta.stats",
         "anvio/status/contig-hmms",
-        "anvio/samples-merged",
-        "anvio/status/contig-tax"
-
-rule anvio_contigs:
-    input:
-        "megahit-{params}/megahit.contigs.fa".format(params=config['megahit']['preset'])
-    output:
-        "contigs.fa"
-    version:
-        get_version('sed', lines=[1,])
-    log:
-        "logs/simplify-contig-names"
-    benchmark:
-        "benchmarks/simplify-contig-names.time"
-    shell:
-        'cat {input} | sed -r "s/^>(\S+)\s*.*$/>\\1/" > {output}'
-
-rule anvio_merge_profiles:
-    input:
-        profiles=expand("anvio/profile-{sample}/RUNINFO.cp",
-                    sample=config['reads']),
-        contigs_tax="anvio/status/contig-tax"
-    output:
-        "anvio/samples-merged"
-    log:
-        "logs/anvio-merged"
-    benchmark:
-        "benchmarks/anvio.merge.time"
-    shell:
-        """source activate anvio
-           anvi-merge {input.profiles} -c contigs.db -o {output}"""
+        "anvio/status/contig-tax",
+        "anvio/status/samples-merged",
+        "anvio/status/contig-cogs"
 

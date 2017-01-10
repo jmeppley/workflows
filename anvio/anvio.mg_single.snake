@@ -53,32 +53,4 @@ rule anvio_all:
         "anvio/status/samples-merged",
         "anvio/status/contig-cogs"
 
-rule fake_genes:
-    """ create a symlink to the contig genes file with the proper extension, so the lastal rule will find it """
-    input: "contigs.genes.ffn"
-    output: temp("contigs.genes.fasta")
-    shell: "ln -s {input} {output}"
-
-rule anvio_merge_profiles:
-    """ Merge all the AnVio profiles """
-    input:
-        profiles=expand("anvio/profile-{sample}/RUNINFO.cp",
-                    sample=config['reads']),
-        contigs_tax="anvio/status/contig-tax",
-    output:
-        "anvio/status/samples-merged"
-    log:
-        "logs/anvio-merged"
-    benchmark:
-        "benchmarks/anvio.merge.time"
-    version:
-        get_version("anvi-profile",
-                    cmd_prefix="source activate anvio \n",
-                    lines=[1,],
-                    regular_expression=r'(\d.+)')
-    shell:
-        """source activate anvio
-           anvi-merge {input.profiles} -c contigs.db -o anvio/samples-merged
-           touch {output}"""
-
 

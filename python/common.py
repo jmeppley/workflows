@@ -18,10 +18,11 @@ def get_version(command, version_flag='--version',
 
     if regular_expression given, the first captured group is returned.
     """
-    out = subprocess.check_output(" ".join([cmd_prefix,
-                                            command,
-                                            version_flag,
-                                            "; exit 0"]),
+    command = " ".join([cmd_prefix,
+                        command,
+                        version_flag,
+                        "; exit 0"])
+    out = subprocess.check_output(command,
                                   stderr=subprocess.STDOUT,
                                   shell=True).decode()
 
@@ -44,7 +45,7 @@ def get_version(command, version_flag='--version',
         try:
             return regular_expression.search(out).group(1)
         except AttributeError:
-            raise Exception("Expression {} did not matach a group in output: {}".format(regular_expression.pattern, out))
+            print("WARNING: Expression {} did not matach a group in output from `{}`: {}".format(regular_expression.pattern, command, out))
 
 
 

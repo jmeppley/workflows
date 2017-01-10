@@ -4,6 +4,11 @@ Rules for getting contigs ready for AnVio. Includes gene calls, hmm processing, 
 Outputs are empty status files because anvio tends to re-use files because they are dbs that get updated as you go. 
 """
 
+centrifuge = 'centrifuge' in config
+if not centrifuge:
+    # create dummy config to prevent errors
+    config['centrifuge']={'path':'/dummy','db':'db'}
+
 # rules for annotating genes with tax from refseq
 include: "../annotation/common.genes.snake"
 
@@ -112,6 +117,12 @@ rule anvio_genes:
         """source activate anvio
            anvi-get-dna-sequences-for-gene-calls -c contigs.db -o {output}"""
 
+rule fake_genes:
+    """ create a symlink to the contig genes file with the proper extension, so the lastal rule will find it """
+    input: "contigs.genes.ffn"
+    output: temp("contigs.genes.fasta")
+    shell: "ln -s {input} {output}"
+
 rule anvio_contig_cogs:
     """ annotates contigs with COGs """
     input:
@@ -181,14 +192,14 @@ rule anvio_gene_taxa:
     Uses centrifuge if configured, else, it tries to use RefDeq and lastal
     """
     input:
-        "centrifuge_hits.tsv" if 'centrifuge' in config \
+        "centrifuge_hits.tsv" if centrifuge \
             else "contigs.annotation.tax_matrix.tsv",
         "anvio/status/contig-db"
     output:
         "anvio/status/contig-tax"
     params:
-        format="centrifuge" if 'centrifuge' in config else "default_matrix",
-        extra_file="centrifuge_report.tsv" if 'centrifuge' in config else "",
+        format="centrifuge" if centrifuge else "default_matrix",
+        extra_file="centrifuge_report.tsv" if centrifuge else "",
     version:
         get_version("anvi-profile",
                     cmd_prefix="source activate anvio \n",
