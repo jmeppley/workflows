@@ -136,13 +136,10 @@ rule anvio_contig_cogs:
     threads:
         50
     version:
-        get_version("anvi-profile",
-                    cmd_prefix="source activate anvio \n",
-                    lines=[1,],
-                    regular_expression=r'(\d.+)')
+        get_version("diamond")
     shell:
         """source activate anvio
-           anvi-run-ncbi-cogs -c contigs.db --num-threads {threads}
+           anvi-run-ncbi-cogs -c contigs.db --num-threads {threads} --search-with diamond
            touch {output}"""
         
 
