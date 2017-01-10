@@ -7,6 +7,44 @@ Outputs are empty status files because anvio tends to re-use files because they 
 # rules for annotating genes with tax from refseq
 include: "../annotation/common.genes.snake"
 
+rule anvio_contigs_drop_desc:
+    """ Simplify the contig names so AnVio doesn't freak out """
+    input:
+        config.get('contig_fasta',"contigs.raw.fasta")
+    output:
+        temp("contigs.no_desc.fasta")
+    version:
+        get_version('sed', lines=[1,])
+    log:
+        "logs/simplify-contig-names"
+    benchmark:
+        "benchmarks/simplify-contig-names.time"
+    shell:
+        'cat {input} | sed -r "s/^>(\S+)\s*.*$/>\\1/" > {output}'
+
+rule anvio_contigs_prune:
+    """ drop short contigs """
+    input:
+        rules.anvio_contigs_drop_desc.output
+    output:
+        "contigs.fasta"
+    version:
+        get_version('sed', lines=[1,])
+    log:
+        "logs/drop-short-contigs"
+    benchmark:
+        "benchmarks/drop-short-contigs.time"
+    params:
+        min_len=config.get("min_contig_length",2500)
+    version:
+        get_version("anvi-script-reformat-fasta",
+                    cmd_prefix="source activate anvio \n",
+                    lines=[1,],
+                    regular_expression=r'(\d.+)')
+    shell:
+        """ source activate anvio
+            anvi-script-reformat-fasta {input} -o {output} -l {params.min_len} """
+
 rule contig_db:
     """
     Prep a fasta file of contig sequences for use in AnVio
@@ -23,7 +61,10 @@ rule contig_db:
     benchmark:
         "benchmarks/anvio-contig-db.time"
     version:
-        get_version("anvi-profile",lines=[1,])
+        get_version("anvi-profile",
+                    cmd_prefix="source activate anvio \n",
+                    lines=[1,],
+                    regular_expression=r'(\d.+)')
     shell:
         """source activate anvio
            rm -f contigs.db contigs.h5
@@ -42,6 +83,11 @@ rule anvio_hmms:
         "logs/contigs.hmms"
     threads:
         20
+    version:
+        get_version("anvi-profile",
+                    cmd_prefix="source activate anvio \n",
+                    lines=[1,],
+                    regular_expression=r'(\d.+)')
     shell:
         """source activate anvio
            anvi-run-hmms -c contigs.db --num-threads {threads}
@@ -57,11 +103,39 @@ rule anvio_genes:
         "benchmarks/contigs.genes.time"
     log:
         "logs/contigs.genes"
+    version:
+        get_version("anvi-profile",
+                    cmd_prefix="source activate anvio \n",
+                    lines=[1,],
+                    regular_expression=r'(\d.+)')
     shell:
         """source activate anvio
            anvi-get-dna-sequences-for-gene-calls -c contigs.db -o {output}"""
 
-rule contigs_tax_table:
+rule anvio_contig_cogs:
+    """ annotates contigs with COGs """
+    input:
+        "anvio/status/contig-db"
+    output:
+        "anvio/status/contig-cogs"
+    benchmark:
+        "benchmarks/contigs.cogs.time"
+    log:
+        "logs/contigs.cogs"
+    threads:
+        50
+    version:
+        get_version("anvi-profile",
+                    cmd_prefix="source activate anvio \n",
+                    lines=[1,],
+                    regular_expression=r'(\d.+)')
+    shell:
+        """source activate anvio
+           anvi-run-ncbi-cogs -c contigs.db --num-threads {threads}
+           touch {output}"""
+        
+
+rule contigs_tax_table_lastal:
     """ uses my script to assign taxa to gene calls """
     input:
         "contigs.genes.vs.RefSeq.lastx",
@@ -74,21 +148,55 @@ rule contigs_tax_table:
     params:
         taxdump=os.path.split(config['dbs']["RefSeq"]['path'])[0],
         taxmap=config['dbs']['RefSeq']['path'] + ".tax",
+    version:
+        get_version('assign_taxa.py')
     shell:
         """cat "gene_callers_id\tt_phylum\tt_class\tt_order\tt_family\tt_genus\tt_species" > {output}
            assign_taxa.py -r species -R phylum -R class -R order -R family\
            -R genus -f blast -F 0 -C toporg -p accs -n {params.taxdump}\
            -m {params.taxmap} >> {output}"""
 
-rule anvio_gene_taxa:
-    """ Loads gene tax assignments into contig DB for AnVio """
+rule contigs_tax_table_centrifuge:
+    """ uses centrifuge to assign taxa to gene calls """
     input:
-        "contigs.annotation.tax_matrix.tsv",
+        "contigs.genes.ffn"
+    output:
+        "centrifuge_hits.tsv"
+    log:
+        "logs/contigs_centrifuge"
+    benchmark:
+        "benchmarks/contigs.centrifuge.time"
+    params:
+        centrifuge=config['centrifuge']['path'] + "/centrifuge",
+        db=config['centrifuge']['path'] + "/" + config['centrifuge']['db'],
+    version:
+        get_version(config['centrifuge']['path'] + "/centrifuge",
+                    lines=[1,],
+                    regular_expression=r'(\d.+)')
+    shell:
+        "{params.centrifuge} -f -x {params.db} {input} -S {output}"
+
+rule anvio_gene_taxa:
+    """ Loads gene tax assignments into contig DB for AnVio 
+    Uses centrifuge if configured, else, it tries to use RefDeq and lastal
+    """
+    input:
+        "centrifuge_hits.tsv" if 'centrifuge' in config \
+            else "contigs.annotation.tax_matrix.tsv",
         "anvio/status/contig-db"
     output:
         "anvio/status/contig-tax"
+    params:
+        format="centrifuge" if 'centrifuge' in config else "default_matrix",
+        extra_file="centrifuge_report.tsv" if 'centrifuge' in config else "",
+    version:
+        get_version("anvi-profile",
+                    cmd_prefix="source activate anvio \n",
+                    lines=[1,],
+                    regular_expression=r'(\d.+)')
     shell:
         """source activate anvio
-           anvi-import-taxonomy -c contigs.db -i {input[0]} -p default_matrix
+           anvi-import-taxonomy -c contigs.db \
+             -i {params.extra_file} {input[0]} -p {params.format}
            touch {output}"""
 

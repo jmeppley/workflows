@@ -39,7 +39,13 @@ def get_version(command, version_flag='--version',
     if regular_expression is None:
         return out.strip()
     else:
-        return regular_expression.search(out).group(1)
+        if isinstance(regular_expression, str):
+            regular_expression = re.compile(regular_expression)
+        try:
+            return regular_expression.search(out).group(1)
+        except AttributeError:
+            raise Exception("Expression {} did not matach a group in output: {}".format(regular_expression.pattern, out))
+
 
 
 def parse_stats(stats_file):

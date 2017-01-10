@@ -9,15 +9,13 @@ sys.path[0]=os.path.join(snakefile_path,'..','python')
 from common import get_version, collect_sample_reads
 configfile: "./anvio.yaml"
 
-include: "anvio.contigs.snake"
-include: "anvio.profiles.snake"
-include: "../common/mapping_bwa.snake"
-include: "../common/common.snake"
-
 ####
 # Required conda packages:
 #
-# snakemake bwa prinseq pandas last
+# snakemake bwa prinseq pandas last samtools
+# 
+# also install centrifuge to conda env with:
+#   make install prefix=$CONDA_PREFIX
 # 
 # also need a conda environment for AnVio 
 #    (config['anvio_env'] defaults to "anvio")
@@ -29,8 +27,17 @@ include: "../common/common.snake"
 # Get sample reads from dir and pattern if not provided
 collect_sample_reads(config)
 #
+# if we're using centrifuge, load dummy info in dbs
+if 'centrifuge' in config:
+    config.setdefault('dbs',{'RefSeq':{'type':'tax',
+                                       'path':'/dummy'}})
 # Configuration
 ######################
+
+include: "anvio.contigs.snake"
+include: "anvio.profiles.snake"
+include: "../common/mapping_bwa.snake"
+include: "../common/common.snake"
 
 #print(config)
 
@@ -44,21 +51,7 @@ rule anvio_all:
         "anvio/status/contig-hmms",
         "anvio/status/contig-tax",
         "anvio/status/samples-merged",
-
-rule anvio_contigs:
-    """ Simplify the contig names so AnVio doesn't freak out """
-    input:
-        config.get('contig_fasta',"contigs.fasta")
-    output:
-        "contigs.fa"
-    version:
-        get_version('sed', lines=[1,])
-    log:
-        "logs/simplify-contig-names"
-    benchmark:
-        "benchmarks/simplify-contig-names.time"
-    shell:
-        'cat {input} | sed -r "s/^>(\S+)\s*.*$/>\\1/" > {output}'
+        "anvio/status/contig-cogs"
 
 rule fake_genes:
     """ create a symlink to the contig genes file with the proper extension, so the lastal rule will find it """
@@ -66,24 +59,23 @@ rule fake_genes:
     output: temp("contigs.genes.fasta")
     shell: "ln -s {input} {output}"
 
-rule fake_contigs:
-    """ create a symlink to the contigs with the proper extension so that the mapping rules will pick it up """
-    input: "contigs.fa"
-    output: temp("contigs.fasta")
-    shell: "ln -s {input} {output}"
-
 rule anvio_merge_profiles:
     """ Merge all the AnVio profiles """
     input:
         profiles=expand("anvio/profile-{sample}/RUNINFO.cp",
                     sample=config['reads']),
-        contigs_tax="anvio/status/contig-tax"
+        contigs_tax="anvio/status/contig-tax",
     output:
         "anvio/status/samples-merged"
     log:
         "logs/anvio-merged"
     benchmark:
         "benchmarks/anvio.merge.time"
+    version:
+        get_version("anvi-profile",
+                    cmd_prefix="source activate anvio \n",
+                    lines=[1,],
+                    regular_expression=r'(\d.+)')
     shell:
         """source activate anvio
            anvi-merge {input.profiles} -c contigs.db -o anvio/samples-merged

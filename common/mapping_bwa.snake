@@ -12,7 +12,7 @@ rule index_contigs:
     log:
         "logs/bwa_index.log"
     benchmark:
-        "benchmarks/bwa_pre_index.txt"
+        "benchmarks/bwa_pre_index.time"
     version:
         get_version('bwa', 
                     version_flag="", 
@@ -38,7 +38,7 @@ rule map_sample_reads:
                     version_flag="", 
                     regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
     threads:
-        20
+        15
     shell:
         "bwa mem -t {threads} mapping/contigs.index.bwa {input[1]} 2> {log}  > {output}"
 
@@ -51,7 +51,7 @@ rule sam_to_bam:
     benchmark:
         "benchmarks/{root}.bwa_sam_bam.time"
     threads:
-        8
+        1
     version:
         get_version('samtools', lines=0)
     shell:
@@ -65,7 +65,7 @@ rule index_bam:
     output:
         "{root}.bam.bai"
     benchmark:
-        "benchmarks/{root}.bwa_index_bam.txt"
+        "benchmarks/{root}.bwa_index_bam.time"
     version:
         get_version('samtools', lines=0)
     shell:

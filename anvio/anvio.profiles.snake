@@ -12,13 +12,18 @@ rule anvio_profile:
         "logs/anvio-profile-{sample}"
     benchmark:
         "benchmarks/anvio-profile-{sample}.time"
-    version:
-        get_version("anvi-profile",lines=[1,])
     params:
-        bam=lambda w: "mapping/{sample}.reads.vs.contigs.bam".format(sample=w.sample)
+        bam=lambda w: "mapping/{sample}.reads.vs.contigs.bam".format(sample=w.sample),
+        min_len=config.get("min_contig_length",2500)
+    version:
+        get_version("anvi-profile",
+                    cmd_prefix="source activate anvio \n",
+                    lines=[1,],
+                    regular_expression=r'(\d.+)')
     shell:
         """source activate anvio
            rm -rf anvio/profile-{wildcards.sample}
            anvi-profile -i {params.bam} -c contigs.db -S {wildcards.sample} \
-           -o anvio/profile-{wildcards.sample}"""
+            -o anvio/profile-{wildcards.sample} \
+            --min-contig-length {params.min_len}"""
 
