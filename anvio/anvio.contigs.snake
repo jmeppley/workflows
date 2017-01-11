@@ -162,7 +162,7 @@ rule contigs_tax_table_lastal:
         """echo "gene_callers_id\tt_phylum\tt_class\tt_order\tt_family\tt_genus\tt_species" > {output}
            assign_taxa.py -r species -R phylum -R class -R order -R family\
            -R genus -f blast -F 0 -C first -p accs -n {params.taxdump}\
-           -m {params.taxmap} >> {output}"""
+           -m {params.taxmap} {input} >> {output}"""
 
 rule contigs_tax_table_centrifuge:
     """ uses centrifuge to assign taxa to gene calls """
