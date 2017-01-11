@@ -2,7 +2,7 @@
 """
 Submit this clustering script for sbatch to snakemake with:
 
-    snakemake -j 99 --debug --immediate-submit --cluster 'Snakefile-sbatch.py -t {threads} {dependencies}' --cluster-config cluster.yaml
+    snakemake -j 99 --immediate-submit --cluster 'Snakefile-sbatch.py -t {threads} {dependencies}' --cluster-config cluster.yaml
 
 The cluster config file should have values for sbatch options keyed byb snakemake rule name. A "default" rule cofig can be specified. EG:
 
