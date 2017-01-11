@@ -2,11 +2,15 @@
 Collection of rules to create a sample databse for metagenomic
 analysis in anvi'o
 """
+config.setdefault('anvio_env','anvio')
 
 config.setdefault('sample_tree',{})
 config['sample_tree'].setdefault('distance_metrics',['euclidean',])
 config['sample_tree'].setdefault('coverage_metrics',\
                                  ['mean_coverage_Q2Q3_contigs'])
+
+if 'sample_metadata' in config:
+    config.setdefault('outputs',set()).add("anvio/samples.db")
 
 rule samples_db:
     """
@@ -14,19 +18,20 @@ rule samples_db:
     """
     input:
         order="anvio/sample.orders.tsv",
-        data="sample.data.tsv"
+        data=config['sample_metadata']
     output:
         "anvio/samples.db"
     benchmark:
         "benchmarks/anvio.sample.db.time"
     version:
         get_version("anvi-gen-samples-info-database",
-                    cmd_prefix="source activate anvio \n",
+                    cmd_prefix="source activate {} \n"\
+                                .format(config['anvio_env']),
                     lines=[1,],
                     regular_expression=r'(\d.+)')
         
     shell:
-        """ source activate anvio
+        """ source activate {config[anvio_env]}
             rm -f anvio/samples.db
             anvi-gen-samples-info-database -D {input.data} -R {input.order} \
                 -o {output}
@@ -44,7 +49,7 @@ rule compile_sample_orders:
         lines = ["attributes\tbasic\tnewick",]
         for newick_file in input:
             with open(newick_file) as f:
-                tree = f.read()
+                tree = f.read().strip()
             lines.append("coverage\t\t{}".format(tree))
         with open(output.table, 'w') as out:
             out.write("\n".join(lines))
@@ -59,11 +64,12 @@ rule cluster_samples:
         "benchmarks/cluster_samples_{coverage_metric}_{distance_metric}.time"
     version:
         get_version("anvi-matrix-to-newick",
-                    cmd_prefix="source activate anvio \n",
+                    cmd_prefix="source activate {} \n"\
+                                .format(config['anvio_env']),
                     lines=[1,],
                     regular_expression=r'(\d.+)')
     shell:
-        """ source activate anvio
+        """ source activate {config[anvio_env]}
             anvi-matrix-to-newick {input} --transpose \
             --distance {wildcards.distance_metric} -o {output} """
 
@@ -81,11 +87,12 @@ rule sample_coverage_table:
         "benchmarks/extract_sample_{coverage_metric}.time"
     version:
         get_version("anvi-matrix-to-newick",
-                    cmd_prefix="source activate anvio \n",
+                    cmd_prefix="source activate {} \n"\
+                                .format(config['anvio_env']),
                     lines=[1,],
                     regular_expression=r'(\d.+)')
     shell:
-        """ source activate anvio
+        """ source activate {config[anvio_env]}
             anvi-export-table anvio/samples-merged/PROFILE.db --table {wildcards.coverage_metric} -o {output}.raw
             perl -pe 's/\\t[^\\t]+$/\n/' {output}.raw > {output}
             rm {output}.raw

@@ -2,6 +2,9 @@
 Collection of rules from setting up AnVio profiles
 """
 
+config.setdefault('anvio_env','anvio')
+config.setdefault('outputs',set()).add("anvio/status/samples-merged")
+
 rule anvio_profile:
     input:
         "anvio/status/contig-db",
@@ -17,11 +20,12 @@ rule anvio_profile:
         min_len=config.get("min_contig_length",2500)
     version:
         get_version("anvi-profile",
-                    cmd_prefix="source activate anvio \n",
+                    cmd_prefix="source activate {}\n"\
+                               .format(config['anvio_env']),
                     lines=[1,],
                     regular_expression=r'(\d.+)')
     shell:
-        """source activate anvio
+        """source activate {config[anvio_env]}
            rm -rf anvio/profile-{wildcards.sample}
            anvi-profile -i {params.bam} -c contigs.db -S {wildcards.sample} \
             -o anvio/profile-{wildcards.sample} \
@@ -41,11 +45,12 @@ rule anvio_merge_profiles:
         "benchmarks/anvio.merge.time"
     version:
         get_version("anvi-profile",
-                    cmd_prefix="source activate anvio \n",
+                    cmd_prefix="source activate {}\n"\
+                               .format(config['anvio_env']),
                     lines=[1,],
                     regular_expression=r'(\d.+)')
     shell:
-        """source activate anvio
+        """source activate {config[anvio_env]}
            anvi-merge {input.profiles} -c contigs.db -o anvio/samples-merged
            touch {output}"""
 

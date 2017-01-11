@@ -22,19 +22,14 @@ include: "anvio.profiles.snake"
 config['contig_fasta'] = "megahit-{params}/megahit.contigs.fa"\
                             .format(params=config['megahit']['preset'])
 #
+# these should be set by the anvio.xxx.snake files
+outputs = config.setdefault('outputs',set())
+#
 # End Configuration
 ######################
 
 
 ######################
 # Rules
-
-
 rule anvio_all:
-    input:
-        "contigs.fasta.stats",
-        "anvio/status/contig-hmms",
-        "anvio/status/contig-tax",
-        "anvio/status/samples-merged",
-        "anvio/status/contig-cogs"
-
+    input: outputs
