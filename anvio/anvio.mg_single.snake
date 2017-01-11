@@ -36,6 +36,7 @@ if 'centrifuge' in config:
 
 include: "anvio.contigs.snake"
 include: "anvio.profiles.snake"
+include: "anvio.samples.snake"
 include: "../common/mapping_bwa.snake"
 include: "../common/common.snake"
 
@@ -51,6 +52,7 @@ rule anvio_all:
         "anvio/status/contig-hmms",
         "anvio/status/contig-tax",
         "anvio/status/samples-merged",
-        "anvio/status/contig-cogs"
+        "anvio/status/contig-cogs",
+        "anvio/samples.db"
 
 
