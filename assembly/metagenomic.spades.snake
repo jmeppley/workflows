@@ -137,6 +137,7 @@ all_targets = [
         "contigs.stats.txt",
         "contigs.annotations.gff",
         "contigs.annotations.faa.stats",
+        #"contigs.annotations.coverage.tsv",
         "mapping/reads.vs.contigs.bam.bai"
     ]
 

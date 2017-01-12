@@ -2,13 +2,32 @@
 # genes in an faa file using RefSeq, KEGG, PFAM and others.
 # Annotations are generated as tables of gene_family counts 
 #  groupbed by taxonomic clade
+import os
+import sys
+
+snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
+sys.path[0]=os.path.join(snakefile_path,'..','python')
+from annotate import get_db_dot_fmt_strings
 
 include: "../common/common.snake"
-include: "./common.snake"
+include: "./common.genes.snake"
 
 # it is assumed that the file {prefix}.faa exists and contains protein seqs
-config.setdefault('prefix','genes')
+prefix = "genes" if "genes_faa" not in config \
+                 else os.path.splitext(config['genes_faa'])[0]
+config.setdefault('prefix',prefix)
 
+gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs, config)
+print(gene_family_db_dot_fmts )
+
+output_tables = \
+        expand("{prefix}.annot.{taxdb}.lastp.{clade}.vs.{db_dot_fmt}.tsv",
+                prefix=config['prefix'],
+                taxdb=config['taxdb'],
+                db_dot_fmt=gene_family_db_dot_fmts,
+                clade=config['clade_ranks']),
+
+print("\n".join(*output_tables))
 ##########
 # RULES:
 #  This lays out the dependencies and logic of the workflow
@@ -17,8 +36,7 @@ localrules: all, clean
 
 rule all:
     input:
-        expand("{prefix}.annotation.{clade_rank}.{{db}}.tsv".format(**config),
-                db=gene_family_dbs),
+        output_tables,
         "{prefix}.faa.stats".format(**config)
 
 rule clean:

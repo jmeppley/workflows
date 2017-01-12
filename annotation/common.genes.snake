@@ -28,172 +28,18 @@ config.setdefault('annotation_hit_table_map',{})
 # End configuration
 ##########
 
-rule hmmer_dbfrag:
-    """
-    Look for profile matches in the Nth fragment of a DB
-    """
-    input:
-        "{file_root}.faa"
-    output:
-        temp("{file_root}.vs.{db}.{N}.tbl.dfrag")
-    benchmark:
-        "benchmarks/hmmer.{file_root}.vs.{db}.{N}.time"
-    log:
-        "logs/hmmer.{file_root}.vs.{db}.{N}.log"
-    version:
-        get_version('hmmsearch','-h',lines=[1,])
-    threads:
-        lambda wildcards: config['threads'].get('hmmer',default_threads)
-    params:
-        db_path=lambda wildcards: config['dbs'][wildcards.db]['path'].format(N=int(wildcards.N))
-    shell:
-        "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
-        {params.db_path} {input}"
-
-rule hmmer_fragdb:
-    """
-    Look for profile matches in N fragments of a larger db. This rule just merges the N outputs of hmmer_dbfrag.
-    """
-    input:
-        lambda w: expand("{file_root}.vs.{db}.{{N}}.tbl.dfrag".format(db=w.db,
-                                                                      file_root=w.file_root), 
-                         N=range(1,1+config['dbs'][w.db]['frags']))
-    output:
-        "{file_root}.vs.{db}.tbl.dbatch"
-    benchmark:
-        "benchmarks/hmmer.{file_root}.vs.{db}.dbatch.time"
-    log:
-        "logs/hmmer.{file_root}.vs.{db}.dbatch.log"
-    version:
-        get_version('sort',lines=[1,])
-    shell:
-        "cat {input} | grep -v '^#' | sort -k 1,1 > {output}"
-
-rule hmmer:
-    """
-    Look for profile matches
-    """
-    input:
-        "{file_root}.faa"
-    output:
-        "{file_root}.vs.{db}.tbl"
-    benchmark:
-        "benchmarks/hmmer.{file_root}.vs.{db}.time"
-    log:
-        "logs/hmmer.{file_root}.vs.{db}.log"
-    version:
-        get_version('hmmsearch','-h',lines=[1,])
-    threads:
-        lambda wildcards: config['threads'].get('hmmer',default_threads)
-    params:
-        db_path=lambda wildcards: config['dbs'][wildcards.db]['path']
-    shell:
-        "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
-        {params.db_path} {input}"
-
-rule lastal:
-    """
-    Look for matches in RefSeq or KEGG
-    """
-    input:
-        lambda w: "{file_root}.{ext}".format(file_root=w.file_root,
-                ext="faa" if w.alg=='p' else 'fasta' if w.alg=='x' else 'ffn')
-    output:
-        "{file_root}.vs.{db}.last{alg,[xpn]}"
-    benchmark:
-        "benchmarks/lastal.{db}.time"
-    log:
-        "logs/lastal.{db}.log"
-    version:
-        get_version('lastal')
-    threads:
-        lambda wildcards: config['threads'].get('lastal',default_threads)
-    params:
-        db_path=lambda w: config['dbs'][w.db]['path'],
-        fshift=lambda w: "-F 15" if w.alg=='x' else "",
-        opts=lambda w: "" if w.alg=='n' else "-b 1 -x 15 -y 7 -z 25",
-        keep=config.get('last_filter','-F 5')
-    shell:
-        "lastal -P {threads} {params.fshift} -f BlastTab {params.opts} \
-         {params.db_path} {input} \
-         | grep -v '^#'  \
-         | filter_blast_m8.py -f blast {params.keep} \
-         > {output}"
-
-rule assign_taxa:
-    """
-    Turn a hit table of predicted genes vs RefSeq into a table of reads
-    
-    Uses sed to change gene names back into read names before the assignment script sets to work.
-    """
-    input:
-        lambda w: "{hit_table_prefix}.vs.{taxdb}.{lastalg}".format(
-                    hit_table_prefix = config['annotation_hit_table_map']\
-                                                    .get(w.annotation_prefix,
-                                                         w.annotation_prefix),
-                    taxdb=w.taxdb,
-                    lastalg=w.lastalg)
-        #"{annotation_prefix}.vs.{taxdb}.{lastalg}"
-    output:
-        temp("{annotation_prefix}.annotation.{taxdb}.{lastalg}.{rank}.tsv")
-    benchmark:
-        "benchmarks/assign_taxa.{rank}.{taxdb}.{lastalg}.time"
-    #log:
-    #    "logs/assign_taxa.{rank}.{taxdb}.{lastalg}.log"
-    params:
-        taxdump=lambda w: os.path.split(config['dbs'][w.taxdb]['path'])[0],
-        taxmap=lambda w: config['dbs'][w.taxdb]['path'] + ".tax",
-        hit_table_filter=lambda w: config.get('hit_table_filter',{})\
-                                         .get(w.annotation_prefix,'cat'),
-        format=lambda w: 'blast' if re.search(r'^b?last[pnx]$', w.lastalg)\
-                                 else w.lastalg
-    version:
-        get_version('assign_taxa.py')
-    shell:
-         "cat {input} \
-         | {params.hit_table_filter} \
-         | assign_taxa.py -o {output} -r {wildcards.rank} \
-            -f {params.format} -F 0 -C first -p accs \
-            -n {params.taxdump} -m {params.taxmap}"
-
-rule assign_paths:
-    """
-    Turn a hit table (from hmmer or lastal) into a one-to-many map from reads to gene families.
-
-    Uses sed to change gene names back into read names before the assignment script sets to work.
-    """
-    input:
-        lambda w: get_hit_table_name_from_wildcards_db(w, config)
-    output:
-        temp("{annotation_prefix}.annotation.gene_family.{db}.tsv")
-    benchmark:
-        "benchmarks/assign_paths.{db}.time"
-    log:
-        "logs/assign_paths.{db}.log"
-    version:
-        get_version('assign_paths.py')
-    params:
-        format=lambda w: 'blast' if config['dbs'][w.db].get('format','hmmer')=='lastdb' else 'hmmsearchdom',
-        # KEGG and PFAM need special handling
-        params=lambda w: get_db_assignment_params(w, config),
-        hit_table_filter=lambda w: config.get('hit_table_filter',{})\
-                                         .get(w.annotation_prefix,'cat'),
-    shell:
-         "cat {input} \
-         | {params.hit_table_filter} \
-         | assign_paths.py -o {output} -C first -f {params.format} {params.params} \
-         "
+include: "common.snake"
 
 rule compile_counts:
     """
     Use clade assignments and gene family assignments to compile a table of gene family counts by clade.
     """
     input:
-        lambda w: "{annotation_prefix}.annotation.{taxdb}.{taxalg}.{rank}.tsv"\
-            .format(taxdb=config['taxdb'], taxalg=config['taxalg'], **w),
-        "{annotation_prefix}.annotation.gene_family.{db}.tsv"
+        "{prefix}.annot.{taxdb}.{taxalg}.{rank}.tsv",
+        "{prefix}.annot.gene_family.{db}.{dbfmt}.tsv",
+        "{prefix}.coverage.tsv",
     output:
-        "{annotation_prefix}.annotation.{rank}.{db}.tsv"
+        "{prefix}.annot.{taxdb}.{taxalg}.{rank}.vs.{db}.{dbfmt}.tsv"
     benchmark:
         "benchmarks/compile_counts.{rank}.{db}"
     log:
@@ -203,20 +49,6 @@ rule compile_counts:
     params:
         three_column_opt="-L" if config.get('output_style','default').lower() == 'long' else ""
     shell:
-        "compile_hit_counts.py {params.three_column_opt} -1 {input[0]} -2 {input[1]} -o {output} -S"
-
-rule count_tax_hits:
-    input:
-        "{hit_table_prefix}.annotation.{db}.{alg}.{rank}.tsv"
-    output:
-        "{hit_table_prefix}.annotation.{db}.{alg}.{rank}.count.tsv"
-    benchmark:
-        "benchmarks/{hit_table_prefix}.{db}.{alg}.{rank}.count.time"
-    log:
-        "logs/{hit_table_prefix}.{db}.{alg}.{rank}.count.log"
-    version:
-        get_version("count_hits.py")
-    shell:
-        "count_hits.py -v -i {input} -H 1 -a portion\
-        > {output} 2> {log}"
+        "compile_hit_counts.py {params.three_column_opt} -1 {input[0]} -2 {input[1]} \
+            -m {input[2]} -o {output} -S"
 
