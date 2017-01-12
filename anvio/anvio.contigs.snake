@@ -4,10 +4,17 @@ Rules for getting contigs ready for AnVio. Includes gene calls, hmm processing, 
 Outputs are empty status files because anvio tends to re-use files because they are dbs that get updated as you go. 
 """
 
+config.setdefault('anvio_env','anvio')
+
 centrifuge = 'centrifuge' in config
 if not centrifuge:
     # create dummy config to prevent errors
     config['centrifuge']={'path':'/dummy','db':'db'}
+
+for contig_output in ["anvio/status/contig-hmms",
+                      "anvio/status/contig-tax",
+                      "anvio/status/contig-cogs"]:
+    config.setdefault('outputs',set()).add(contig_output)
 
 # rules for annotating genes with tax from refseq
 include: "../annotation/common.genes.snake"
@@ -43,11 +50,12 @@ rule anvio_contigs_prune:
         min_len=config.get("min_contig_length",2500)
     version:
         get_version("anvi-script-reformat-fasta",
-                    cmd_prefix="source activate anvio \n",
+                    cmd_prefix="source activate {}\n"\
+                               .format(config['anvio_env']),
                     lines=[1,],
                     regular_expression=r'(\d.+)')
     shell:
-        """ source activate anvio
+        """ source activate {config[anvio_env]}
             anvi-script-reformat-fasta {input} -o {output} -l {params.min_len} """
 
 rule contig_db:
@@ -67,11 +75,12 @@ rule contig_db:
         "benchmarks/anvio-contig-db.time"
     version:
         get_version("anvi-profile",
-                    cmd_prefix="source activate anvio \n",
+                    cmd_prefix="source activate {}\n"\
+                               .format(config['anvio_env']),
                     lines=[1,],
                     regular_expression=r'(\d.+)')
     shell:
-        """source activate anvio
+        """source activate {config[anvio_env]}
            rm -f contigs.db contigs.h5
            anvi-gen-contigs-database -f {input} -o contigs.db
            touch {output}"""
@@ -90,11 +99,12 @@ rule anvio_hmms:
         20
     version:
         get_version("anvi-profile",
-                    cmd_prefix="source activate anvio \n",
+                    cmd_prefix="source activate {}\n"\
+                               .format(config['anvio_env']),
                     lines=[1,],
                     regular_expression=r'(\d.+)')
     shell:
-        """source activate anvio
+        """source activate {config[anvio_env]}
            anvi-run-hmms -c contigs.db --num-threads {threads}
            touch {output}"""
 
@@ -110,11 +120,12 @@ rule anvio_genes:
         "logs/contigs.genes"
     version:
         get_version("anvi-profile",
-                    cmd_prefix="source activate anvio \n",
+                    cmd_prefix="source activate {}\n"\
+                               .format(config['anvio_env']),
                     lines=[1,],
                     regular_expression=r'(\d.+)')
     shell:
-        """source activate anvio
+        """source activate {config[anvio_env]}
            anvi-get-dna-sequences-for-gene-calls -c contigs.db -o {output}"""
 
 rule fake_genes:
@@ -138,7 +149,7 @@ rule anvio_contig_cogs:
     version:
         get_version("diamond")
     shell:
-        """source activate anvio
+        """source activate {config[anvio_env]}
            anvi-run-ncbi-cogs -c contigs.db --num-threads {threads} --search-with diamond
            touch {output}"""
         
@@ -199,11 +210,12 @@ rule anvio_gene_taxa:
         extra_file="centrifuge_report.tsv" if centrifuge else "",
     version:
         get_version("anvi-profile",
-                    cmd_prefix="source activate anvio \n",
+                    cmd_prefix="source activate {}\n"\
+                               .format(config['anvio_env']),
                     lines=[1,],
                     regular_expression=r'(\d.+)')
     shell:
-        """source activate anvio
+        """source activate {config[anvio_env]}
            anvi-import-taxonomy -c contigs.db \
              -i {params.extra_file} {input[0]} -p {params.format}
            touch {output}"""

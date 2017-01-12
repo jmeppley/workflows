@@ -36,21 +36,15 @@ if 'centrifuge' in config:
 
 include: "anvio.contigs.snake"
 include: "anvio.profiles.snake"
+include: "anvio.samples.snake"
 include: "../common/mapping_bwa.snake"
 include: "../common/common.snake"
 
-#print(config)
-
+# these should be set by the anvio.xxx.snake files
+outputs = config.setdefault('outputs',set())
 
 ######################
 # Rules
 
 rule anvio_all:
-    input:
-        "contigs.fasta.stats",
-        "anvio/status/contig-hmms",
-        "anvio/status/contig-tax",
-        "anvio/status/samples-merged",
-        "anvio/status/contig-cogs"
-
-
+    input: outputs
