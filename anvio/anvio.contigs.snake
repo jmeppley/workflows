@@ -215,7 +215,7 @@ rule anvio_gene_taxa:
                     lines=[1,],
                     regular_expression=r'(\d.+)')
     shell:
-        """source activate config[anvio_env]
+        """source activate {config[anvio_env]}
            anvi-import-taxonomy -c contigs.db \
              -i {params.extra_file} {input[0]} -p {params.format}
            touch {output}"""
