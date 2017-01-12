@@ -3,7 +3,10 @@ Collection of rules from setting up AnVio profiles
 """
 
 config.setdefault('anvio_env','anvio')
-config.setdefault('outputs',set()).add("anvio/status/samples-merged")
+config.setdefault('samples_name','all')
+merged_samples_dir = "anvio/status/samples-{}-merged"\
+                                    .format(config['samples_name'])
+config.setdefault('outputs',set()).add(merged_samples_dir)
 
 rule anvio_profile:
     input:
@@ -34,11 +37,11 @@ rule anvio_profile:
 rule anvio_merge_profiles:
     """ Merge all the AnVio profiles """
     input:
-        profiles=expand("anvio/profile-{sample}/RUNINFO.cp",
-                    sample=config['reads']),
-        contigs_tax="anvio/status/contig-tax",
+        contig_status="anvio/status/contig-db",
+        profiles=lambda w: expand("anvio/profile-{sample}/RUNINFO.cp",
+                            sample=config['reads']),
     output:
-        "anvio/status/samples-merged"
+        merged_samples_dir
     log:
         "logs/anvio-merged"
     benchmark:
@@ -51,6 +54,7 @@ rule anvio_merge_profiles:
                     regular_expression=r'(\d.+)')
     shell:
         """source activate {config[anvio_env]}
-           anvi-merge {input.profiles} -c contigs.db -o anvio/samples-merged
+           anvi-merge {input.profiles} -c contigs.db \
+                -o anvio/samples-{config[samples_name]}-merged
            touch {output}"""
 

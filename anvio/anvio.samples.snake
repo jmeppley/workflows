@@ -4,13 +4,15 @@ analysis in anvi'o
 """
 config.setdefault('anvio_env','anvio')
 
+config.setdefault('samples_name','all')
 config.setdefault('sample_tree',{})
 config['sample_tree'].setdefault('distance_metrics',['euclidean',])
 config['sample_tree'].setdefault('coverage_metrics',\
                                  ['mean_coverage_Q2Q3_contigs'])
 
+sample_db_file = "anvio/samples.{}.db".format(config['samples_name'])
 if 'sample_metadata' in config:
-    config.setdefault('outputs',set()).add("anvio/samples.db")
+    config.setdefault('outputs',set()).add(sample_db_file)
 
 rule samples_db:
     """
@@ -20,7 +22,7 @@ rule samples_db:
         order="anvio/sample.orders.tsv",
         data=config['sample_metadata']
     output:
-        "anvio/samples.db"
+        sample_db_file
     benchmark:
         "benchmarks/anvio.sample.db.time"
     version:
@@ -32,7 +34,7 @@ rule samples_db:
         
     shell:
         """ source activate {config[anvio_env]}
-            rm -f anvio/samples.db
+            rm -f {output}
             anvi-gen-samples-info-database -D {input.data} -R {input.order} \
                 -o {output}
         """

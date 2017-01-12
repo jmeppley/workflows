@@ -11,10 +11,13 @@ if not centrifuge:
     # create dummy config to prevent errors
     config['centrifuge']={'path':'/dummy','db':'db'}
 
+if centrifuge or 'dbs' in config:
+    config.setdefault('outputs',set()).add("anvio/status/contig-tax")
+
 for contig_output in ["anvio/status/contig-hmms",
-                      "anvio/status/contig-tax",
                       "anvio/status/contig-cogs"]:
     config.setdefault('outputs',set()).add(contig_output)
+
 
 # rules for annotating genes with tax from refseq
 include: "../annotation/common.genes.snake"

@@ -78,12 +78,13 @@ def collect_sample_reads(config):
         sample_RE = re.compile(samples_pattern.get('re',
                                                    r'/([^/]+)/[^/]+$'))
         #print(sample_RE.pattern)
+        #print(samples_pattern.get('glob',"No glob!"))
         for read_file in glob.glob(samples_pattern.get('glob',
                                                        './*/reads.cleaned.fastq.gz')):
-            # print(read_file)
+            #print(read_file)
             sample = sample_RE.search(read_file).group(1)
             # sanitize sample name
             sample = re.sub(r'[^A-Za-z0-9_]','_',sample)
-            # print(sample)
+            #print(sample)
             reads[sample]=read_file
 #

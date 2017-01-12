@@ -7,8 +7,7 @@ import sys
 snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
 sys.path[0]=os.path.join(snakefile_path,'..','python')
 from common import get_version, collect_sample_reads
-configfile: "./anvio.yaml"
-
+#configfile: "./anvio.yaml"
 ####
 # Required conda packages:
 #
@@ -28,7 +27,7 @@ configfile: "./anvio.yaml"
 collect_sample_reads(config)
 #
 # if we're using centrifuge, load dummy info in dbs
-if 'centrifuge' in config:
+if 'dbs' not in config:
     config.setdefault('dbs',{'RefSeq':{'type':'tax',
                                        'path':'/dummy'}})
 # Configuration
