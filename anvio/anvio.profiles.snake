@@ -4,9 +4,11 @@ Collection of rules from setting up AnVio profiles
 
 config.setdefault('anvio_env','anvio')
 config.setdefault('samples_name','all')
-merged_samples_dir = "anvio/status/samples-{}-merged"\
+config['merged_samples_dir'] = "anvio/samples-{}-merged"\
                                     .format(config['samples_name'])
-config.setdefault('outputs',set()).add(merged_samples_dir)
+config['merged_samples_status'] = "anvio/status/samples-{}-merged"\
+                                    .format(config['samples_name'])
+config.setdefault('outputs',set()).add(config['merged_samples_status'])
 
 rule anvio_profile:
     input:
@@ -41,7 +43,7 @@ rule anvio_merge_profiles:
         profiles=lambda w: expand("anvio/profile-{sample}/RUNINFO.cp",
                             sample=config['reads']),
     output:
-        merged_samples_dir
+        config['merged_samples_status']
     log:
         "logs/anvio-merged"
     benchmark:
@@ -55,6 +57,6 @@ rule anvio_merge_profiles:
     shell:
         """source activate {config[anvio_env]}
            anvi-merge {input.profiles} -c contigs.db \
-                -o anvio/samples-{config[samples_name]}-merged
+                -o {config[merged_samples_dir]}
            touch {output}"""
 

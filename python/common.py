@@ -70,19 +70,25 @@ def collect_sample_reads(config):
     """
     if 'reads' not in config:
         try:
-            samples_pattern = config['samples_pattern']
+            samples_pattern_data = config['samples_pattern']
         except:
             raise Exception("Please supply list of samples or patterns to find"
                             "them with") 
         reads = config.setdefault('reads',{})
-        sample_RE = re.compile(samples_pattern.get('re',
-                                                   r'/([^/]+)/[^/]+$'))
+        sample_pattern = samples_pattern_data.get('re', r'/([^/]+)/[^/]+$')
+        sample_RE = re.compile(sample_pattern)
         #print(sample_RE.pattern)
-        #print(samples_pattern.get('glob',"No glob!"))
-        for read_file in glob.glob(samples_pattern.get('glob',
-                                                       './*/reads.cleaned.fastq.gz')):
+        read_file_glob = samples_pattern_data.get('glob', './*/reads.cleaned.fastq.gz')
+        read_files = glob.glob(read_file_glob)
+        if len(read_files)==0:
+            raise Exception("The sample reads wildcard '{}' did not match any files!"\
+                                .format(read_file_glob))
+        for read_file in read_files:
             #print(read_file)
-            sample = sample_RE.search(read_file).group(1)
+            m = sample_RE.search(read_file)
+            if m is None:
+                raise Exception("The sample matching expression ({}) failed to find a sample name in the path: {}".format(sample_pattern, read_file))
+            sample = m.group(1)
             # sanitize sample name
             sample = re.sub(r'[^A-Za-z0-9_]','_',sample)
             #print(sample)

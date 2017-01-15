@@ -14,10 +14,6 @@ if 'dbs' not in config:
     config.setdefault('dbs',{'RefSeq':{'type':'tax',
                                        'path':'/dummy'}})
 
-include: "../assembly/metagenomic.megahit.snake"
-include: "anvio.contigs.snake"
-include: "anvio.profiles.snake"
-
 ######################
 # Configuration
 #
@@ -33,6 +29,12 @@ outputs = config.setdefault('outputs',set())
 # End Configuration
 ######################
 
+include: "anvio.contigs.snake"
+include: "anvio.profiles.snake"
+include: "anvio.samples.snake"
+include: "../assembly/metagenomic.megahit.snake"
+
+ruleorder: anvio_contigs_prune > contigs
 
 ######################
 # Rules

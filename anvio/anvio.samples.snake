@@ -19,10 +19,10 @@ rule samples_db:
     compile a table of metadata and some sorting options into a sample database
     """
     input:
-        order="anvio/sample.orders.tsv",
-        data=config['sample_metadata']
+        order="anvio/samples.orders.{samples}.tsv",
+        data=config.get('sample_metadata','samples.dummy.tsv')
     output:
-        sample_db_file
+        "anvio/samples.{samples}.db"
     benchmark:
         "benchmarks/anvio.sample.db.time"
     version:
@@ -42,11 +42,13 @@ rule samples_db:
 rule compile_sample_orders:
     """ collect newick trees into ordering file for samples """
     input:
-        expand("anvio/sample_tree_{coverage_metric}.{distance_metric}.newick",
-               coverage_metric=config['sample_tree']['coverage_metrics'],
-               distance_metric=config['sample_tree']['distance_metrics'])
+        lambda w: expand(
+         "anvio/sample_tree.{samples}.{coverage_metric}.{distance_metric}.newick",
+         samples=w.samples,
+         coverage_metric=config['sample_tree']['coverage_metrics'],
+         distance_metric=config['sample_tree']['distance_metrics'])
     output:
-        table="anvio/sample.orders.tsv"
+        table="anvio/samples.orders.{samples}.tsv"
     run:
         lines = ["attributes\tbasic\tnewick",]
         for newick_file in input:
@@ -59,9 +61,9 @@ rule compile_sample_orders:
 rule cluster_samples:
     """ Use hierarchical clustering to build a dendrogram of samples """
     input:
-        "anvio/sample_coverages_{coverage_metric}.tsv"
+        "anvio/sample_coverages.{samples}.{coverage_metric}.tsv"
     output:
-        "anvio/sample_tree_{coverage_metric}.{distance_metric}.newick"
+        "anvio/sample_tree.{samples}.{coverage_metric}.{distance_metric}.newick"
     benchmark:
         "benchmarks/cluster_samples_{coverage_metric}_{distance_metric}.time"
     version:
@@ -82,9 +84,9 @@ rule sample_coverage_table:
     We need to drop the last column (it's text, not data)
     """
     input:
-        "anvio/status/samples-merged"
+        "anvio/status/samples-{samples}-merged"
     output:
-        "anvio/sample_coverages_{coverage_metric}.tsv"
+        "anvio/sample_coverages.{samples}.{coverage_metric}.tsv"
     benchmark:
         "benchmarks/extract_sample_{coverage_metric}.time"
     version:
@@ -95,7 +97,7 @@ rule sample_coverage_table:
                     regular_expression=r'(\d.+)')
     shell:
         """ source activate {config[anvio_env]}
-            anvi-export-table anvio/samples-merged/PROFILE.db --table {wildcards.coverage_metric} -o {output}.raw
+            anvi-export-table {config[merged_samples_dir]}/PROFILE.db --table {wildcards.coverage_metric} -o {output}.raw
             perl -pe 's/\\t[^\\t]+$/\n/' {output}.raw > {output}
             rm {output}.raw
         """
