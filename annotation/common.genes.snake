@@ -49,6 +49,7 @@ rule compile_counts:
     params:
         three_column_opt="-L" if config.get('output_style','default').lower() == 'long' else ""
     shell:
-        "compile_hit_counts.py {params.three_column_opt} -1 {input[0]} -2 {input[1]} \
-            -m {input[2]} -o {output} -S"
-
+        "compile_hit_counts.py {params.three_column_opt} \
+            -1 {input[0]} -2 {input[1]} \
+            -m {input[2]} \
+            -o {output} -S"

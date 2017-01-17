@@ -32,7 +32,7 @@ rule anvio_profile:
     shell:
         """source activate {config[anvio_env]}
            rm -rf anvio/profile-{wildcards.sample}
-           anvi-profile -i {params.bam} -c contigs.db -S {wildcards.sample} \
+           anvi-profile -i {params.bam} -c anvio/contigs.db -S {wildcards.sample} \
             -o anvio/profile-{wildcards.sample} \
             --min-contig-length {params.min_len}"""
 
@@ -56,7 +56,7 @@ rule anvio_merge_profiles:
                     regular_expression=r'(\d.+)')
     shell:
         """source activate {config[anvio_env]}
-           anvi-merge {input.profiles} -c contigs.db \
+           anvi-merge {input.profiles} -c anvio/contigs.db \
                 -o {config[merged_samples_dir]}
            touch {output}"""
 

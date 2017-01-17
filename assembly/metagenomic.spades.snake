@@ -136,6 +136,7 @@ all_targets = [
         "contigs.report",
         "contigs.stats.txt",
         "contigs.annotations.gff",
+        "contigs.annotations.coverage.tsv",
         "contigs.annotations.faa.stats",
         #"contigs.annotations.coverage.tsv",
         "mapping/reads.vs.contigs.bam.bai"
@@ -593,6 +594,38 @@ rule final_report:
         report={"reads":read_stats,"assembly":contig_stats}
         with open(output[0],'w') as OUTF:
             OUTF.write(yaml.dump(report, default_flow_style=False))
+
+rule annotation_coverage:
+    """
+    For each anntation, pull out the median coverage for its contig
+    into a simple two column table
+    """
+    input:
+        gff="contigs.annotations.gff",
+        stats="contigs.stats.txt"
+    output:
+        table="contigs.annotations.coverage.tsv",
+    run:
+        # Read stats table, but just keep median coverage
+        cov_dict = pandas.read_table(input.stats, index_col=0, usecols=['contig','md cov'])['md cov']
+        with open(output.table,'w') as OUT:
+            with open(input.gff) as GFF:
+                feature_count = 0
+                current_contig = 0
+                for line in GFF:
+                    contig = line.split()[0].strip()
+                    if contig != current_contig:
+                        feature_count=1
+                        current_contig = contig
+                    else:
+                        feature_count+=1
+                    OUT.write("{contig}_{feature_count}\t{coverage}\n"\
+                               .format(contig=contig,
+                                       feature_count=feature_count,
+                                       coverage=cov_dict[contig]))
+
+
+
 
 rule clean:
     params:

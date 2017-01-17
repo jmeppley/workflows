@@ -9,11 +9,6 @@ sys.path[0]=os.path.join(snakefile_path,'..','python')
 from common import get_version
 configfile: "./pooled_assembly.yaml"
 
-# if we're using centrifuge, load dummy info in dbs
-if 'dbs' not in config:
-    config.setdefault('dbs',{'RefSeq':{'type':'tax',
-                                       'path':'/dummy'}})
-
 ######################
 # Configuration
 #

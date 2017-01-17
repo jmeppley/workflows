@@ -175,7 +175,7 @@ def get_samtool_depth_table_from_handle(depth_stream):
             """
 
     # reading into lists is a fast way to build a big DataFrame
-    contigs, av_covs, mn_covs, mx_covs = [], [], [], []
+    contigs, av_covs, mn_covs, mx_covs, md_covs = [], [], [], [], []
 
     # loop over contig bases
     current_contig=None
@@ -191,6 +191,7 @@ def get_samtool_depth_table_from_handle(depth_stream):
                 av_covs.append(depths.mean())
                 mn_covs.append(depths.min())
                 mx_covs.append(depths.max())
+                md_covs.append(numpy.median(depths))
             depths=[]
             current_contig = contig
 
@@ -203,8 +204,9 @@ def get_samtool_depth_table_from_handle(depth_stream):
     av_covs.append(depths.mean())
     mn_covs.append(depths.min())
     mx_covs.append(depths.max())
+    md_covs.append(numpy.median(depths))
 
-    return pandas.DataFrame({'contig':contigs,'av cov':av_covs,'mx cov':mx_covs,'mn cov':mn_covs},columns=['contig','av cov','mn cov','mx cov']).set_index('contig')
+    return pandas.DataFrame({'contig':contigs,'av cov':av_covs,'mx cov':mx_covs,'mn cov':mn_covs,'md cov':md_covs},columns=['contig','av cov','mn cov','mx cov','md cov']).set_index('contig')
 
 ## 
 # this evolved from (but now bears little resemblance to) the
