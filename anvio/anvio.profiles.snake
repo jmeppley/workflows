@@ -58,6 +58,7 @@ rule anvio_merge_profiles:
                     regular_expression=r'(\d.+)')
     shell:
         """source activate {config[anvio_env]}
+           rm -rf {config[merged_samples_dir]}
            anvi-merge {input.profiles} -c anvio/contigs.db \
                 -o {config[merged_samples_dir]}
            touch {output}"""
