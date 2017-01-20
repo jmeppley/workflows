@@ -18,7 +18,7 @@ prefix = "genes" if "genes_faa" not in config \
 config.setdefault('prefix',prefix)
 
 gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs, config)
-print(gene_family_db_dot_fmts )
+#print(gene_family_db_dot_fmts )
 
 output_tables = \
         expand("{prefix}.annot.{taxdb}.lastp.{clade}.vs.{db_dot_fmt}.tsv",
@@ -27,7 +27,7 @@ output_tables = \
                 db_dot_fmt=gene_family_db_dot_fmts,
                 clade=config['clade_ranks']),
 
-print("\n".join(*output_tables))
+#print("\n".join(*output_tables))
 ##########
 # RULES:
 #  This lays out the dependencies and logic of the workflow

@@ -33,6 +33,13 @@ if 'bbmap' not in config['system_paths']:
     except:
         print("Can't find bbmap resources, please set system_paths->bbmap in the snakemake config file")
 
+# available rRNA DBs
+rrna_db_dot_fmts=[]
+for db, db_data in config['dbs'].items():
+    if db_data.get('type')=='rrna':
+        fmt = db_data.get('format','lastdb')
+        rrna_db_dot_fmts.append("{}.{}".format(db,fmt))
+
 # Define some global variables
 read_directions = ['R1','R2']
 
@@ -380,13 +387,13 @@ rule cmsearch_tbl_to_gff:
     input:
         "contigs.annotations.{molecule}.tbl"
     output:
-        "contigs.annotations.{molecule}.gff"
+        "contigs.annotations.{molecule,[^.]+}.gff"
     benchmark:
         "benchmarks/contigs.annotations.{molecule}.gff.txt"
     version:
         get_version('filter_blast_m8.py')
     shell:
-        "filter_blast_m8.py -v -f cmsearch --gff -o {output} {input}"
+        "sort {input} | filter_blast_m8.py -v -f cmsearch --gff | sort | filter_blast_m8.py -f gff -s score > {output}"
 
 rule prodigal:
     """ get gene predictions form prodigal """
@@ -509,33 +516,124 @@ rule contig_stats_table:
     shell:
         "python {config[system_paths][pymg_dir]}/edl/assembly.py get_contig_stats {input} {output} txt_width=75 log=True"
 
-rule ssu_report:
+rule long_rrna_gff:
+    """ find long LSU or SSU annotations """
+    input:
+        "{prefix}.gff"
+    output:
+        "{prefix}.{mol,[LS]SU}.gt{length,\d+}.gff"
+    benchmark:
+        "benchmarks/{prefix}.{mol}.gt{length}.time"
+    version:
+        get_version("filter_blast_m8")
+    shell:
+        "grep {wildcards.mol} {input} \
+          | sort \
+          | filter_blast_m8.py -s score -L {wildcards.length} -f gff \
+            --nonoverlapping \
+          > {output}"
+
+rule rrna_fasta:
+    """ extract rRNA fasta """
+    input:
+        contigs="contigs.fasta",
+        gff="{prefix}.gff"
+    output:
+        "{prefix}.gff.fna"
+    benchmark:
+        "benchmarks/{prefix}.gff.fna.time"
+    version:
+        get_version("get_sequences_from_m8.py")
+    shell:
+        "cat {input.contigs} \
+            | get_sequences_from_m8.py -f gff {input.gff} \
+            > {output}"
+
+rule map_genes_to_bwadb:
     """
-    Look at the rRNA annotations and get table of nearly full length SSUs
+    map genes to BWA db. 
+    There must be a bwa formatted db path configured in:
+        config['dbs'][wildcards.db]['path']
     """
     input:
-        "contigs.annotations.rRNA.gff",
-        "contigs.stats.txt"
+        "{file_root}.fna"
     output:
-        "contigs.annotations.rRNA.SSU.gt1200.tsv"
+        ("{file_root}.fna.vs.{db}.sam")
+    log:
+        "logs/{file_root}.vs.{db}.sam.log"
+    benchmark:
+        "benchmarks/{file_root}.vs.{db}.sam.time"
+    version:
+        get_version('bwa', 
+                    version_flag="", 
+                    regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
+    threads:
+        lambda w: config.get('threads',{}).get('bwa',20)
+    params:
+        db_path=lambda w: config['dbs'][w.db]['path'],
+    shell:
+        "bwa mem -t {threads} {params.db_path} {input} 2> {log}  > {output}"
+
+rule rrna_report:
+    """
+    Look at the rRNA annotations and get table of nearly full length LSUs or SSUs
+    """
+    input:
+        gff="contigs.annotations.rRNA.{mol}.gt{length}.gff",
+        hits=lambda w: expand("contigs.annotations.rRNA.{mol}.gt{length}" + \
+                              ".gff.fna.vs.{db_dot_fmt}",
+                              db_dot_fmt=[s for s in rrna_db_dot_fmts \
+                                          if re.search(w.mol,s) is not None],
+                              mol=w.mol,
+                              length=w.length,
+                    ),
+        stats="contigs.stats.txt"
+    output:
+        "contigs.annotations.rRNA.{mol,[LS]SU}.gt{length,\d+}.tsv"
     params:
         length=1200
     run:
-        with open(output[0],'w') as OUTF:
-            OUTF.write("contig\tcoverage\tstart\tend\n")
-
-            from edl.util import parseMapFile
-            coverage_map = parseMapFile(input[1], valueCol=4, skipFirst=1, valueType=float)
-
-            from edl import blastm8
-            rrna_annots=blastm8.M8Stream(input[0])
-            params=blastm8.FilterParams(format='gff',length=params.length,sortReads=True,sort='score',nonoverlapping=True)
-            ssu_RE = re.compile(r'SSU')
-            for read, hits in blastm8.filterM8Stream(rrna_annots,options=params,returnLines=False):
-                 for hit in hits:
-                     if ssu_RE.search(hit.hit_type) is not None and abs(hit.mlen)>1000:
-                        OUTF.write("{}\t{}\t{}\t{}\n".format(hit.read,coverage_map[hit.read],hit.qstart,hit.qend))
-            rrna_annots.close()
+        # get map from contigs to coverage
+        coverages = pandas.read_table(input.stats,
+                                      index_col=0,
+                                      usecols=['contig','md cov',])['md cov']
+        # table of rRNA model hits from filtered GFF
+        features = pandas.read_table(input.gff,
+                                     header=None,
+                                     names=['contig',
+                                            'tool',
+                                            'type',
+                                            'start',
+                                            'end',
+                                            'score',
+                                            'notes'],
+                                     usecols=[0,1,2,3,4,5,8])
+        # add coverages
+        features['coverage'] = [coverages[features.loc[i,'contig']]\
+                                for i in features.index]
+        # index on contig, start, and end, and just take a few columns
+        output_table = features.set_index(['contig', 'start', 'end'])\
+                                            [['coverage', 'type', 'score']]
+        # get Silva annotation(s) for each feature
+        from edl.blastm8 import generate_hits
+        from edl.util import parseMapFile
+        for hit_table in input.hits:
+            hit_table_name = re.search(r'gff\.fna\.vs\.(.+)', hit_table).group(1)
+            db, format = hit_table_name.split('.',1)
+            id_name_file = config['dbs'][db]['path'] + ".ids"
+            hit_descriptions = parseMapFile(id_name_file)
+            for gene, hits in generate_hits(hit_table, format=format):
+                # take the first hit
+                hit = list(hits)[0]
+                contig, start, end = re.search(r'^(.+)_(\d+)_(\d+)$', gene)\
+                                                                        .groups()
+                index = (contig, int(start), int(end))
+                if index not in output_table.index:
+                    index = (contig, int(end), int(start))
+                desc = hit_descriptions[hit.hit]
+                output_table.loc[index, db] = desc
+        
+        output_table.to_csv(output[0], sep='\t')
 
 rule final_report:
     input:
@@ -545,6 +643,7 @@ rule final_report:
         contig_stats="contigs.fasta.stats",
         gene_stats="contigs.annotations.faa.stats",
         ssu_rrnas="contigs.annotations.rRNA.SSU.gt1200.tsv",
+        lsu_rrnas="contigs.annotations.rRNA.LSU.gt2000.tsv",
         histograms='contigs.fasta.histograms'
     output:
         "contigs.report"
@@ -583,13 +682,20 @@ rule final_report:
         # annotations
         stats = parse_stats(input.gene_stats)
         contig_stats['genes']=stats['reads']
-        
+
         # full length SSUs
         ssu_count=-1
         with open(input.ssu_rrnas) as INF:
             for line in INF:
                 ssu_count+=1
         contig_stats['SSUs']=ssu_count
+
+        # full length LSUs
+        lsu_count=-1
+        with open(input.lsu_rrnas) as INF:
+            for line in INF:
+                lsu_count+=1
+        contig_stats['LSUs']=lsu_count
 
         report={"reads":read_stats,"assembly":contig_stats}
         with open(output[0],'w') as OUTF:

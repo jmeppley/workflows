@@ -2,7 +2,7 @@ import re
 
 include: "../annotation/common.sixframe.snake"
 
-silva_fmts={}
+silva_fmts=config.setdefault('silva_fmts',{})
 for db, db_data in config['dbs'].items():
     if db_data.get('type')=='rrna':
         fmt = db_data.get('format','lastdb')
@@ -18,7 +18,9 @@ rule silva_all:
 
 rule map_reads_to_bwadb:
     """
-    map reads to BWA db
+    map reads to BWA db. 
+    There must be a bwa formatted db path configured in:
+        config['dbs'][wildcards.db]['path']
     """
     input:
         "{file_root}.fastq"
