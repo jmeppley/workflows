@@ -1,16 +1,10 @@
-import os
-import sys
-snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
-sys.path[0]=os.path.join(snakefile_path,'..','python')
-from common import get_version
-
 rule uncompress_file:
     input:
         "{file_root}.gz"
     output:
         temp("{file_root}")
     wildcard_constraints:
-        file_root=r'.+(?<!\.gz)$'
+        file_root=r'.+(?<!gz)$'
     benchmark:
         "benchmarks/{file_root}.gunzip.time"
     version:

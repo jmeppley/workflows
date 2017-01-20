@@ -6,31 +6,27 @@ Outputs are empty status files because anvio tends to re-use files because they 
 
 config.setdefault('anvio_env','anvio')
 
+# use centrifuge if configured
 centrifuge = 'centrifuge' in config
-if centrifuge or 'dbs' in config:
-    config.setdefault('outputs',set()).add("anvio/status/contig-tax")
-
-# load dummy info so that unuse rules won't throw errors during compilation
-if 'dbs' not in config:
-    config.setdefault('dbs',{'RefSeq':{'type':'tax',
-                                       'path':'/dummy'}})
 if not centrifuge:
-    # create dummy config to prevent errors
-    config['centrifuge']={'path':'/dummy','db':'db'}
+    # otherwise try using configured tax db
+    dbtax = 'dbs' in config
+else:
+    dbtax = False
 
+if centrifuge or dbtax:
+    # add to outputs if either is configured
+    config.setdefault('outputs',set()).add("anvio/status/contig-tax")
 
 for contig_output in ["anvio/status/contig-hmms",
                       "anvio/status/contig-cogs"]:
     config.setdefault('outputs',set()).add(contig_output)
 
 
-# rules for annotating genes with tax from refseq
-include: "../annotation/common.genes.snake"
-
 rule anvio_contigs_drop_desc:
     """ Simplify the contig names so AnVio doesn't freak out """
     input:
-        config.get('contig_fasta',"contigs.raw.fasta")
+        "contigs.fasta"
     output:
         temp("contigs.no_desc.fasta")
     version:
@@ -47,7 +43,7 @@ rule anvio_contigs_prune:
     input:
         rules.anvio_contigs_drop_desc.output
     output:
-        "contigs.fasta"
+        "anvio/contigs.fa"
     version:
         get_version('sed', lines=[1,])
     log:
@@ -74,7 +70,7 @@ rule contig_db:
         * runs prodigal to find genes/ORFs
     """
     input:
-        "contigs.fasta"
+        "anvio/contigs.fa"
     output:
         "anvio/status/contig-db"
     log:
@@ -160,71 +156,78 @@ rule anvio_contig_cogs:
         """source activate {config[anvio_env]}
            anvi-run-ncbi-cogs -c anvio/contigs.db --num-threads {threads} --search-with diamond
            touch {output}"""
-        
 
-rule contigs_tax_table_lastal:
-    """ uses my script to assign taxa to gene calls """
-    input:
-        "contigs.genes.vs.RefSeq.lastx",
-    output:
-        "contigs.annotation.tax_matrix.tsv"
-    log:
-        "logs/contigs_tax_table"
-    benchmark:
-        "benchmarks/contigs.tax.table.time"
-    params:
-        taxdump=os.path.split(config['dbs']["RefSeq"]['path'])[0],
-        taxmap=config['dbs']['RefSeq']['path'] + ".tax",
-    version:
-        get_version('assign_taxa.py')
-    shell:
-        """echo "gene_callers_id\tt_phylum\tt_class\tt_order\tt_family\tt_genus\tt_species" > {output}
-           assign_taxa.py -r species -R phylum -R class -R order -R family\
-           -R genus -f blast -F 0 -C first -p accs -n {params.taxdump}\
-           -m {params.taxmap} {input} >> {output}"""
+if dbtax:
+    # rules for annotating genes with tax from refseq
+    include: "../annotation/common.genes.snake"
 
-rule contigs_tax_table_centrifuge:
-    """ uses centrifuge to assign taxa to gene calls """
-    input:
-        "contigs.genes.ffn"
-    output:
-        "centrifuge_hits.tsv"
-    log:
-        "logs/contigs_centrifuge"
-    benchmark:
-        "benchmarks/contigs.centrifuge.time"
-    params:
-        centrifuge=config['centrifuge']['path'] + "/centrifuge",
-        db=config['centrifuge']['path'] + "/" + config['centrifuge']['db'],
-    version:
-        get_version(config['centrifuge']['path'] + "/centrifuge",
-                    lines=[1,],
-                    regular_expression=r'(\d.+)')
-    shell:
-        "{params.centrifuge} -f -x {params.db} {input} -S {output}"
+    rule contigs_tax_table:
+        """ uses my script to assign taxa to gene calls """
+        input:
+            "contigs.genes.vs.RefSeq.lastx",
+        output:
+            "contigs.annotation.tax_matrix.tsv"
+        log:
+            "logs/contigs_tax_table"
+        benchmark:
+            "benchmarks/contigs.tax.table.time"
+        params:
+            taxdump=os.path.split(config['dbs']["RefSeq"]['path'])[0],
+            taxmap=config['dbs']['RefSeq']['path'] + ".tax",
+        version:
+            get_version('assign_taxa.py')
+        shell:
+            """echo "gene_callers_id\tt_phylum\tt_class\tt_order\tt_family\tt_genus\tt_species" > {output}
+               assign_taxa.py -r species -R phylum -R class -R order -R family\
+               -R genus -f blast -F 0 -C first -p accs -n {params.taxdump}\
+               -m {params.taxmap} {input} >> {output}"""
 
-rule anvio_gene_taxa:
-    """ Loads gene tax assignments into contig DB for AnVio 
-    Uses centrifuge if configured, else, it tries to use RefDeq and lastal
-    """
-    input:
-        "centrifuge_hits.tsv" if centrifuge \
-            else "contigs.annotation.tax_matrix.tsv",
-        "anvio/status/contig-db"
-    output:
-        "anvio/status/contig-tax"
-    params:
-        format="centrifuge" if centrifuge else "default_matrix",
-        extra_file="centrifuge_report.tsv" if centrifuge else "",
-    version:
-        get_version("anvi-profile",
-                    cmd_prefix="source activate {}\n"\
-                               .format(config['anvio_env']),
-                    lines=[1,],
-                    regular_expression=r'(\d.+)')
-    shell:
-        """source activate {config[anvio_env]}
-           anvi-import-taxonomy -c anvio/contigs.db \
-             -i {params.extra_file} {input[0]} -p {params.format}
-           touch {output}"""
+if centrifuge:
+    rule contigs_tax_table:
+        """ uses centrifuge to assign taxa to gene calls
+            
+            the first output file is created silently, so it's not in the 
+            shell command. """
+        input:
+            "contigs.genes.ffn"
+        output:
+            "centrifuge_report.tsv",
+            "centrifuge_hits.tsv",
+        log:
+            "logs/contigs_centrifuge"
+        benchmark:
+            "benchmarks/contigs.centrifuge.time"
+        params:
+            centrifuge=config['centrifuge']['path'] + "/centrifuge",
+            db=config['centrifuge']['path'] + "/" + config['centrifuge']['db'],
+        version:
+            get_version(config['centrifuge']['path'] + "/centrifuge",
+                        lines=[1,],
+                        regular_expression=r'(\d.+)')
+        shell:
+            "{params.centrifuge} -f -x {params.db} {input} -S {output[1]}"
+
+if centrifuge or dbtax:
+    rule anvio_gene_taxa:
+        """ Loads gene tax assignments into contig DB for AnVio 
+        Uses centrifuge if configured, else, it tries to use RefDeq and lastal
+        """
+        input:
+            table=rules.contigs_tax_table.output,
+            contig="anvio/status/contig-db"
+        output:
+            "anvio/status/contig-tax"
+        params:
+            format="centrifuge" if centrifuge else "default_matrix",
+        version:
+            get_version("anvi-profile",
+                        cmd_prefix="source activate {}\n"\
+                                   .format(config['anvio_env']),
+                        lines=[1,],
+                        regular_expression=r'(\d.+)')
+        shell:
+            """source activate {config[anvio_env]}
+               anvi-import-taxonomy -c anvio/contigs.db \
+                 -i {input.table} -p {params.format}
+               touch {output}"""
 

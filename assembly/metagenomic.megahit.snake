@@ -2,14 +2,7 @@
 Python Makefile to assemble reads from multiple samples into a single assembly
 with megahit.
 """
-import os
-import sys
-snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
-sys.path[0]=os.path.join(snakefile_path,'..','python')
-from common import get_version, collect_sample_reads
-configfile: "./pooled_assembly.yaml"
-include: "../common/common.snake"
-include: "../common/mapping_bwa.snake"
+#include: "../common/common.snake"
 
 ####
 # Required conda packages:
@@ -23,8 +16,6 @@ include: "../common/mapping_bwa.snake"
 # Default to "meta" preset for megahit
 config.setdefault('megahit',{}).setdefault('preset','meta')
 # 
-# Get sample reads from dir and pattern if not provided
-collect_sample_reads(config)
 #
 # Configuration
 ######################

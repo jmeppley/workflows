@@ -1,0 +1,84 @@
+"""
+Python Makefile to process multiple samples via megahit and AnVio per:
+http://merenlab.org/2016/06/22/anvio-tutorial-v2/
+
+To run:
+
+snakemake -s /path/to/workflows/anvio.metagenomic.snake --configfile anvio.metagenomic.yaml [OPTIONS]
+
+The following conda packages will install everything you need:
+conda create -n snakemake -c bioconda python=3 snakemake pandas biopython bbmap bfc megahit bwa
+
+Anvio must be installed in the runing environmetn or in a conda environment. If it is installed in a conda environment, set the config variable anvio_env to te name of that environment.
+
+With a config file like this:
+samples_pattern:
+    glob: "../data/*.fastq"
+    re: "/([^_]+)_[^/]+\.fastq"
+    cleaned: False
+    name: all
+    metadata: samples.all.tsv
+megahit:
+    preset: meta
+threads:
+    lastal:  10
+    bwa:     10
+    megahit: 40
+centrifuge:
+    path: /path/to/centrifuge
+    db: dbs/p+h+v
+anvio_env: anvio
+
+The fields in samples_pattern are:
+ glob: a path wildcard that will match all the fastq files you want to include
+ re: a regular expression pattern that will pull the sample name from each fasta file
+ cleaned: Set to true to skip QC
+ name: string to use in naming combined outputs
+
+to skip assembly and just map reads to contigs supply:
+contigs_fasta: /path/to/contigs.fasta
+
+"""
+from python.common import get_version, collect_sample_reads
+
+######################
+# Configuration
+transitions = config.setdefault('transitions',{})
+#
+# Get sample reads from dir and pattern if not provided
+needs_qc = collect_sample_reads(config)
+if needs_qc:
+    include: "qc/bfc.snake"
+#
+# if contigs_fasta is not set, pull in megahit
+run_assembly = 'contigs_fasta' not in config
+if run_assembly:
+    include: "assembly/metagenomic.megahit.snake"
+    # output of megahit becomes start of anvio workflow
+    transitions['contigs.fasta'] \
+                    = "megahit-{params}/megahit.contigs.fa" \
+                                .format(params=config['megahit']['preset'])
+else:
+    # work from existing contigs
+    transitions['contigs.fasta'] = config['contigs_fasta']
+#
+# This list will be filled in by the anvio/anvio.* snakefiles
+outputs = config.setdefault('outputs',set())
+#
+# End Configuration
+######################
+
+include: "anvio/anvio.contigs.snake"
+include: "anvio/anvio.profiles.snake"
+include: "anvio/anvio.samples.snake"
+#include: "assembly/metagenomic.megahit.snake"
+include: "common/transitions.snake"
+
+ruleorder: anvio_contigs_prune > contigs
+
+print(config)
+
+######################
+# Rules
+rule anvio_all:
+    input: outputs

@@ -10,6 +10,8 @@ config['merged_samples_status'] = "anvio/status/samples-{}-merged"\
                                     .format(config['samples_name'])
 config.setdefault('outputs',set()).add(config['merged_samples_status'])
 
+include: "../common/mapping_bwa.snake"
+
 rule anvio_profile:
     input:
         "anvio/status/contig-db",
