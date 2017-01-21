@@ -40,6 +40,8 @@ contigs_fasta: /path/to/contigs.fasta
 
 """
 from python.common import get_version, collect_sample_reads
+from snakemake.logging import logger
+import yaml
 
 ######################
 # Configuration
@@ -76,7 +78,7 @@ include: "common/transitions.snake"
 
 ruleorder: anvio_contigs_prune > contigs
 
-print(config)
+logger.debug("Snakefile config:\n" + yaml.dump(config))
 
 ######################
 # Rules

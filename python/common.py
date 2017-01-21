@@ -150,7 +150,7 @@ def collect_sample_reads(config):
     already_cleaned = samples_pattern_data.get('cleaned',True) \
                         in [True, 1, "True", "T", "true", "t"]
     for sample in list(reads.keys()):
-        files = [os.path.abspath(f) for f in sorted(reads[sample])]
+        files = sorted(reads[sample])
 
         # Bail out if we have too many files per sample
         if len(files)>2:
