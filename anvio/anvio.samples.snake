@@ -13,9 +13,26 @@ config['sample_tree'].setdefault('distance_metrics',['euclidean',])
 config['sample_tree'].setdefault('coverage_metrics',\
                                  ['mean_coverage_Q2Q3_contigs'])
 
+# set up sample files
+sample_metadata_file = "anvio/samples.{}.metadata.db"\
+                                .format(config['samples_name'])
+dummy_metadata_file = "anvio/samples.{}.dummy.metadata.db"\
+                                .format(config['samples_name'])
+# in future, allow config to specify real metadata table to override this:
+config.setdefault('transitions')[sample_metadata_file] = dummy_metadata_file
 sample_db_file = "anvio/samples.{}.db".format(config['samples_name'])
-if 'sample_metadata' in config:
-    config.setdefault('outputs',set()).add(sample_db_file)
+config.setdefault('outputs',set()).add(sample_db_file)
+
+rule metadata_placeholder:
+    """ Generate a table of sample names so we can do sample clustering
+    even if there is no proper metadata (yet) """
+    output: dummy_metadata_file
+    run:
+        with open(output[0], 'w') as OUTF:
+            samples = sorted(list(config['reads'].keys()))
+            OUTF.write("samples\tname\n")
+            for sample in samples:
+                OUTF.write("{sample}\t{sample}\n".format(sample=sample))
 
 rule samples_db:
     """
@@ -23,7 +40,7 @@ rule samples_db:
     """
     input:
         order="anvio/samples.orders.{samples}.tsv",
-        data=config.get('sample_metadata','samples.dummy.tsv')
+        data=sample_metadata_file
     output:
         "anvio/samples.{samples}.db"
     benchmark:

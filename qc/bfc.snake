@@ -16,7 +16,6 @@ defaults={'bbduk':{'ram':'1g',
                    'adapter_flags':'ktrim=r k=23 mink=11 hdist=1 tbo tpe tbo tpe',
                    'phix_flags':'k=27 hdist=1 qtrim=rl trimq=17 cardinality=t mingc=0.05 maxgc=0.95'},
           'bfc':{'ram':'5g',
-                 'threads':20,
                  'params':'-1 -k 21'}}
 apply_defaults(config, defaults)
 
