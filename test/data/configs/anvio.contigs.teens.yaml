@@ -1,0 +1,19 @@
+samples_pattern:
+    glob: "../../data/raw_reads/*_1-1?_DNA*.fastq"
+    re: "/[^A-Za-z]*([A-Za-z][^/]*)_S\\d[^/]+\\.fastq"
+    cleaned: False
+    name: "teens"
+sample_tree:
+    coverage_metrics:
+        - mean_coverage_Q2Q3_contigs
+        - mean_coverage_contigs
+        - variability_contigs
+        - std_coverage_contigs
+        - abundance_contigs
+        - detection_contigs
+threads:
+    lastal: 10
+    bwa: 10
+    megahit: 40
+    bfc: 3
+anvio_env: anvio
