@@ -45,7 +45,7 @@ rule megahit:
         preset=lambda w: w.params,
         inputs=','.join([r for s,r in config['reads'].items()])
     threads:
-        40
+        config.get('threads',{}).get('megahit',40)
     shell:
         "megahit --12 {params.inputs} --presets {params.preset} -t {threads}\
          --continue -o megahit-{params.preset} --out-prefix megahit --verbose\

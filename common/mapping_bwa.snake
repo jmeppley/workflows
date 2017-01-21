@@ -38,7 +38,7 @@ rule map_sample_reads:
                     version_flag="", 
                     regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
     threads:
-        15
+        config.get('threads',{}).get('bwa',15)
     shell:
         "bwa mem -t {threads} mapping/contigs.index.bwa {input[1]} 2> {log}  > {output}"
 

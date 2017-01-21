@@ -2,7 +2,11 @@
 Collection of rules from setting up AnVio profiles
 """
 
-config.setdefault('anvio_env','anvio')
+if 'anvio_env' not in config:
+    config['anvio_prefix']=""
+else:
+    config['anvio_prefix'] = "source activate {}\n".format(config['anvio_env'])
+
 config.setdefault('samples_name','all')
 config['merged_samples_dir'] = "anvio/samples-{}-merged"\
                                     .format(config['samples_name'])
@@ -27,12 +31,11 @@ rule anvio_profile:
         min_len=config.get("min_contig_length",2500)
     version:
         get_version("anvi-profile",
-                    cmd_prefix="source activate {}\n"\
-                               .format(config['anvio_env']),
+                    cmd_prefix=config['anvio_prefix'],
                     lines=[1,],
                     regular_expression=r'(\d.+)')
     shell:
-        """source activate {config[anvio_env]}
+        """{config[anvio_prefix]}
            rm -rf anvio/profile-{wildcards.sample}
            anvi-profile -i {params.bam} -c anvio/contigs.db -S {wildcards.sample} \
             -o anvio/profile-{wildcards.sample} \
@@ -52,12 +55,11 @@ rule anvio_merge_profiles:
         "benchmarks/anvio.merge.time"
     version:
         get_version("anvi-profile",
-                    cmd_prefix="source activate {}\n"\
-                               .format(config['anvio_env']),
+                    cmd_prefix=config['anvio_prefix'],
                     lines=[1,],
                     regular_expression=r'(\d.+)')
     shell:
-        """source activate {config[anvio_env]}
+        """{config[anvio_prefix]}
            anvi-merge {input.profiles} -c anvio/contigs.db \
                 -o {config[merged_samples_dir]}
            touch {output}"""

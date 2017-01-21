@@ -2,7 +2,10 @@
 Collection of rules to create a sample databse for metagenomic
 analysis in anvi'o
 """
-config.setdefault('anvio_env','anvio')
+if 'anvio_env' not in config:
+    config['anvio_prefix']=""
+else:
+    config['anvio_prefix'] = "source activate {}\n".format(config['anvio_env'])
 
 config.setdefault('samples_name','all')
 config.setdefault('sample_tree',{})
@@ -27,13 +30,12 @@ rule samples_db:
         "benchmarks/anvio.sample.db.time"
     version:
         get_version("anvi-gen-samples-info-database",
-                    cmd_prefix="source activate {} \n"\
-                                .format(config['anvio_env']),
+                    cmd_prefix=config['anvio_prefix'],
                     lines=[1,],
                     regular_expression=r'(\d.+)')
         
     shell:
-        """ source activate {config[anvio_env]}
+        """ {config[anvio_prefix]}
             rm -f {output}
             anvi-gen-samples-info-database -D {input.data} -R {input.order} \
                 -o {output}
@@ -68,12 +70,11 @@ rule cluster_samples:
         "benchmarks/cluster_samples_{coverage_metric}_{distance_metric}.time"
     version:
         get_version("anvi-matrix-to-newick",
-                    cmd_prefix="source activate {} \n"\
-                                .format(config['anvio_env']),
+                    cmd_prefix=config['anvio_prefix'],
                     lines=[1,],
                     regular_expression=r'(\d.+)')
     shell:
-        """ source activate {config[anvio_env]}
+        """ {config[anvio_prefix]}
             anvi-matrix-to-newick {input} --transpose \
             --distance {wildcards.distance_metric} -o {output} """
 
@@ -91,12 +92,11 @@ rule sample_coverage_table:
         "benchmarks/extract_sample_{coverage_metric}.time"
     version:
         get_version("anvi-matrix-to-newick",
-                    cmd_prefix="source activate {} \n"\
-                                .format(config['anvio_env']),
+                    cmd_prefix=config['anvio_prefix'],
                     lines=[1,],
                     regular_expression=r'(\d.+)')
     shell:
-        """ source activate {config[anvio_env]}
+        """ {config[anvio_prefix]}
             anvi-export-table {config[merged_samples_dir]}/PROFILE.db --table {wildcards.coverage_metric} -o {output}.raw
             perl -pe 's/\\t[^\\t]+$/\n/' {output}.raw > {output}
             rm {output}.raw

@@ -174,7 +174,7 @@ def collect_sample_reads(config):
         # Do we have a pair of files or single file?
         if len(files)==1:
             # we are starting from interleaved, just link it in
-            transitions['reads/{sample}/reads.R12.fastq'\
+            transitions['reads/{sample}/reads.renamed.R12.fastq'\
                                 .format(sample=sample)] = files[0]
         else:
             needs_qc = True
