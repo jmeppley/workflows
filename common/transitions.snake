@@ -8,11 +8,12 @@ Often when we combine them, trying to encode the full workflow in filenames
 quickly becomes impractical. 
 
 If we use a symblic link, though, the output of one set of rules with a complicated name, can also be the simply named input of another set of rules.
+
+Another use if for when the input file is in another part of the file system. We can link it to a simply named file to start the workflow.
 """
 
 # dynamically generate overly specific regex constrain that lists all file names
 pattern = "(" + "|".join(config.get('transitions',{}).keys()) + ")"
-print(pattern)
 
 # transition rule will only match one of the configured files
 rule transition_link:
