@@ -69,7 +69,7 @@ def apply_defaults(config, defaults):
         else:
             config.setdefault(param, pdefaults)
 
-def collect_sample_reads(config):
+def collect_sample_reads(config, get_stats=True):
     """
     If there is not already a "reads" dict in config, build it from the samples
     pattern
@@ -149,6 +149,7 @@ def collect_sample_reads(config):
     transitions = config.setdefault('transitions',{})
     already_cleaned = samples_pattern_data.get('cleaned',True) \
                         in [True, 1, "True", "T", "true", "t"]
+    fasta_files = []
     for sample in list(reads.keys()):
         files = sorted(reads[sample])
 
@@ -166,10 +167,22 @@ def collect_sample_reads(config):
             reads[sample] = \
                     'reads/{sample}/reads.renamed.R12.cleaned.corrected.fastq.gz'\
                             .format(sample=sample)
+
+            # keep track of fasta files that will be generated
+            fasta_files.extend([
+               'reads/{sample}/reads.renamed.R12.cleaned.corrected.fastq.gz'\
+                                                            .format(sample=sample),
+               'reads/{sample}/reads.renamed.R12.cleaned.fastq.gz'\
+                                                            .format(sample=sample)])
+                
         else:
             # we just need to get interleaved reads
             reads[sample] = 'reads/{sample}/reads.R12.fastq'\
                             .format(sample=sample)
+
+        # both tracks go through this file
+        fasta_files.append('reads/{sample}/reads.renamed.R12.fastq'\
+                                                            .format(sample=sample))
             
         # Do we have a pair of files or single file?
         if len(files)==1:
@@ -184,5 +197,11 @@ def collect_sample_reads(config):
             transitions['reads/{sample}/reads.R2.fastq'\
                             .format(sample=sample)] = files[1]
             
+    if get_stats:
+        # add stats file to final outputs for each fasta file generated
+        outputs = config.setdefault('outputs', set())
+        for ext in ['stats', 'hist']:
+            for file_name in fasta_files:
+                outputs.add(".".join((file_name, ext)))
 
     return needs_qc

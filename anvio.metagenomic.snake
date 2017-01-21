@@ -66,6 +66,10 @@ else:
 #
 # This list will be filled in by the anvio/anvio.* snakefiles
 outputs = config.setdefault('outputs',set())
+# generate simple statistics (prinseq) and histogram from contigs
+for ext in ['stats', 'hist']:
+    for file_name in ['contigs.fasta', 'anvio/contigs.fa']:
+        outputs.add(".".join((file_name, ext)))
 #
 # End Configuration
 ######################
@@ -75,8 +79,7 @@ include: "anvio/anvio.profiles.snake"
 include: "anvio/anvio.samples.snake"
 #include: "assembly/metagenomic.megahit.snake"
 include: "common/transitions.snake"
-
-ruleorder: anvio_contigs_prune > contigs
+include: "common/common.snake"
 
 logger.debug("Snakefile config:\n" + yaml.dump(config))
 
