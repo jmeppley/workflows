@@ -95,11 +95,13 @@ rule trim_bbduk_phix:
                     lines=[1,],)
     params:
         phiX_file=config['system_paths']['bbmap'] \
-                         + "/resources/phix174_ill.ref.fa.gz"
+                         + "/resources/phix174_ill.ref.fa.gz",
+        minlength="minlength=" + str(config.get('min_read_length',10))
     shell:
         "bbduk.sh -Xmx{config[bbduk][ram]} \
           in={input} out={output[0]} gchist={output[1]} \
           interleaved overwrite {config[bbduk][phix_flags]} \
+          {params.minlength} \
           ref={params.phiX_file} 2> {log}"
 
 rule bfc_error_correction:
