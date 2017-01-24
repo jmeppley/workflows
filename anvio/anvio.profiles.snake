@@ -34,12 +34,15 @@ rule anvio_profile:
                     cmd_prefix=config['anvio_prefix'],
                     lines=[1,],
                     regular_expression=r'(\d.+)')
+
+    threads:
+        config.get('threads',{}).get('anvi-profile',5)
     shell:
         """{config[anvio_prefix]}
            rm -rf anvio/profile-{wildcards.sample}
            anvi-profile -i {params.bam} -c anvio/contigs.db -S {wildcards.sample} \
             -o anvio/profile-{wildcards.sample} \
-            --min-contig-length {params.min_len}"""
+            --min-contig-length {params.min_len} > {log}"""
 
 rule anvio_merge_profiles:
     """ Merge all the AnVio profiles """
@@ -62,6 +65,6 @@ rule anvio_merge_profiles:
         """{config[anvio_prefix]}
            rm -rf {config[merged_samples_dir]}
            anvi-merge {input.profiles} -c anvio/contigs.db \
-                -o {config[merged_samples_dir]}
+                -o {config[merged_samples_dir]} > {log}
            touch {output}"""
 

@@ -45,6 +45,8 @@ rule samples_db:
         "anvio/samples.{samples}.db"
     benchmark:
         "benchmarks/anvio.sample.db.time"
+    log:
+        "logs/anvio-samples-{samples}.log"
     version:
         get_version("anvi-gen-samples-info-database",
                     cmd_prefix=config['anvio_prefix'],
@@ -55,7 +57,7 @@ rule samples_db:
         """ {config[anvio_prefix]}
             rm -f {output}
             anvi-gen-samples-info-database -D {input.data} -R {input.order} \
-                -o {output}
+                -o {output} > {log}
         """
 
 rule compile_sample_orders:
@@ -83,6 +85,8 @@ rule cluster_samples:
         "anvio/sample_coverages.{samples}.{coverage_metric}.tsv"
     output:
         "anvio/sample_tree.{samples}.{coverage_metric}.{distance_metric}.newick"
+    log:
+        "logs/anvio-cluster-samples.{samples}.{coverage_metric}.out"
     benchmark:
         "benchmarks/cluster_samples_{coverage_metric}_{distance_metric}.time"
     version:
@@ -93,7 +97,7 @@ rule cluster_samples:
     shell:
         """ {config[anvio_prefix]}
             anvi-matrix-to-newick {input} --transpose \
-            --distance {wildcards.distance_metric} -o {output} """
+            --distance {wildcards.distance_metric} -o {output} > {log}"""
 
 rule sample_coverage_table:
     """ 
@@ -105,6 +109,8 @@ rule sample_coverage_table:
         "anvio/status/samples-{samples}-merged"
     output:
         "anvio/sample_coverages.{samples}.{coverage_metric}.tsv"
+    log:
+        "logs/anvio-export-sample-coverage.{samples}.out"
     benchmark:
         "benchmarks/extract_sample_{coverage_metric}.time"
     version:
@@ -114,7 +120,7 @@ rule sample_coverage_table:
                     regular_expression=r'(\d.+)')
     shell:
         """ {config[anvio_prefix]}
-            anvi-export-table {config[merged_samples_dir]}/PROFILE.db --table {wildcards.coverage_metric} -o {output}.raw
+            anvi-export-table {config[merged_samples_dir]}/PROFILE.db --table {wildcards.coverage_metric} -o {output}.raw > {log}
             perl -pe 's/\\t[^\\t]+$/\n/' {output}.raw > {output}
             rm {output}.raw
         """

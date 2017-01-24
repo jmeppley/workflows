@@ -62,7 +62,8 @@ rule anvio_contigs_prune:
                     regular_expression=r'(\d.+)')
     shell:
         """ {config[anvio_prefix]}
-            anvi-script-reformat-fasta {input} -o {output} -l {params.min_len} """
+            anvi-script-reformat-fasta {input} -o {output} -l {params.min_len} \
+             > {log}"""
 
 rule contig_db:
     """
@@ -87,7 +88,7 @@ rule contig_db:
     shell:
         """{config[anvio_prefix]}
            rm -f anvio/contigs.db anvio/contigs.h5
-           anvi-gen-contigs-database -f {input} -o anvio/contigs.db
+           anvi-gen-contigs-database -f {input} -o anvio/contigs.db > {log}
            touch {output}"""
 
 rule anvio_hmms:
@@ -109,7 +110,7 @@ rule anvio_hmms:
                     regular_expression=r'(\d.+)')
     shell:
         """{config[anvio_prefix]}
-           anvi-run-hmms -c anvio/contigs.db --num-threads {threads}
+           anvi-run-hmms -c anvio/contigs.db --num-threads {threads} > {log}
            touch {output}"""
 
 rule anvio_genes:
@@ -129,7 +130,8 @@ rule anvio_genes:
                     regular_expression=r'(\d.+)')
     shell:
         """{config[anvio_prefix]}
-           anvi-get-dna-sequences-for-gene-calls -c anvio/contigs.db -o {output}"""
+           anvi-get-dna-sequences-for-gene-calls -c anvio/contigs.db \
+            -o {output} > {log}"""
 
 rule fake_genes:
     """ create a symlink to the contig genes file with the proper extension, so the lastal rule will find it """
@@ -153,7 +155,8 @@ rule anvio_contig_cogs:
         get_version("diamond")
     shell:
         """{config[anvio_prefix]}
-           anvi-run-ncbi-cogs -c anvio/contigs.db --num-threads {threads} --search-with diamond
+           anvi-run-ncbi-cogs -c anvio/contigs.db --num-threads {threads} \
+            --search-with diamond > {log}
            touch {output}"""
 
 if dbtax:
@@ -216,6 +219,8 @@ if centrifuge or dbtax:
             contig="anvio/status/contig-db"
         output:
             "anvio/status/contig-tax"
+        log:
+            "logs/anvio-import-taxonomy.log"
         params:
             format="centrifuge" if centrifuge else "default_matrix",
         version:
@@ -226,6 +231,6 @@ if centrifuge or dbtax:
         shell:
             """{config[anvio_prefix]}
                anvi-import-taxonomy -c anvio/contigs.db \
-                 -i {input.table} -p {params.format}
+                 -i {input.table} -p {params.format} > {log}
                touch {output}"""
 
