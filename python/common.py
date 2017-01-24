@@ -171,18 +171,18 @@ def collect_sample_reads(config, get_stats=True):
             # keep track of fasta files that will be generated
             fasta_files.extend([
                'reads/{sample}/reads.renamed.R12.cleaned.corrected.fastq.gz'\
-                                                            .format(sample=sample),
+                                                        .format(sample=sample),
                'reads/{sample}/reads.renamed.R12.cleaned.fastq.gz'\
-                                                            .format(sample=sample)])
+                                                        .format(sample=sample)])
                 
         else:
             # we just need to get interleaved reads
-            reads[sample] = 'reads/{sample}/reads.R12.fastq'\
+            reads[sample] = 'reads/{sample}/reads.renamed.R12.fastq'\
                             .format(sample=sample)
 
         # both tracks go through this file
         fasta_files.append('reads/{sample}/reads.renamed.R12.fastq'\
-                                                            .format(sample=sample))
+                                                        .format(sample=sample))
             
         # Do we have a pair of files or single file?
         if len(files)==1:
