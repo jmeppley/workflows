@@ -57,14 +57,14 @@ run_assembly = 'megahit' in config
 if run_assembly:
     include: "assembly/metagenomic.megahit.snake"
     # output of megahit becomes start of anvio workflow
-    transitions['contigs.fasta'] \
+    transitions['contigs.raw.fasta'] \
                     = "megahit-{params}/megahit.contigs.fa" \
                                 .format(params=config['megahit']\
                                                 .get('preset','meta-sensitive'))
 else:
     # work from existing contigs
-    if config.setdefault('contigs_fasta','contigs.fasta') != 'contigs.fasta':
-        transitions['contigs.fasta'] = config['contigs_fasta']
+    if config.setdefault('contigs_fasta','contigs.raw.fasta') != 'contigs.raw.fasta':
+        transitions['contigs.raw.fasta'] = config['contigs_fasta']
 #
 # This list will be filled in by the anvio/anvio.* snakefiles
 outputs = config.setdefault('outputs',set())
@@ -79,11 +79,12 @@ for ext in ['stats', 'hist']:
 include: "anvio/anvio.contigs.snake"
 include: "anvio/anvio.profiles.snake"
 include: "anvio/anvio.samples.snake"
-#include: "assembly/metagenomic.megahit.snake"
 include: "common/transitions.snake"
 include: "common/common.snake"
 
 logger.debug("Snakefile config:\n" + yaml.dump(config))
+
+ruleorder: transition_link > link_contigs_fasta
 
 ######################
 # Rules

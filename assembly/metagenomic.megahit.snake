@@ -52,7 +52,7 @@ rule megahit:
          > {log} 2>&1"
 
 
-rule contigs:
+rule link_contigs_fasta:
     input:
         "megahit-{params}/megahit.contigs.fa".format(params=config['megahit']['preset'])
     output:

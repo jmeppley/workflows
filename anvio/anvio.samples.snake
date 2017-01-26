@@ -57,7 +57,7 @@ rule samples_db:
         """ {config[anvio_prefix]}
             rm -f {output}
             anvi-gen-samples-info-database -D {input.data} -R {input.order} \
-                -o {output} > {log}
+                -o {output} > {log} 2>&1 
         """
 
 rule compile_sample_orders:
@@ -97,7 +97,7 @@ rule cluster_samples:
     shell:
         """ {config[anvio_prefix]}
             anvi-matrix-to-newick {input} --transpose \
-            --distance {wildcards.distance_metric} -o {output} > {log}"""
+            --distance {wildcards.distance_metric} -o {output} > {log} 2>&1 """
 
 rule sample_coverage_table:
     """ 
@@ -120,7 +120,7 @@ rule sample_coverage_table:
                     regular_expression=r'(\d.+)')
     shell:
         """ {config[anvio_prefix]}
-            anvi-export-table {config[merged_samples_dir]}/PROFILE.db --table {wildcards.coverage_metric} -o {output}.raw > {log}
+            anvi-export-table {config[merged_samples_dir]}/PROFILE.db --table {wildcards.coverage_metric} -o {output}.raw > {log} 2>&1 
             perl -pe 's/\\t[^\\t]+$/\n/' {output}.raw > {output}
             rm {output}.raw
         """

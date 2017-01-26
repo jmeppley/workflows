@@ -29,7 +29,7 @@ for contig_output in ["anvio/status/contig-hmms",
 rule anvio_contigs_drop_desc:
     """ Simplify the contig names so AnVio doesn't freak out """
     input:
-        "contigs.fasta"
+        "contigs.raw.fasta"
     output:
         temp("contigs.no_desc.fasta")
     version:
@@ -63,7 +63,7 @@ rule anvio_contigs_prune:
     shell:
         """ {config[anvio_prefix]}
             anvi-script-reformat-fasta {input} -o {output} -l {params.min_len} \
-             > {log}"""
+             > {log} 2>&1 """
 
 rule contig_db:
     """
@@ -88,8 +88,8 @@ rule contig_db:
     shell:
         """{config[anvio_prefix]}
            rm -f anvio/contigs.db anvio/contigs.h5
-           anvi-gen-contigs-database -f {input} -o anvio/contigs.db > {log}
-           touch {output}"""
+           anvi-gen-contigs-database -f {input} -o anvio/contigs.db > {log} 2>&1 
+           touch {output} """
 
 rule anvio_hmms:
     """ Preprocess contigs to find bacterial single copy genes """
@@ -110,8 +110,8 @@ rule anvio_hmms:
                     regular_expression=r'(\d.+)')
     shell:
         """{config[anvio_prefix]}
-           anvi-run-hmms -c anvio/contigs.db --num-threads {threads} > {log}
-           touch {output}"""
+           anvi-run-hmms -c anvio/contigs.db --num-threads {threads} > {log} 2>&1 
+           touch {output} """
 
 rule anvio_genes:
     """ extract gene calls (as DNS seqs) from processed contigs """
@@ -131,7 +131,7 @@ rule anvio_genes:
     shell:
         """{config[anvio_prefix]}
            anvi-get-dna-sequences-for-gene-calls -c anvio/contigs.db \
-            -o {output} > {log}"""
+            -o {output} > {log} 2>&1 """
 
 rule fake_genes:
     """ create a symlink to the contig genes file with the proper extension, so the lastal rule will find it """
@@ -156,7 +156,7 @@ rule anvio_contig_cogs:
     shell:
         """{config[anvio_prefix]}
            anvi-run-ncbi-cogs -c anvio/contigs.db --num-threads {threads} \
-            --search-with diamond > {log}
+            --search-with diamond > {log} 2>&1 
            touch {output}"""
 
 if dbtax:
@@ -234,6 +234,6 @@ if centrifuge or dbtax:
         shell:
             """{config[anvio_prefix]}
                anvi-import-taxonomy -c anvio/contigs.db \
-                 -i {input.table} -p {params.format} > {log}
+                 -i {input.table} -p {params.format} > {log} 2>&1 
                touch {output}"""
 

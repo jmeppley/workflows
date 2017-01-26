@@ -18,7 +18,7 @@ rule index_contigs:
                     version_flag="", 
                     regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
     shell:
-        "bwa index -p mapping/contigs.index.bwa      {input} 2>&1 >  {log}"
+        "bwa index -p mapping/contigs.index.bwa {input} > {log} 2>&1 "
 
 rule map_sample_reads:
     """
@@ -40,7 +40,9 @@ rule map_sample_reads:
     threads:
         config.get('threads',{}).get('bwa',15)
     shell:
-        "bwa mem -t {threads} mapping/contigs.index.bwa {input[1]} 2> {log}  > {output}"
+        "bwa mem -t {threads} mapping/contigs.index.bwa {input[1]} \
+            2> {log} \
+            > {output}"
 
 
 rule sam_to_bam:
