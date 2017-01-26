@@ -206,8 +206,11 @@ if centrifuge:
             get_version(config['centrifuge']['path'] + "/centrifuge",
                         lines=[1,],
                         regular_expression=r'(\d.+)')
+        threads:
+            lambda wildcards: config['threads'].get('centrifuge',20)
         shell:
-            "{params.centrifuge} -f -x {params.db} {input} -S {output[1]}"
+            "{params.centrifuge} -f -x {params.db} -p {threads} \
+                {input} -S {output[1]}"
 
 if centrifuge or dbtax:
     rule anvio_gene_taxa:
