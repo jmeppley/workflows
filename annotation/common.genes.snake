@@ -15,11 +15,6 @@ config.setdefault('clade_ranks', ['order'])
 # Defaults to 8 for eveerything
 default_threads=config.setdefault('threads',{}).get('default', 3)
 #
-# pull out taxdb (usually refseq) and list of gene family dbs
-gene_family_dbs, config['taxdb'] = get_db_types(config)
-config['taxalg']='lastp'
-#
-config.setdefault('annotation_hit_table_map',{})
 # End configuration
 ##########
 

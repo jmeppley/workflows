@@ -1,0 +1,126 @@
+"""
+Python Makefile to pull out reads from a BAM alignment 
+  and use RefSeq, KEGG, PFAM, and others to annotate them
+Annotations are generated as tables of gene_family counts 
+  groupbed by taxonomic clade
+
+To run:
+
+snakemake -s /path/to/workflows/annotate.reads.snake --configfile annotate.reads.yaml [OPTIONS]
+
+The following conda packages are necessary:
+conda create -n snakemake -c bioconda python=3 snakemake samtools last
+
+Plus the tools here:
+https://github.com/jmeppley/py-metagenomics
+
+You will need to run the makefiles in py-metagenomics/databases or provide your own sequence dbs.
+
+With a config file that looks like this:
+reads_file: /path/to/file.bam
+annot_prefix: reads
+clade_rank: order
+output_style: long
+threads:
+    hmmer:    2
+    lastal:   10
+    prodigal: 50
+dbs:
+    RefSeq:
+        path: "/projectb/scratch/jmeppley/seqdbs/RefSeq/78/RefSeq-78.           AllProteins.faa.ldb/lastdb"
+        type: lastdb
+        istaxdb: True
+    KEGG:
+        path: "/projectb/scratch/jmeppley/seqdbs/KEGG/KeggGene.pep.20160919/    lastdb"
+        type: lastdb
+    PFAM:
+        path: "/projectb/scratch/jmeppley/seqdbs/PFAM/30.0/frag-20/Pfam-A.{N:   02d}.hmm"
+        frags: 20
+    COG:
+        path: "/projectb/scratch/jmeppley/seqdbs/cdd/16_January_2015/COG/frag-  10/COG.hmm.{N:02d}.ascii"
+        frags: 10
+    TIGR:
+        path: "/projectb/scratch/jmeppley/seqdbs/TIGRFAM/15.0/frag-10/TIGRFAMS. {N:02d}.hmm"
+        frags: 10
+
+The reads can be embedded in a bam file or given as fasta or fastq.
+"""
+
+from python.common import get_version
+from python.annotate import get_db_dot_fmt_strings
+
+#########
+# CONFIGURATION
+#
+# defaults for basic operation
+# ranks to collect taxa on (defaults to order)
+config.setdefault('clade_ranks', ['order'])
+#
+# read file names for start of workflow
+prefix = config.setdefault('annot_prefix', 'reads')
+reads_file = config.setdefault('reads_file', '{prefix}.fasta'.format(**vars()))
+transitions = config.setdefault('transitions',{})
+#
+# If the starting file doesn't fit our naming scheme,
+#  call for a symbolic link to be made (using transitions dict)
+extension = re.search(r'\.([a-z0-1A-Z]+)$', reads_file).group(1)
+if extension in ['fna', 'ffn', 'fa', 'fasta']:
+    extension = 'fasta'
+if extension in ['fasta', 'fastq', 'bam']:
+    annot_start_file = "{prefix}.{extension}".format(**vars())
+    if reads_file != annot_start_file
+        transitions[annot_start_file] = reads_file
+else:
+    raise Exception("Initial file must be bam or fasta! I don't know what to do "
+            "with {reads_file}".format(**vars()))
+#
+#
+# End configuration
+##########
+
+include: "common/common.snake"
+include: "annotation/common.sixframe.snake"
+
+# make sure read extraction comes from sam, not a nonexistent fastq:
+#ruleorder: extract_reads > fastq_to_fasta
+
+# set up list of files to create
+#  - The final tabulations
+#  - Stats and histrogram files for reads and translated seqs
+gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs, config)
+annotation_file_list = \
+                expand("{prefix}.annotation.{taxdb}.lastx.{clade_rank}.vs.{db_dot_fmt}.tsv",
+                       prefix=prefix,
+                       taxdb=config['taxdb'],
+                       clade_rank=config['clade_ranks'],
+                       db_dot_fmt=gene_family_db_dot_fmts,) + \
+                expand("{prefix}.{suffix}.{ext}", 
+                       ext=['stats','hist'],
+                       suffix=['fasta','sixframe.faa'],
+                       prefix=prefix)
+
+##########
+# RULES:
+#  This lays out the dependencies and logic of the workflow
+#  After the "all" target, it is generally laid out start to finish
+rule read_annotation_all:
+    input:
+        annotation_file_list
+
+rule extract_reads:
+    """
+    Pull reads out of BAM file
+    """
+    input:
+        "{prefix}.bam"
+    output:
+        temp("{prefix}.fasta")
+    benchmark:
+        "benchmarks/{prefix}_extract_reads.time"
+    log:
+        "logs/{prefix}_extract_reads.log"
+    version:
+        get_version('samtools', lines=[0,])
+    shell:
+        "samtools fasta -0 {output} {input} > {log} 2>&1"
+
