@@ -14,7 +14,9 @@ config['merged_samples_status'] = "anvio/status/samples-{}-merged"\
                                     .format(config['samples_name'])
 config.setdefault('outputs',set()).add(config['merged_samples_status'])
 
+# import mapping rules and start from filtered contigs
 include: "../common/mapping_bwa.snake"
+config.setdefault('transitions',{})['contigs.fasta'] = 'anvio/contigs.fa'
 
 rule anvio_profile:
     input:
@@ -42,7 +44,7 @@ rule anvio_profile:
            rm -rf anvio/profile-{wildcards.sample}
            anvi-profile -i {params.bam} -c anvio/contigs.db -S {wildcards.sample} \
             -o anvio/profile-{wildcards.sample} \
-            --min-contig-length {params.min_len} > {log}"""
+            --min-contig-length {params.min_len} > {log} 2>&1 """
 
 rule anvio_merge_profiles:
     """ Merge all the AnVio profiles """
@@ -65,6 +67,6 @@ rule anvio_merge_profiles:
         """{config[anvio_prefix]}
            rm -rf {config[merged_samples_dir]}
            anvi-merge {input.profiles} -c anvio/contigs.db \
-                -o {config[merged_samples_dir]} > {log}
+                -o {config[merged_samples_dir]} > {log} 2>&1 
            touch {output}"""
 
