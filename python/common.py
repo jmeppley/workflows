@@ -144,11 +144,19 @@ def collect_sample_reads(config, get_stats=True):
         sample = re.sub(r'[^A-Za-z0-9_]','_',sample)
         reads.setdefault(sample,[]).append(read_file)
 
-    # loop back over samples and set up cleaning or interleaving if needed
-    needs_qc = False
-    transitions = config.setdefault('transitions',{})
+    # generate naming strings for linking QC workflow steps
     already_cleaned = samples_pattern_data.get('cleaned',True) \
                         in [True, 1, "True", "T", "true", "t"]
+    if already_cleaned:
+        qc_steps = []
+    else:
+        qc_steps = ['cleaned','corrected']
+    if "min_read_length" in config:
+        qc_steps.append("gte{}".format(config['min_read_length']))
+
+    # loop back over samples and set up cleaning or interleaving if needed
+    needs_qc_or_join = len(qc_steps) > 0
+    transitions = config.setdefault('transitions',{})
     fasta_files = []
     for sample in list(reads.keys()):
         files = sorted(reads[sample])
@@ -160,37 +168,28 @@ def collect_sample_reads(config, get_stats=True):
                                 .format(sample,
                                         "\n".join(files)))
 
-        # Do we need to clean?
-        if not already_cleaned:
-            needs_qc = True
-            # set target that will invoke QC
-            reads[sample] = \
-                    'reads/{sample}/reads.renamed.R12.cleaned.corrected.fastq.gz'\
+        # keep track of fasta files that will be generated
+        last_fasta_file = 'reads/{sample}/reads.renamed.R12.fastq'\
                             .format(sample=sample)
-
-            # keep track of fasta files that will be generated
-            fasta_files.extend([
-               'reads/{sample}/reads.renamed.R12.cleaned.corrected.fastq.gz'\
-                                                        .format(sample=sample),
-               'reads/{sample}/reads.renamed.R12.cleaned.fastq.gz'\
-                                                        .format(sample=sample)])
+        fasta_files.append(last_fasta_file)
+        qc_chain = ""
+        for qc_step in qc_steps:
+            qc_chain += qc_step + "."
+            last_fasta_file = \
+                    'reads/{sample}/reads.renamed.R12.{qc_chain}fastq.gz'\
+                            .format(sample=sample, qc_chain=qc_chain)
+            fasta_files.append(last_fasta_file)
+        
+        # set target of QC, and starting point of assembly/mapping, to last file
+        reads[sample] = last_fasta_file
                 
-        else:
-            # we just need to get interleaved reads
-            reads[sample] = 'reads/{sample}/reads.renamed.R12.fastq'\
-                            .format(sample=sample)
-
-        # both tracks go through this file
-        fasta_files.append('reads/{sample}/reads.renamed.R12.fastq'\
-                                                        .format(sample=sample))
-            
         # Do we have a pair of files or single file?
         if len(files)==1:
             # we are starting from interleaved, just link it in
             transitions['reads/{sample}/reads.renamed.R12.fastq'\
                                 .format(sample=sample)] = files[0]
         else:
-            needs_qc = True
+            needs_qc_or_join = True
             # we are starting from paired files, link those
             transitions['reads/{sample}/reads.R1.fastq'\
                             .format(sample=sample)] = files[0]
@@ -204,4 +203,4 @@ def collect_sample_reads(config, get_stats=True):
             for file_name in fasta_files:
                 outputs.add(".".join((file_name, ext)))
 
-    return needs_qc
+    return needs_qc_or_join

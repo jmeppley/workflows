@@ -96,12 +96,10 @@ rule trim_bbduk_phix:
     params:
         phiX_file=config['system_paths']['bbmap'] \
                          + "/resources/phix174_ill.ref.fa.gz",
-        minlength="minlength=" + str(config.get('min_read_length',10))
     shell:
         "bbduk.sh -Xmx{config[bbduk][ram]} \
           in={input} out={output[0]} gchist={output[1]} \
           interleaved overwrite {config[bbduk][phix_flags]} \
-          {params.minlength} \
           ref={params.phiX_file} 2> {log}"
 
 rule bfc_error_correction:
@@ -125,4 +123,25 @@ rule bfc_error_correction:
           -t {threads} {input} 2> {log} \
           | seqtk dropse - \
           | gzip -c > {output}"
+
+if 'min_read_length' in config:
+    rule remove_short_reads:
+        """ drop reads under a specified length """
+        input:
+            "{prefix}.fastq.gz"
+        output:
+            "{prefix}.gte{min_length}.fastq.gz"
+        log:   
+            "logs/{prefix}.remove.short.reads.log"
+        benchmark:
+            "benchmarks/{prefix}.remove.short.reads.time"
+        version:
+            get_version('seqtk', version_flag='',
+                        regular_expression=r'Version:\s+(\S.*\S)')
+        shell:
+            "gunzip -c {input} \
+                | seqtk seq -L 100 \
+                | seqtk dropse \
+                | gzip -c \
+                > {output}"
 
