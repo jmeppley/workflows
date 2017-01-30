@@ -7,11 +7,11 @@ To run:
 snakemake -s /path/to/workflows/anvio.metagenomic.snake --configfile anvio.metagenomic.yaml [OPTIONS]
 
 The following conda packages will install everything you need:
-conda create -n snakemake -c bioconda python=3 snakemake pandas biopython bbmap bfc megahit bwa samtools
+conda create -n snakemake -c bioconda python=3 snakemake pandas biopython bbmap bfc megahit bwa samtools prinseq seqtk
 
 Anvio must be installed in the runing environmetn or in a conda environment. If it is installed in a conda environment, set the config variable anvio_env to te name of that environment.
 
-With a config file like this:
+With a config file like this to run megahit on a set of fastq reads files:
 samples_pattern:
     glob: "../data/*.fastq"
     re: "/([^_]+)_[^/]+\.fastq"
@@ -21,7 +21,6 @@ samples_pattern:
 megahit:
     preset: meta
 threads:
-    lastal:  10
     bwa:     10
     megahit: 40
 centrifuge:
@@ -35,11 +34,25 @@ The fields in samples_pattern are:
  cleaned: Set to true to skip QC
  name: string to use in naming combined outputs
 
-to skip assembly and just map reads to contigs supply:
+Or to skip assembly and specify a contigs file against which to compare reads:
+samples_pattern:
+    glob: "../data/*.fastq"
+    re: "/([^_]+)_[^/]+\.fastq"
+    cleaned: True
+    name: all
+    metadata: samples.all.tsv
 contigs_fasta: /path/to/contigs.fasta
+threads:
+    bwa:         10
+    anvi-profile: 3
+centrifuge:
+    path: /path/to/centrifuge
+    db: dbs/p+h+v
+anvio_env: anvio
 
 """
-from python.common import get_version, collect_sample_reads
+from python.common import get_version
+from python.anvio import collect_sample_reads
 from snakemake.logging import logger
 import yaml
 
@@ -83,8 +96,6 @@ include: "common/transitions.snake"
 include: "common/common.snake"
 
 logger.debug("Snakefile config:\n" + yaml.dump(config))
-
-ruleorder: transition_link > link_contigs_fasta
 
 ######################
 # Rules
