@@ -10,8 +10,8 @@ This makefile does two things:
 The annotation/common.snake makefile has the meat of the annotation code
 """
 
-from common import get_version
-from annotate import get_db_assignment_params,get_db_types,\
+from python.common import get_version
+from python.annotate import get_db_assignment_params,get_db_types,\
                      get_hit_table_name_from_wildcards_db
 
 # command for removing transeq readingframe suffixes from hit names

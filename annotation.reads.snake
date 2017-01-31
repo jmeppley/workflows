@@ -46,6 +46,7 @@ dbs:
 The reads can be embedded in a bam file or given as fasta or fastq.
 """
 
+import yaml
 from python.common import get_version
 from python.annotate import get_db_dot_fmt_strings
 
@@ -68,7 +69,7 @@ if extension in ['fna', 'ffn', 'fa', 'fasta']:
     extension = 'fasta'
 if extension in ['fasta', 'fastq', 'bam']:
     annot_start_file = "{prefix}.{extension}".format(**vars())
-    if reads_file != annot_start_file
+    if reads_file != annot_start_file:
         transitions[annot_start_file] = reads_file
 else:
     raise Exception("Initial file must be bam or fasta! I don't know what to do "
@@ -78,7 +79,8 @@ else:
 # End configuration
 ##########
 
-include: "common/common.snake"
+include: "common/stats.snake"
+include: "common/transitions.snake"
 include: "annotation/common.sixframe.snake"
 
 # make sure read extraction comes from sam, not a nonexistent fastq:
@@ -89,7 +91,7 @@ include: "annotation/common.sixframe.snake"
 #  - Stats and histrogram files for reads and translated seqs
 gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs, config)
 annotation_file_list = \
-                expand("{prefix}.annotation.{taxdb}.lastx.{clade_rank}.vs.{db_dot_fmt}.tsv",
+                expand("{prefix}.annot.{taxdb}.lastx.{clade_rank}.vs.{db_dot_fmt}.tsv",
                        prefix=prefix,
                        taxdb=config['taxdb'],
                        clade_rank=config['clade_ranks'],
@@ -98,6 +100,8 @@ annotation_file_list = \
                        ext=['stats','hist'],
                        suffix=['fasta','sixframe.faa'],
                        prefix=prefix)
+
+logger.debug("Snakefile config:\n" + yaml.dump(config))
 
 ##########
 # RULES:
