@@ -96,8 +96,6 @@ for ext in ['stats', 'hist']:
 # End Configuration
 ######################
 
-include: "anvio/anvio.contigs.snake"
-include: "anvio/anvio.profiles.snake"
 include: "anvio/anvio.samples.snake"
 include: "common/transitions.snake"
 include: "common/common.snake"

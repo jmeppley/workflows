@@ -1,11 +1,7 @@
 """
 Collection of rules from setting up AnVio profiles
 """
-
-if 'anvio_env' not in config:
-    config['anvio_prefix']=""
-else:
-    config['anvio_prefix'] = "source activate {}\n".format(config['anvio_env'])
+include: "avnio.contigs.snake"
 
 config.setdefault('samples_name','all')
 config['merged_samples_dir'] = "anvio/samples-{}-merged"\
@@ -33,11 +29,7 @@ rule anvio_profile:
         bam=lambda w: "mapping/{sample}.reads.vs.contigs.bam".format(sample=w.sample),
         min_len=config.get("min_contig_length",2500)
     version:
-        get_version("anvi-profile",
-                    cmd_prefix=config['anvio_prefix'],
-                    lines=[1,],
-                    regular_expression=r'(\d.+)')
-
+        config['anvio_version']
     threads:
         config.get('threads',{}).get('anvi-profile',5)
     shell:
@@ -61,10 +53,7 @@ rule anvio_merge_profiles:
     benchmark:
         "benchmarks/anvio.merge.time"
     version:
-        get_version("anvi-profile",
-                    cmd_prefix=config['anvio_prefix'],
-                    lines=[1,],
-                    regular_expression=r'(\d.+)')
+        config['anvio_version']
     params:
         profiles=lambda w: expand("anvio/profile-{sample}/PROFILE.db",
                             sample=config['reads']),

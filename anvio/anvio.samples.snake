@@ -2,10 +2,7 @@
 Collection of rules to create a sample databse for metagenomic
 analysis in anvi'o
 """
-if 'anvio_env' not in config:
-    config['anvio_prefix']=""
-else:
-    config['anvio_prefix'] = "source activate {}\n".format(config['anvio_env'])
+include: "anvio.profiles.snake"
 
 config.setdefault('samples_name','all')
 config.setdefault('sample_tree',{})
@@ -48,11 +45,7 @@ rule samples_db:
     log:
         "logs/anvio-samples-{samples}.log"
     version:
-        get_version("anvi-gen-samples-info-database",
-                    cmd_prefix=config['anvio_prefix'],
-                    lines=[1,],
-                    regular_expression=r'(\d.+)')
-        
+        config['anvio_version']
     shell:
         """ {config[anvio_prefix]}
             rm -f {output}
@@ -90,10 +83,7 @@ rule cluster_samples:
     benchmark:
         "benchmarks/cluster_samples_{coverage_metric}_{distance_metric}.time"
     version:
-        get_version("anvi-matrix-to-newick",
-                    cmd_prefix=config['anvio_prefix'],
-                    lines=[1,],
-                    regular_expression=r'(\d.+)')
+        config['anvio_version']
     shell:
         """ {config[anvio_prefix]}
             anvi-matrix-to-newick {input} --transpose \
@@ -114,10 +104,7 @@ rule sample_coverage_table:
     benchmark:
         "benchmarks/extract_sample_{coverage_metric}.time"
     version:
-        get_version("anvi-matrix-to-newick",
-                    cmd_prefix=config['anvio_prefix'],
-                    lines=[1,],
-                    regular_expression=r'(\d.+)')
+        config['anvio_version']
     shell:
         """ {config[anvio_prefix]}
             anvi-export-table {config[merged_samples_dir]}/PROFILE.db --table {wildcards.coverage_metric} -o {output}.raw > {log} 2>&1 

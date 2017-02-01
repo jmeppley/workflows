@@ -9,6 +9,17 @@ if 'anvio_env' not in config:
 else:
     config['anvio_prefix'] = "source activate {}\n".format(config['anvio_env'])
 
+config['anvio_version'] = \
+        get_version("anvi-profile",
+                    cmd_prefix=config['anvio_prefix'],
+                    lines=[1,],
+                    regular_expression=r'(\d.+)')
+
+import re
+v1,v2,v3 = re.search(r'^(\d+)(?:\.(\d+))?(?:\.(\d+))?',
+                     config['anvio_version']).groups()
+anvi_ver_gt_210 = v1>='2' and v2>='1' and v3>='1'
+
 # use centrifuge if configured
 centrifuge = 'centrifuge' in config
 if not centrifuge:
@@ -56,10 +67,7 @@ rule anvio_contigs_prune:
     params:
         min_len=config.get("min_contig_length",2500)
     version:
-        get_version("anvi-script-reformat-fasta",
-                    cmd_prefix=config['anvio_prefix'],
-                    lines=[1,],
-                    regular_expression=r'(\d.+)')
+        config['anvio_version']
     shell:
         """ {config[anvio_prefix]}
             anvi-script-reformat-fasta {input} -o {output} -l {params.min_len} \
@@ -81,10 +89,7 @@ rule contig_db:
     benchmark:
         "benchmarks/anvio-contig-db.time"
     version:
-        get_version("anvi-profile",
-                    cmd_prefix=config['anvio_prefix'],
-                    lines=[1,],
-                    regular_expression=r'(\d.+)')
+        config['anvio_version']
     shell:
         """{config[anvio_prefix]}
            rm -f anvio/contigs.db anvio/contigs.h5
@@ -104,10 +109,7 @@ rule anvio_hmms:
     threads:
         20
     version:
-        get_version("anvi-profile",
-                    cmd_prefix=config['anvio_prefix'],
-                    lines=[1,],
-                    regular_expression=r'(\d.+)')
+        config['anvio_version']
     shell:
         """{config[anvio_prefix]}
            anvi-run-hmms -c anvio/contigs.db --num-threads {threads} > {log} 2>&1 
@@ -124,10 +126,7 @@ rule anvio_genes:
     log:
         "logs/contigs.genes"
     version:
-        get_version("anvi-profile",
-                    cmd_prefix=config['anvio_prefix'],
-                    lines=[1,],
-                    regular_expression=r'(\d.+)')
+        config['anvio_version']
     shell:
         """{config[anvio_prefix]}
            anvi-get-dna-sequences-for-gene-calls -c anvio/contigs.db \
@@ -152,7 +151,8 @@ rule anvio_contig_cogs:
     threads:
         50
     version:
-        get_version("diamond")
+        get_version("diamond",
+                    cmd_prefix=config['anvio_prefix'],)
     shell:
         """{config[anvio_prefix]}
            anvi-run-ncbi-cogs -c anvio/contigs.db --num-threads {threads} \
@@ -227,10 +227,7 @@ if centrifuge or dbtax:
         params:
             format="centrifuge" if centrifuge else "default_matrix",
         version:
-            get_version("anvi-profile",
-                        cmd_prefix=config['anvio_prefix'],
-                        lines=[1,],
-                        regular_expression=r'(\d.+)')
+            config['anvio_version']
         shell:
             """{config[anvio_prefix]}
                anvi-import-taxonomy -c anvio/contigs.db \
