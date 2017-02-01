@@ -87,6 +87,7 @@ else:
 #
 # This list will be filled in by the anvio/anvio.* snakefiles
 outputs = config.setdefault('outputs',set())
+#
 # generate simple statistics (prinseq) and histogram from contigs
 for ext in ['stats', 'hist']:
     for file_name in ['contigs.fasta', 'anvio/contigs.fa']:

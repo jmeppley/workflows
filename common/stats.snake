@@ -1,24 +1,39 @@
+try:
+    hist_version = get_version('histograms.py')
+    enable_hist = True
+except:
+    enable_hist = False
 
-rule histogram_simple:
-    """ produce a histogram of sequence lengths """
-    input:
-        "{file_root}.{ext}"
-    output:
-        "{file_root}.{ext,f(aa|fn|na|a|asta|astq)(\.gz)?}.hist"
-    log:
-        "logs/{file_root}.{ext}.hist.log"
-    benchmark:
-        "benchmarks/{file_root}.{ext}.hist.time"
-    version:
-        get_version('histograms.py')
-    params:
-        cat=lambda wildcards:"gunzip -c" \
-         if re.search(r'\.gz$',wildcards.ext) else "cat"
-    shell:
-        "{params.cat} {input} | \
-        seqtk comp | \
-        cut -f 2 | \
-        histograms.py -l length -b 30 > {output}"
+if enable_hist:
+    rule histogram_simple:
+        """ produce a histogram of sequence lengths """
+        input:
+            "{file_root}.{ext}"
+        output:
+            "{file_root}.{ext,f(aa|fn|na|a|asta|astq)(\.gz)?}.hist"
+        log:
+            "logs/{file_root}.{ext}.hist.log"
+        benchmark:
+            "benchmarks/{file_root}.{ext}.hist.time"
+        version:
+            get_version('histograms.py')
+        params:
+            cat=lambda wildcards:"gunzip -c" \
+             if re.search(r'\.gz$',wildcards.ext) else "cat"
+        shell:
+            "{params.cat} {input} | \
+            seqtk comp | \
+            cut -f 2 | \
+            histograms.py -l length -b 30 > {output}"
+else:
+    rule histogram_dummy:
+        """ create a placeholder file so that the workflow is happy """
+        input:
+            "{file_root}.{ext}"
+        output:
+            "{file_root}.{ext,f(aa|fn|na|a|asta|astq)(\.gz)?}.hist"
+        shell:
+            "echo 'histograms.py is not installed' > {output}"
 
 rule prinseq_any:
     """ calculate basic stats for a fasta file """
