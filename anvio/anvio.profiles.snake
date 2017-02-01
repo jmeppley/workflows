@@ -23,7 +23,8 @@ rule anvio_profile:
         "anvio/status/contig-db",
         "mapping/{sample}.reads.vs.contigs.bam.bai"
     output:
-        "anvio/profile-{sample}/RUNINFO.cp"
+        #"anvio/profile-{sample}/RUNINFO.cp"
+        "anvio/status/profile-{sample}"
     log:
         "logs/anvio-profile-{sample}"
     benchmark:
@@ -44,13 +45,14 @@ rule anvio_profile:
            rm -rf anvio/profile-{wildcards.sample}
            anvi-profile -i {params.bam} -c anvio/contigs.db -S {wildcards.sample} \
             -o anvio/profile-{wildcards.sample} \
-            --min-contig-length {params.min_len} > {log} 2>&1 """
+            --min-contig-length {params.min_len} > {log} 2>&1
+           touch {output}"""
 
 rule anvio_merge_profiles:
     """ Merge all the AnVio profiles """
     input:
         contig_status="anvio/status/contig-db",
-        profiles=lambda w: expand("anvio/profile-{sample}/RUNINFO.cp",
+        profiles=lambda w: expand("anvio/status/profile-{sample}",
                             sample=config['reads']),
     output:
         config['merged_samples_status']
@@ -63,10 +65,13 @@ rule anvio_merge_profiles:
                     cmd_prefix=config['anvio_prefix'],
                     lines=[1,],
                     regular_expression=r'(\d.+)')
+    params:
+        profiles=lambda w: expand("anvio/profile-{sample}/PROFILE.db",
+                            sample=config['reads']),
     shell:
         """{config[anvio_prefix]}
            rm -rf {config[merged_samples_dir]}
-           anvi-merge {input.profiles} -c anvio/contigs.db \
+           anvi-merge {params.profiles} -c anvio/contigs.db \
                 -o {config[merged_samples_dir]} > {log} 2>&1 
            touch {output}"""
 
