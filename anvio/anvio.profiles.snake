@@ -55,7 +55,9 @@ rule anvio_merge_profiles:
     version:
         config['anvio_version']
     params:
-        profiles=lambda w: expand("anvio/profile-{sample}/PROFILE.db",
+        profiles=lambda w: expand("anvio/profile-{sample}/{filename}",
+                            filename="PROFILE.db" if anvi_ver_gt_210 \
+                                        else "RUNINFO.cp",
                             sample=config['reads']),
     shell:
         """{config[anvio_prefix]}

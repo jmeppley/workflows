@@ -5,6 +5,7 @@ samples_pattern:
     name: "all"
 megahit:
     preset: meta-sensitive
+min_contig_length: 500
 sample_tree:
     coverage_metrics:
         - mean_coverage_Q2Q3_contigs
