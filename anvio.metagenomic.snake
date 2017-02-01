@@ -8,7 +8,7 @@ snakemake -s /path/to/workflows/anvio.metagenomic.snake --configfile anvio.metag
 
 The following conda packages will install everything you need:
 conda create -n snakemake -c bioconda python=3 snakemake pandas biopython bbmap
-bfc megahit bwa samtools prinseq seqtk mira
+bfc megahit bwa samtools prinseq seqtk
 
 NOTES for OSX:
  * megahit is not (yet) in conda, you will have to install it manually

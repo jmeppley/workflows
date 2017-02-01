@@ -1,11 +1,10 @@
 samples_pattern:
     glob: "../../data/raw_reads/*.fastq"
     re: "/[^A-Za-z]*([A-Za-z][^/]*)_S\\d[^/]+\\.fastq"
-    cleaned: False
+    cleaned: True
     name: "all"
     metadata: "samples.all.tsv"
-megahit:
-    preset: meta-sensitive
+contigs_fasta: ../../data/contigs/contigs.100.fa
 sample_tree:
     coverage_metrics:
         - mean_coverage_Q2Q3_contigs
@@ -15,8 +14,7 @@ sample_tree:
         - abundance_contigs
         - detection_contigs
 threads:
-    lastal: 10
     bwa: 10
-    megahit: 40
+    anvio-profile: 1
     bfc: 3
 anvio_env: anvio

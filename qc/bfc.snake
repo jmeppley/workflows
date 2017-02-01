@@ -24,15 +24,22 @@ rule rename_raw_reads:
     input:
         "{path}{sample}/{prefix}.{dir}.fastq"
     output:
-        temp("{path}{sample,[^/]+}/{prefix}.renamed.{dir,R[12]}.fastq")
+        reads=temp("{path}{sample,[^/]+}/{prefix}.renamed.{dir,R[12]}.fastq"),
+        name_map="{path}{sample}/{prefix}.renamed.{dir}.tsv"
     log:
         "logs/{path}{sample}.{prefix}.renamed.{dir}.log"
     benchmark:
         "benchmarks/{path}{prefix}.renamed.{dir}.time"
-    version:
-        get_version('miraconvert','-v')
-    shell:
-        "miraconvert -f fastq -R {wildcards.sample} -S solexa -t fastq {input} {output} > {log}"
+    run:
+        from Bio import SeqIO
+        name_root = wildcards.sample
+        with open(output.reads,'w') as OUTR:
+            with open(output.name_map, 'w') as OUTM:
+                for i, record in enumerate(SeqIO.parse(input[0]),'fasta'):
+                    old_id = record.id
+                    record.id = "{}_{}".format(name_root, i+1)
+                    OUTR.write(record.format('fasta'))
+                    OUTM.write("{}\t{}\n".format(old_id, record.id))
 
 rule interleave:
     """
