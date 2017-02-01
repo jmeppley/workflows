@@ -1,0 +1,14 @@
+rule uncompress_file:
+    input:
+        "{file_root}.gz"
+    output:
+        temp("{file_root}")
+    wildcard_constraints:
+        file_root=r'.+(?<!gz)$'
+    benchmark:
+        "benchmarks/{file_root}.gunzip.time"
+    version:
+        get_version('gunzip', lines=0)
+    shell:
+        "gunzip -c {input} > {output}"
+

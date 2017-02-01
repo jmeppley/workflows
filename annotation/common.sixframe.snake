@@ -1,39 +1,23 @@
 """
-Annotate reads using six frame translation. Lastal has this built in (aka: lastx) when given the -F flag. For hmmsearch, we'll run through transeq 1st
+Annotate reads using six frame translation. Lastal has this built in (aka: lastx) when given the -F flag. For hmmsearch, we'll run through transeq 1st.
+
+This makefile does two things:
+
+ 1. It sets up the transeq rule (with some required name manipulation to prevent errors).
+
+ 2. It defines a version of the compile_counts rule that calls for sixframe translation.
+
+The annotation/common.snake makefile has the meat of the annotation code
 """
 
-import sys
-import os
-snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
-sys.path[0]=os.path.join(snakefile_path,'..','python')
-from common import get_version
-from annotate import get_db_assignment_params,get_db_types,\
+from python.common import get_version
+from python.annotate import get_db_assignment_params,get_db_types,\
                      get_hit_table_name_from_wildcards_db
-#configfile: "annotation.yaml"
-#########
-# CONFIGURATION
-#
-# rank to collect taxa on (defaults to order)
-config.setdefault('clade_ranks', ['order'])
-#
-# threads per search are set in the threads: parameter
-# Either use the db name or "default". EG:
-# threads:
-#   default: 5
-#   lastal: 20
-# Defaults to 8 for eveerything
-default_threads=config.setdefault('threads',{}).get('default', 3)
-#
-# pull out taxdb (usually refseq) and list of gene family dbs
-gene_family_dbs, config['taxdb'] = get_db_types(config)
-#
-config.setdefault('annotation_hit_table_map',{})
-# End configuration
-##########
 
 # command for removing transeq readingframe suffixes from hit names
 translation_filter = "perl -pe 's/^(\S+)_\d+(\s+)/\\1\\2/'"
 
+# NB: the following refers to annotation/common.snake (not common/common.snake)
 include: "common.snake"
 
 rule remove_colons:

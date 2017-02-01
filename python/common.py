@@ -25,13 +25,18 @@ def get_version(command, version_flag='--version',
                                   stderr=subprocess.STDOUT,
                                   shell=True).decode()
 
+
     # select specific lines
     if lines is not None:
         out_lines = out.split("\n")
         if isinstance(lines,slice):
             out = "\n".join(out_lines[lines])
         elif isinstance(lines, int):
-            out = out_lines[lines]
+            try:
+                out = out_lines[lines]
+            except IndexError:
+                print("WARNING: Line {} does not exist in output from '{}':\n{}".format(lines, command, out))
+
         else:
             out = "\n".join(out_lines[i] for i in lines)
 

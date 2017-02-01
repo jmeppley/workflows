@@ -1,0 +1,9 @@
+
+rule fastq_to_fasta:
+    input: "{file_root}.fastq"
+    output: temp("{file_root}.fasta")
+    benchmark: "benchmarks/{file_root}.fasta.time"
+    version: get_version("seqtk", "", lines=2)
+    shell:
+        "seqtk seq -A {input} > {output}"
+
