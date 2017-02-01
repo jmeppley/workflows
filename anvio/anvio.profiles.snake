@@ -1,7 +1,7 @@
 """
 Collection of rules from setting up AnVio profiles
 """
-include: "avnio.contigs.snake"
+include: "anvio.contigs.snake"
 
 config.setdefault('samples_name','all')
 config['merged_samples_dir'] = "anvio/samples-{}-merged"\
