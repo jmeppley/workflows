@@ -16,23 +16,17 @@ with megahit.
 # Default to "meta" preset for megahit
 config.setdefault('megahit',{}).setdefault('preset','meta')
 # 
-#
-# Configuration
 ######################
 
 
 ######################
 # Rules
-rule all:
-    input:
-        "contigs.fasta.stats",
-
 rule megahit:
     """
     requires "reads" dictionary in config with map from sample names to list of fastq files of prepped reads for each sample
     """
     input:
-        [reads for sample,reads in config['reads'].items()]
+        [filename for sample,filename in config['reads'].items()]
     output:
         "megahit-{params}/megahit.contigs.fa"
     log:
@@ -51,12 +45,4 @@ rule megahit:
          --continue -o megahit-{params.preset} --out-prefix megahit --verbose\
          > {log} 2>&1"
 
-
-rule link_contigs_fasta:
-    input:
-        "megahit-{params}/megahit.contigs.fa".format(params=config['megahit']['preset'])
-    output:
-        "contigs.fasta"
-    shell:
-        "ln -s {input} {output}"
 
