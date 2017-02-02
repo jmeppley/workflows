@@ -22,23 +22,24 @@ apply_defaults(config, defaults)
 rule rename_raw_reads:
     """ Rename reads to be based on a "sample" name """
     input:
-        "{path}{sample}/{prefix}.{dir}.fastq"
+        "{path}/{sample}/{prefix}.{dir}.fastq"
     output:
-        reads=temp("{path}{sample,[^/]+}/{prefix}.renamed.{dir,R[12]}.fastq"),
-        name_map="{path}{sample}/{prefix}.renamed.{dir}.tsv"
+        reads=temp("{path}/{sample,[^/]+}/{prefix,[^/]+}.renamed.{dir,R[12]}.fastq"),
+        name_map="{path}/{sample}/{prefix}.renamed.{dir}.tsv"
     log:
-        "logs/{path}{sample}.{prefix}.renamed.{dir}.log"
+        "logs/{path}.{sample}.{prefix}.renamed.{dir}.log"
     benchmark:
-        "benchmarks/{path}{prefix}.renamed.{dir}.time"
+        "benchmarks/{path}.{prefix}.renamed.{dir}.time"
     run:
         from Bio import SeqIO
         name_root = wildcards.sample
+        print("Renaming root is %r from %r" % (name_root, wildcards.sample))
         with open(output.reads,'w') as OUTR:
             with open(output.name_map, 'w') as OUTM:
-                for i, record in enumerate(SeqIO.parse(input[0],'fasta')):
+                for i, record in enumerate(SeqIO.parse(input[0],'fastq')):
                     old_id = record.id
                     record.id = "{}_{}".format(name_root, i+1)
-                    OUTR.write(record.format('fasta'))
+                    OUTR.write(record.format('fastq'))
                     OUTM.write("{}\t{}\n".format(old_id, record.id))
 
 rule interleave:
