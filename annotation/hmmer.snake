@@ -6,14 +6,10 @@ rule hmmer_db_press:
         "{db_path}"
     output:
         "{db_path,.+\.[Hh][Mm][Mm](\.[Aa][Ss][Cc][Ii][Ii])?}.h3i"
-    benchmark:
-        "benchmarks/hmmpress.{db_path}.time"
-    log:
-        "logs/hmmpress.{db_path}.log"
     version:
         get_version('hmmpress','-h',lines=[1,])
     shell:
-        "hmmpress {input} > {log}"
+        "hmmpress {input}"
 
 rule hmmer:
     """

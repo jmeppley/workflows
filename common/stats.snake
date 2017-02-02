@@ -1,5 +1,9 @@
 try:
     hist_version = get_version('histograms.py')
+    try:
+        logger.debug("Histogram version: {}".format(hist_version))
+    except:
+        pass
     enable_hist = True
 except:
     enable_hist = False
@@ -21,10 +25,15 @@ if enable_hist:
             cat=lambda wildcards:"gunzip -c" \
              if re.search(r'\.gz$',wildcards.ext) else "cat"
         shell:
-            "{params.cat} {input} | \
+            """
+            echo $PATH
+            which histograms.py
+            {params.cat} {input} | \
             seqtk comp | \
             cut -f 2 | \
-            histograms.py -l length -b 30 > {output}"
+            histograms.py -l length -b 30 > {output}
+            """
+
 else:
     rule histogram_dummy:
         """ create a placeholder file so that the workflow is happy """

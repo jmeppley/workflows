@@ -6,9 +6,7 @@ rule lastdb:
     """
     input: "{db_path}.faa"
     output: "{db_path}.prj"
-    benchmark: "benchmarks/{db_path}.lastdb.time"
-    log: "logs/{db_path}.lastdb.log"
-    shell: "lastdb -v -p wildcards.db_path {input} > {log}"
+    shell: "lastdb -v -p {wildcards.db_path} {input}"
 
 rule lastal:
     """
@@ -35,7 +33,7 @@ rule lastal:
         keep=config.get('last_filter','-F 5')
     shell:
         "lastal -P {threads} {params.fshift} -f BlastTab {params.opts} \
-         {params.db_path} {input} \
+         {params.db_path} {input[0]} \
          | grep -v '^#'  \
          | filter_blast_m8.py -f blast {params.keep} \
          > {output}"

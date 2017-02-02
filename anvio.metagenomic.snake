@@ -93,6 +93,12 @@ for ext in ['stats', 'hist']:
     for file_name in ['contigs.fasta', 'anvio/contigs.fa']:
         outputs.add(".".join((file_name, ext)))
 #
+# add my tools to the path (Somewhat of a hack, maybe I'll get my stuff in
+# conda eventually)
+snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))
+pymg_dir = os.path.sep.join([snakefile_path, 'tools', 'pymg'])
+os.environ['PATH'] += os.pathsep + os.pathsep.join([pymg_dir, ])
+#
 # End Configuration
 ######################
 
