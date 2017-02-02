@@ -15,11 +15,6 @@ config['anvio_version'] = \
                     lines=[1,],
                     regular_expression=r'(\d.+)')
 
-import re
-v1,v2,v3 = re.search(r'^(\d+)(?:\.(\d+))?(?:\.(\d+))?',
-                     config['anvio_version']).groups()
-anvi_ver_gt_210 = v1>='2' and v2>='1' and v3>='1'
-
 # use centrifuge if configured
 centrifuge = 'centrifuge' in config
 if not centrifuge:
@@ -58,8 +53,6 @@ rule anvio_contigs_prune:
         rules.anvio_contigs_drop_desc.output
     output:
         "anvio/contigs.fa"
-    version:
-        get_version('sed', lines=[1,])
     log:
         "logs/drop-short-contigs"
     benchmark:

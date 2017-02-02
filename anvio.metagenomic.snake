@@ -96,6 +96,7 @@ for ext in ['stats', 'hist']:
 # End Configuration
 ######################
 
+# the samples snakefile will pull in profiles and contigs
 include: "anvio/anvio.samples.snake"
 include: "common/transitions.snake"
 include: "common/common.snake"
