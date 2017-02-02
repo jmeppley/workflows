@@ -4,7 +4,8 @@ samples_pattern:
     cleaned: True
     name: "all"
     metadata: "samples.all.tsv"
-contigs_fasta: ../../data/contigs/contigs.100.fa
+contigs_fasta: ../../data/contigs/contigs.aloha.fa
+min_contig_length: 500
 sample_tree:
     coverage_metrics:
         - mean_coverage_Q2Q3_contigs
