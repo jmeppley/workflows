@@ -1,0 +1,84 @@
+rule hmmer_db_press:
+    """
+    Press an hmm file for searching
+    """
+    input:
+        "{db_path}"
+    output:
+        "{db_path,.+\.[Hh][Mm][Mm](\.[Aa][Ss][Cc][Ii][Ii])?}.h3i"
+    benchmark:
+        "benchmarks/hmmpress.{db_path}.time"
+    log:
+        "logs/hmmpress.{db_path}.log"
+    version:
+        get_version('hmmpress','-h',lines=[1,])
+    shell:
+        "hmmpress {input} > {log}"
+
+rule hmmer:
+    """
+    Look for profile matches
+    """
+    input:
+        fasta="{file_root}.faa",
+        db_file=lambda wildcards: config['dbs'][wildcards.db]['path'] + ".h3i"
+    output:
+        "{file_root}.vs.{db}.tbl"
+    benchmark:
+        "benchmarks/hmmer.{file_root}.vs.{db}.time"
+    log:
+        "logs/hmmer.{file_root}.vs.{db}.log"
+    version:
+        get_version('hmmsearch','-h',lines=[1,])
+    threads:
+        lambda wildcards: config['threads'].get('hmmer',default_threads)
+    params:
+        db_path=lambda wildcards: config['dbs'][wildcards.db]['path']
+    shell:
+        "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
+        {params.db_path} {input.fasta}"
+
+rule hmmer_dbfrag:
+    """
+    Look for profile matches in the Nth fragment of a DB
+    """
+    input:
+        db_file=lambda w: config['dbs'][w.db]['path'].format(N=int(w.N)) \
+                                                                    + ".h3i",
+        fasta="{file_root}.faa"
+    output:
+        temp("{file_root}.vs.{db}.{N}.tbl.dfrag")
+    benchmark:
+        "benchmarks/hmmer.{file_root}.vs.{db}.{N}.time"
+    log:
+        "logs/hmmer.{file_root}.vs.{db}.{N}.log"
+    version:
+        get_version('hmmsearch','-h',lines=[1,])
+    threads:
+        config['threads'].get('hmmer',default_threads)
+    params:
+        db_path=lambda w: config['dbs'][w.db]['path'].format(N=int(w.N))
+    shell:
+        "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
+        {params.db_path} {input.fasta}"
+
+rule hmmer_fragdb:
+    """
+    Look for profile matches in N fragments of a larger db. This rule just merges the N outputs of hmmer_dbfrag.
+    """
+    input:
+        lambda w: expand("{file_root}.vs.{db}.{{N}}.tbl.dfrag"\
+                                             .format(db=w.db,
+                                                     file_root=w.file_root), 
+                         N=range(1,1+config['dbs'][w.db]['frags']))
+    output:
+        "{file_root}.vs.{db}.tbl.dbatch"
+    benchmark:
+        "benchmarks/hmmer.{file_root}.vs.{db}.dbatch.time"
+    log:
+        "logs/hmmer.{file_root}.vs.{db}.dbatch.log"
+    version:
+        get_version('sort',lines=[1,])
+    shell:
+        "cat {input} | grep -v '^#' | sort -k 1,1 > {output}"
+

@@ -1,0 +1,42 @@
+rule lastdb:
+    """
+    Compile fasta file into lastb
+    This currenlty only works for protein dbs. Would a second rule for nucl
+    work?
+    """
+    input: "{db_path}.faa"
+    output: "{db_path}.prj"
+    benchmark: "benchmarks/{db_path}.lastdb.time"
+    log: "logs/{db_path}.lastdb.log"
+    shell: "lastdb -v -p wildcards.db_path {input} > {log}"
+
+rule lastal:
+    """
+    Look for matches in RefSeq or KEGG
+    """
+    input:
+        lambda w: "{file_root}.{ext}".format(file_root=w.file_root,
+                ext="faa" if w.alg=='p' else 'fasta' if w.alg=='x' else 'ffn'),
+        lambda w: config['dbs'][w.db]['path'] + ".prj"
+    output:
+        "{file_root}.vs.{db}.last{alg,[xpn]}"
+    benchmark:
+        "benchmarks/lastal.{db}.time"
+    log:
+        "logs/lastal.{db}.log"
+    version:
+        get_version('lastal')
+    threads:
+        lambda wildcards: config['threads'].get('lastal',default_threads)
+    params:
+        db_path=lambda w: config['dbs'][w.db]['path'],
+        fshift=lambda w: "-F 15" if w.alg=='x' else "",
+        opts=lambda w: "" if w.alg=='n' else "-b 1 -x 15 -y 7 -z 25",
+        keep=config.get('last_filter','-F 5')
+    shell:
+        "lastal -P {threads} {params.fshift} -f BlastTab {params.opts} \
+         {params.db_path} {input} \
+         | grep -v '^#'  \
+         | filter_blast_m8.py -f blast {params.keep} \
+         > {output}"
+

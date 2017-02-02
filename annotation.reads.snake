@@ -9,7 +9,7 @@ To run:
 snakemake -s /path/to/workflows/annotate.reads.snake --configfile annotate.reads.yaml [OPTIONS]
 
 The following conda packages are necessary:
-conda create -n snakemake -c bioconda python=3 snakemake samtools last
+conda create -n snakemake -c bioconda python=3 snakemake samtools last hmmer
 
 Plus the tools here:
 https://github.com/jmeppley/py-metagenomics
