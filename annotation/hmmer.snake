@@ -9,7 +9,7 @@ rule hmmer_db_press:
     version:
         get_version('hmmpress','-h',lines=[1,])
     shell:
-        "hmmpress {input}"
+        "rm -f {input}.h3? && hmmpress {input}"
 
 rule hmmer:
     """
