@@ -18,5 +18,5 @@ threads:
     lastal: 10
     bwa: 10
     megahit: 40
-    bfc: 3
+    bfc: 8
 anvio_env: anvio

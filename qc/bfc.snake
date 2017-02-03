@@ -127,10 +127,10 @@ rule bfc_error_correction:
     threads:
         config.get('threads',{}).get('bfc',5)
     shell:
-        "bfc -s {config[bfc][ram]} {config[bfc][params]} \
-          -t {threads} {input} 2> {log} \
-          | seqtk dropse - \
-          | gzip -c > {output}"
+        """bfc -s {config[bfc][ram]} {config[bfc][params]} \
+              -t {threads} {input} 2> {log} \
+              | seqtk dropse - \
+              | gzip -c > {output}"""
 
 if 'min_read_length' in config:
     rule remove_short_reads:
