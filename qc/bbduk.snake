@@ -1,0 +1,50 @@
+
+rule trim_bbduk_adapters:
+    """
+    remove adapters with bbduk
+    """
+    input:
+        "{prefix}.fastq"
+    output:
+        "{prefix}.bbduk_noadapt.fastq"
+    benchmark:
+        "benchmarks/{prefix}.bbduk_noadapt.fastq.time"
+    log:
+        "logs/{prefix}.bbduk_noadapt.log"
+    version:
+        get_version('bbduk.sh',
+                    lines=[1,],)
+    params:
+        adapter_file=config['system_paths']['bbmap'] \
+                        + "/resources/adapters.fa"
+    shell:
+        "bbduk.sh -Xmx{config[bbduk][ram]} \
+          in={input} out={output} \
+          interleaved overwrite {config[bbduk][adapter_flags]} \
+          ref={params.adapter_file} 2> {log}"
+
+rule trim_bbduk_phix:
+    """
+    remove phiX with bbduk
+    """
+    input:
+        "{prefix}.fastq"
+    output:
+        "{prefix}.bbduk_nophix.fastq",
+        "{prefix}.bbduk_nophix.gchist.txt"
+    benchmark:
+        "benchmarks/{prefix}.bbduk_nophix.fastq.time"
+    log:
+        "logs/{prefix}.bbduk_nophix.log"
+    version:
+        get_version('bbduk.sh',
+                    lines=[1,],)
+    params:
+        phiX_file=config['system_paths']['bbmap'] \
+                         + "/resources/phix174_ill.ref.fa.gz",
+    shell:
+        "bbduk.sh -Xmx{config[bbduk][ram]} \
+          in={input} out={output[0]} gchist={output[1]} \
+          interleaved overwrite {config[bbduk][phix_flags]} \
+          ref={params.phiX_file} 2> {log}"
+

@@ -1,0 +1,25 @@
+
+rule pandaseq:
+    """ Joins paired illumina reads """
+    input:
+        fwd="{file_root}.R1.fastq",
+        rev="{file_root}.R2.fastq",
+    output:
+        temp("{file_root}.pandaseq_joined.fastq")
+    log:
+        "logs/{file_root}.pandaseq.log"
+    benchmark:
+        "benchmarks/{file_root}.pandaseq.time"
+    version:
+        get_version('pandaseq',"-v")
+    params:
+        threshold=config.get('pandaseq_threshold','.32')
+    shell:
+        """
+        rm -f {log}
+        pandaseq -f {input.fwd} -r {input.rev} -d rBfkmS \
+        -t {params.threshold} -F > {output} 2> {log} || true
+        ERRS=`egrep -c "^(ERR|bad) " {log} || :` || true
+        if [ "$ERRS" == 0 ]; then exit 0; else exit 2; fi
+        """
+

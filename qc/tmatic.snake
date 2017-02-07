@@ -1,0 +1,84 @@
+
+rule trimmomatic_trim:
+    """Trims given paired-end reads with given parameters"""
+    input:
+        "{file_root}.fastq"
+    output:
+        temp("{file_root}.tmatic_trimmed.fastq")
+    log:
+        "logs/{file_root}_trimmomatic_trim.log"
+    benchmark:
+        "benchmarks/{file_root}_trimmomatic_trim.time"
+    threads:
+        20
+    version:
+        get_version('trimmomatic','-version')
+    params:
+        trim_params=lambda wildcards: config.get('trimmomatic_trim_params',
+                "LEADING:10 TRAILING:10 SLIDINGWINDOW:4:20 MINLEN:50")
+    shell:
+        """
+        trimmomatic SE -threads {threads} {input} {output} {params.trim_params}
+        """
+    
+
+rule trimmomatic_adapters:
+    """
+    Generates fasta file with adapters for trimming
+    """
+    output:
+        "adapters/{chemistry}_{barcode}_adapters.fa"
+    log:
+        "logs/{chemistry}_{barcode}_adapters.fa.log"
+    benchmark:
+        "benchmarks/adapters/{chemistry}_{barcode}.time"
+    run:
+        primer_template = tmatic.get_primer_template(wildcards.chemistry)
+        barcode_data = tmatic.process_barcode_string(wildcards.barcode)
+        with open(output[0], 'w') as OUTF:
+            OUTF.write(primer_template.format(**barcode_data))
+
+
+rule trimmomatic_clean_adapters:
+    """Removes adapters from given paired-end reads with given parameters"""
+    input:
+        fwd="{prefix}.R1.fastq",
+        rev="{prefix}.R2.fastq",
+        primers="adapters/{chemistry}_{barcode}_adapters.fa"
+    output:
+        "{prefix}.{chemistry}.{barcode}.tmatic_noadapt.R1.paired.fastq",
+        "{prefix}.{chemistry}.{barcode}.tmatic_noadapt.R2.paired.fastq",
+        "{prefix}.{chemistry}.{barcode}.tmatic_noadapt.R1.unpaired.fastq",
+        "{prefix}.{chemistry}.{barcode}.tmatic_noadapt.R2.unpaired.fastq",
+    wildcard_constraints:
+        chemistry=r'[^.]+',
+        barcode=r'[ACTGN:]+',
+    log:
+        "logs/{prefix}_{chemistry}.{barcode}.tmatic_noadapt.log"
+    benchmark:
+        "benchmarks/{prefix}_{chemistry}.{barcode}.tmatic_noadapt.time"
+    threads:
+        20
+    version:
+        get_version('trimmomatic','-version')
+    params:
+        clip_params=lambda wildcards: config.get('trimmomatic_clip_params',
+                                                 "2:30:10")
+    shell:
+        """
+        trimmomatic PE -threads {threads} \
+        {input.fwd} {input.rev} \
+        {output[0]} {output[2]} {output[1]} {output[3]} \
+        ILLUMINACLIP:{input.primers}:{params.clip_params}
+        """
+
+rule trimomatic_recombine:
+    input:
+        "{prefix}.tmatic_noadapt.{dir}.paired.fastq",
+        "{prefix}.tmatic_noadapt.{dir}.unpaired.fastq"
+    output: "{prefix}.tmatic_noadapt.{dir}.fastq"
+    wildcard_constraints:
+        prefix=r'.+(?<!paired)',
+        dir=r'R[12]',
+    shell: "cat {input} > {output}"
+

@@ -1,0 +1,21 @@
+"""
+Snakefile to clean and join illumina reads for read-based analysis
+
+We are working from the old recipe from illuminaPrep:
+ * trimmomatic to remove primers
+ * pandaseq to join and screen
+ * trimmomatic again to trim ends and windows
+
+This is in the testing phase:
+ * we have multiple candidate tools for each step
+ * this workflow will link them together based on output file names
+
+"""
+import re
+from python.common import get_version
+from python import tmatic
+
+include: "qc/tmatic.snake"
+include: "qc/pandaseq.snake"
+include: "qc/bbduk.snake"
+
