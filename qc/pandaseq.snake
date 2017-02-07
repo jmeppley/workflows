@@ -2,12 +2,11 @@
 rule pandaseq:
     """ Joins paired illumina reads """
     input:
-        fwd="{file_root}.R1.fastq",
-        rev="{file_root}.R2.fastq",
+        fwd="{file_root}.R1.paired.fastq",
+        rev="{file_root}.R2.paired.fastq",
     output:
-        temp("{file_root}.pandaseq_joined.fastq")
-    log:
-        "logs/{file_root}.pandaseq.log"
+        fastq="{file_root}.paired.pandaseq_joined.fastq",
+        log="{file_root}.paired.pandaseq_join.log",
     benchmark:
         "benchmarks/{file_root}.pandaseq.time"
     version:
@@ -16,10 +15,26 @@ rule pandaseq:
         threshold=config.get('pandaseq_threshold','.32')
     shell:
         """
-        rm -f {log}
         pandaseq -f {input.fwd} -r {input.rev} -d rBfkmS \
-        -t {params.threshold} -F > {output} 2> {log} || true
-        ERRS=`egrep -c "^(ERR|bad) " {log} || :` || true
-        if [ "$ERRS" == 0 ]; then exit 0; else exit 2; fi
+        -t {params.threshold} -F > {output.fastq} 2> {output.log} || true
         """
 
+#old code to check pandaseq output
+#ERRS=`egrep -c "^(ERR|bad) " {log} || :` || true
+#if [ "$ERRS" == 0 ]; then exit 0; else exit 2; fi
+
+rule dummy_join:
+    """ Joins unjoined illumina read pairs """
+    input:
+        fwd="{file_root}.R1.paired.fastq",
+        rev="{file_root}.R2.paired.fastq",
+        pandaseq_log="{file_root}.paired.pandaseq_join.log",
+    output:
+        "{file_root}.paired.pandaseq_dummy.fastq"
+    log:
+        "logs/{file_root}.pandaseq_dummy.log"
+    benchmark:
+        "benchmarks/{file_root}.pandaseq_dummy.time"
+    run:
+        unpaired, counts = scna_pandaseq_log(input.pandaseq_log)
+        
