@@ -1,3 +1,6 @@
+from python.qc import dummy_join_fastq, scan_pandaseq_log
+
+include: "tmatic.snake"
 
 rule pandaseq:
     """ Joins paired illumina reads """
@@ -28,8 +31,16 @@ rule panads_unpaired_list:
         pandaseq_log="{file_root}.paired.pandaseq_join.log",
     output:
         "{file_root}.paired.unassembled.list"
+    log:
+        "logs/{file_root}.paired.unassembled.list.log"
+    benchmark:
+        "benchmarks/{file_root}.paired.unassembled.list.time"
     run:
-        #TODO
+        unpaired_list, counts = \
+            scan_pandaseq_log(input.pandaseq_log, log[0])
+        ...#TODO
+
+
 
 rule pandas_unpaired_reads:
     input:
