@@ -1,0 +1,24 @@
+from python.cutadapt import get_adapters
+
+rule trim_bbduk_adapters:
+    """
+    remove adapters with bbduk
+    """
+    input:
+        "{prefix}.fastq"
+    output:
+        "{prefix}.noadapt.fastq"
+    benchmark:
+        "benchmarks/{prefix}.noadapt.fastq.time"
+    log:
+        "logs/{prefix}.noadapt.log"
+    version:
+        get_version('cutadapt')
+    params:
+        adapters = ' '.join([
+            '-b {adapter}'.format(a) \
+                for a in get_adapters(config.get('chemistry','scripseq'))
+        ])
+    shell:
+        "cutadapt {params.adapters} {input} > {output} 2> {log}"
+
