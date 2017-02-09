@@ -1,3 +1,4 @@
+from python import tmatic
 
 rule trimmomatic_trim:
     """Trims given paired-end reads with given parameters"""

@@ -1,12 +1,13 @@
 from python.pear import dummy_join_fastq
 
 include: "tmatic.snake"
+include: 'bbduk.snake'
 
 rule run_pear:
     """ Joins paired illumina reads """
     input:
-        fwd="{file_root}.R1.paired.fastq",
-        rev="{file_root}.R2.paired.fastq",
+        fwd="{file_root}.R1.paired.noadapt.fastq",
+        rev="{file_root}.R2.paired.noadapt.fastq",
     output:
        "{file_root}.paired.discarded.fastq",
        "{file_root}.paired.assembled.fastq",
@@ -55,3 +56,4 @@ rule merge_pear:
         "benchmarks/{file_root}.joined.time"
     shell:
         "cat {input} > {output}"
+

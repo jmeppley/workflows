@@ -1,22 +1,40 @@
+from python import bbmap
+from snakemake.utils import update_config
+defaults={'bbduk':{'ram':'1g',
+                   'adapter_flags':
+                        'ktrim=r k=23 mink=11 hdist=1 tbo tpe tbo tpe',
+                   'phix_flags': (
+                        'k=27 hdist=1 qtrim=rl trimq=17 cardinality=t '
+                        'mingc=0.05 maxgc=0.95'),
+                   },
+         }
+update_config(config, defaults)
+
+# look in config[system_paths][bbmap] and relative to bbduk.sh script
+#  for adapter file folder (aka resources)
+if 'resource_dir' not in config['bbduk']:
+    config['bbduk']['resource_dir'] = bbmap.get_bbduk_resource_path(config)
 
 rule trim_bbduk_adapters:
     """
     remove adapters with bbduk
     """
     input:
-        "{prefix}.fastq"
+        "{prefix}.{suffix}"
     output:
-        "{prefix}.bbduk_noadapt.fastq"
+        "{prefix}.noadapt.{suffix}"
+    wildcard_constraints:
+        suffix=r'(R[12]\.)?fastq'
     benchmark:
-        "benchmarks/{prefix}.bbduk_noadapt.fastq.time"
+        "benchmarks/{prefix}.noadapt.fastq.time"
     log:
-        "logs/{prefix}.bbduk_noadapt.log"
+        "logs/{prefix}.noadapt.log"
     version:
         get_version('bbduk.sh',
                     lines=[1,],)
     params:
-        adapter_file=config['system_paths']['bbmap'] \
-                        + "/resources/adapters.fa"
+        adapter_file=config['bbduk']['resource_dir'] \
+                        + "/adapters.fa"
     shell:
         "bbduk.sh -Xmx{config[bbduk][ram]} \
           in={input} out={output} \
@@ -40,8 +58,8 @@ rule trim_bbduk_phix:
         get_version('bbduk.sh',
                     lines=[1,],)
     params:
-        phiX_file=config['system_paths']['bbmap'] \
-                         + "/resources/phix174_ill.ref.fa.gz",
+        phiX_file=config['bbduk']['resource_dir'] \
+                         + "/phix174_ill.ref.fa.gz",
     shell:
         "bbduk.sh -Xmx{config[bbduk][ram]} \
           in={input} out={output[0]} gchist={output[1]} \
