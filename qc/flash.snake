@@ -1,0 +1,57 @@
+from python.pear import dummy_join_fastq
+
+include: "tmatic.snake"
+
+rule run_flash:
+    """ Joins paired illumina reads """
+    input:
+        fwd="{file_root}.R1.paired.fastq",
+        rev="{file_root}.R2.paired.fastq",
+    output:
+       "{file_root}.paired.notCombined_1.fastq",
+       "{file_root}.paired.notCombined_2.fastq",
+       "{file_root}.paired.extendedFrags.fastq",
+       "{file_root}.paired.histogram",
+       "{file_root}.paired.hist",
+    log:
+        "logs/{file_root}.paired.flash.log",
+    benchmark:
+        "benchmarks/{file_root}.flash.time"
+    version:
+        get_version('flash',lines=[0,])
+    params:
+        opts=config.get('flash_opts','-M 200'),
+        output="{file_root}.paired"
+    shell:
+        "flash -o {params.output} {params.opts} {input.fwd} {input.rev} \
+             > {log} 2>&1"
+
+rule dummy_join:
+    """ Joins unjoined illumina read pairs """
+    input:
+        fwd="{file_root}.notCombined_1.trimmed.fastq",
+        rev="{file_root}.notCombined_2.trimmed.fastq"
+    output:
+        "{file_root}.trimmed.dummy.fastq"
+    log:
+        "logs/{file_root}.dummy.log"
+    benchmark:
+        "benchmarks/{file_root}.dummy.time"
+    run:
+        dummy_join_fastq(input, output, log)
+
+rule merge_flash:
+    """ merges flash joins and dummy joins (after some end-trimming) """
+    input:
+        pear="{file_root}.paired.extendedFrags.trimmed.fastq",
+        dummy="{file_root}.paired.trimmed.dummy.fastq",
+        unpaired1="{file_root}.R1.unpaired.fastq",
+        unpaired2="{file_root}.R2.unpaired.fastq",
+    output:
+        merged="{file_root}.joined.trimmed.merged.fastq"
+    log:
+        "logs/{file_root}.joined.trimmed.merged.log"
+    benchmark:
+        "benchmarks/{file_root}.joined.trimmed.merge.time"
+    shell:
+        "cat {input} > {output}"

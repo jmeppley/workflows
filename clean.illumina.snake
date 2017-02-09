@@ -13,9 +13,12 @@ This is in the testing phase:
 """
 import re
 from python.common import get_version
-from python import tmatic
+from python.qc import get_qc_outputs
 
-include: "qc/tmatic.snake"
-include: "qc/pandaseq.snake"
-include: "qc/bbduk.snake"
+#config.setdefault('cleaning_protocol', 'joining')
+config.setdefault('cleaning_protocol', 'joining-flash')
+
+snakefiles = get_qc_outputs(config)
+for snakefile in snakefiles:
+    include: snakefile
 
