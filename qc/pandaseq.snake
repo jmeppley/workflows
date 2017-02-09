@@ -28,19 +28,51 @@ rule pandaseq:
 #ERRS=`egrep -c "^(ERR|bad) " {log} || :` || true
 #if [ "$ERRS" == 0 ]; then exit 0; else exit 2; fi
 
+#rule panads_unpaired_list:
+#    input: 
+#        pandaseq_log="{file_root}.paired.pandaseq_join.log",
+#    output:
+#        "{file_root}.paired.unassembled.list"
+#    log:
+#        "logs/{file_root}.paired.unassembled.list.log"
+#    benchmark:
+#        "benchmarks/{file_root}.paired.unassembled.list.time"
+#    run:
+#        with open(log[0], 'w') as LOG:
+#            unpaired, counts = scan_pandaseq_log(input.pandaseq_log, LOG)
+#        with optn(output[0], 'w') as OUTF:
+#            for seqid in unpaired:
+#                OUTF.write(seqid)
+#                OUTF.write("\n")
+
+
+rule pandas_unpaired_reads:
+    input:
+        reads="{file_root}.{dir}.paired.fastq",
+        list="{file_root}.paired.unassembled.list"
+    output:
+        "{file_root}.paired.unassembled.{dir}.fastq",
+    wildcard_constraints:
+        dir=r'R[12]'
+    shell:
+        "screen_list.py -l {input.list} {input.reads} -k -o {output}"
+
 rule dummy_join:
     """ Joins unjoined illumina read pairs """
     input:
         fwd="{file_root}.R1.paired.trimmed.fastq",
         rev="{file_root}.R2.paired.trimmed.fastq",
         pandaseq_log="{file_root}.paired.pandaseq_join.log",
+        #fwd="{file_root}.paired.unassembled.R1.trimmed.fastq",
+        #rev="{file_root}.paired.unassembled.R2.trimmed.fastq",
     output:
-        "{file_root}.paired.pandaseq_dummy.fastq"
+        "{file_root}.paired.trimmed.dummy.fastq"
     log:
         "logs/{file_root}.pandaseq_dummy.log"
     benchmark:
         "benchmarks/{file_root}.pandaseq_dummy.time"
     run:
+        #dummy_join_fastq(input, output, log)
         with open(log[0], 'w') as LOG:
             unpaired, counts = scan_pandaseq_log(input.pandaseq_log, LOG)
         dummy_join_fastq(input, output, log, 
@@ -49,7 +81,7 @@ rule dummy_join:
 rule merge_panda:
     """ merges pandaseq joins and dummy joins (after some end-trimming) """
     input:
-        panda="{file_root}.paired.assembled.trimmed.fastq",
+        pandaseq="{file_root}.paired.assembled.trimmed.fastq",
         dummy="{file_root}.paired.trimmed.dummy.fastq",
         unpaired1="{file_root}.R1.unpaired.fastq",
         unpaired2="{file_root}.R2.unpaired.fastq",
