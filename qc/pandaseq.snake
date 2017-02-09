@@ -5,7 +5,7 @@ rule pandaseq:
         fwd="{file_root}.R1.paired.fastq",
         rev="{file_root}.R2.paired.fastq",
     output:
-        fastq="{file_root}.paired.pandaseq_joined.fastq",
+        fastq="{file_root}.paired.assembled.fastq",
         log="{file_root}.paired.pandaseq_join.log",
     benchmark:
         "benchmarks/{file_root}.pandaseq.time"
@@ -23,17 +23,49 @@ rule pandaseq:
 #ERRS=`egrep -c "^(ERR|bad) " {log} || :` || true
 #if [ "$ERRS" == 0 ]; then exit 0; else exit 2; fi
 
+rule panads_unpaired_list:
+    input: 
+        pandaseq_log="{file_root}.paired.pandaseq_join.log",
+    output:
+        "{file_root}.paired.unassembled.list"
+    run:
+        #TODO
+
+rule pandas_unpaired_reads:
+    input:
+        reads="{file_root}.{dir}.paired.fastq",
+        list="{file_root}.paired.unassembled.list"
+    output:
+        "{file_root}.paired.unassembled.{dir}.fastq",
+    shell:
+        "screen_list.py -l {input.list} {input.reads} -k -o {output}"
+
 rule dummy_join:
     """ Joins unjoined illumina read pairs """
     input:
-        fwd="{file_root}.R1.paired.fastq",
-        rev="{file_root}.R2.paired.fastq",
-        pandaseq_log="{file_root}.paired.pandaseq_join.log",
+        fwd="{file_root}.paired.unassembled.R1.trimmed.fastq",
+        rev="{file_root}.paired.unassembled.R2.trimmed.fastq",
     output:
-        "{file_root}.paired.pandaseq_dummy.fastq"
+        "{file_root}.paired.trimmed.dummy.fastq"
     log:
         "logs/{file_root}.pandaseq_dummy.log"
     benchmark:
         "benchmarks/{file_root}.pandaseq_dummy.time"
     run:
-        unpaired, counts = scna_pandaseq_log(input.pandaseq_log)
+        dummy_join_fastq(input, output, log)
+
+rule merge_panda:
+    """ merges pandaseq joins and dummy joins (after some end-trimming) """
+    input:
+        pandaseq="{file_root}.paired.assembled.trimmed.fastq",
+        dummy="{file_root}.paired.trimmed.dummy.fastq",
+        unpaired1="{file_root}.R1.unpaired.fastq",
+        unpaired2="{file_root}.R2.unpaired.fastq",
+    output:
+        merged="{file_root}.joined.fastq"
+    log:
+        "logs/{file_root}.joined.log"
+    benchmark:
+        "benchmarks/{file_root}.joined.time"
+    shell:
+        "cat {input} > {output}"
