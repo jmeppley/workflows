@@ -46,17 +46,17 @@ rule trimmomatic_clean_adapters:
         rev="{prefix}.R2.fastq",
         primers="adapters/{chemistry}_{barcode}_adapters.fa"
     output:
-        "{prefix}.{chemistry}.{barcode}.tmatic_noadapt.R1.paired.fastq",
-        "{prefix}.{chemistry}.{barcode}.tmatic_noadapt.R2.paired.fastq",
-        "{prefix}.{chemistry}.{barcode}.tmatic_noadapt.R1.unpaired.fastq",
-        "{prefix}.{chemistry}.{barcode}.tmatic_noadapt.R2.unpaired.fastq",
+        "{prefix}.{chemistry}.{barcode}.trim_adapt.R1.paired.fastq",
+        "{prefix}.{chemistry}.{barcode}.trim_adapt.R2.paired.fastq",
+        "{prefix}.{chemistry}.{barcode}.trim_adapt.R1.unpaired.fastq",
+        "{prefix}.{chemistry}.{barcode}.trim_adapt.R2.unpaired.fastq",
     wildcard_constraints:
         chemistry=r'[^.]+',
         barcode=r'[ACTGN:]+',
     log:
-        "logs/{prefix}_{chemistry}.{barcode}.tmatic_noadapt.log"
+        "logs/{prefix}_{chemistry}.{barcode}.trim_adapt.log"
     benchmark:
-        "benchmarks/{prefix}_{chemistry}.{barcode}.tmatic_noadapt.time"
+        "benchmarks/{prefix}_{chemistry}.{barcode}.trim_adapt.time"
     threads:
         20
     version:
@@ -74,9 +74,9 @@ rule trimmomatic_clean_adapters:
 
 rule trimomatic_recombine:
     input:
-        "{prefix}.tmatic_noadapt.{dir}.paired.fastq",
-        "{prefix}.tmatic_noadapt.{dir}.unpaired.fastq"
-    output: "{prefix}.tmatic_noadapt.{dir}.fastq"
+        "{prefix}.trim_adapt.{dir}.paired.fastq",
+        "{prefix}.trim_adapt.{dir}.unpaired.fastq"
+    output: "{prefix}.trim_adapt.{dir}.fastq"
     wildcard_constraints:
         prefix=r'.+(?<!paired)',
         dir=r'R[12]',

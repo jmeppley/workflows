@@ -86,11 +86,39 @@ QC_PROTOCOLS = {
                  'nophix',
                  'corrected',
                  'trimmed'],
-    "joining": ['noadapt', 'joined', 'trimmed', 'nophix'],
+    "joining": ['trim_adapt', 'joined', 'trimmed', 'nophix'],
 }
 
 STEP_FASTQ_OUTPUTS = {
-    'noadapt'
+    'trim_adapt': [
+        (r'\.(R[12])\.', r'.trim_adpt.\1.paired.fastq'),
+        (r'\.(R[12])\.', r'.trim_adpt.\1.unpaired.fastq')]
+    'pear_joined': [
+        (r'\.fastq', r'.paired.assembled.trimmed.fastq'),
+        (r'\.fastq', r'.paired.assembled.fastq'),
+        (r'\.fastq', r'.paired.trimmed.dummy.fastq'),
+        (r'\.fastq', r'.paired.unassembled.reverse.trimmed.fastq'),
+        (r'\.fastq', r'.paired.unassembled.forward.trimmed.fastq'),
+        (r'\.fastq', r'.paired.unassembled.reverse.fastq'),
+        (r'\.fastq', r'.paired.unassembled.forward.fastq')]
+    'flash_joined': [
+        (r'\.fastq', r'.paired.extendedFrags.trimmed.fastq'),
+        (r'\.fastq', r'.paired.extendedFrags.fastq'),
+        (r'\.fastq', r'.paired.trimmed.dummy.fastq'),
+        (r'\.fastq', r'.paired.notCombined_1.trimmed.fastq'),
+        (r'\.fastq', r'.paired.notCombined_2.trimmed.fastq'),
+        (r'\.fastq', r'.paired.notCombined_1.fastq'),
+        (r'\.fastq', r'.paired.notCombined_2.fastq')]
+    'panda_joined': [
+        (r'\.fastq', r'.paired.assembled.trimmed.fastq'),
+        (r'\.fastq', r'.paired.assembled.fastq'),
+        (r'\.fastq', r'.paired.trimmed.dummy.fastq'),
+        (r'\.fastq', r'.paired.unassembled.reverse.trimmed.fastq'),
+        (r'\.fastq', r'.paired.unassembled.forward.trimmed.fastq'),
+        (r'\.fastq', r'.paired.unassembled.reverse.fastq'),
+        (r'\.fastq', r'.paired.unassembled.forward.fastq')]
+
+
 
 QC_STEP_MERGES_PAIRS = set('interleaved', 'joined')
 

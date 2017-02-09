@@ -11,6 +11,7 @@ import re
 import subprocess
 import pandas
 from snakemake.logging import logger
+from snakemake.utils import update_config as apply_defaults
 
 
 def get_version(command, version_flag='--version',
@@ -88,11 +89,3 @@ def parse_stats(stats_file):
                               names=('module', 'key', 'value'),
                               index_col=1)['value']
     return {k:int(stats[k]) for k in ['reads', 'bases']}
-
-def apply_defaults(config, defaults):
-    """ recursively appy defaults to nested dicts """
-    for param, pdefaults in defaults.items():
-        if isinstance(pdefaults, dict):
-            apply_defaults(config.setdefault(param, {}), pdefaults)
-        else:
-            config.setdefault(param, pdefaults)

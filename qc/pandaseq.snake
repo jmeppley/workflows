@@ -37,4 +37,3 @@ rule dummy_join:
         "benchmarks/{file_root}.pandaseq_dummy.time"
     run:
         unpaired, counts = scna_pandaseq_log(input.pandaseq_log)
-        
