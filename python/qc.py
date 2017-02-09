@@ -12,7 +12,6 @@ records jonied by a bunch of NNN's
 
 import re
 import glob
-from collections import OrderedDict
 from Bio import Seq, SeqIO, SeqRecord
 from snakemake.logging import logger
 
@@ -24,7 +23,7 @@ def collect_sample_reads(samples_pattern_data):
     The samples_pattern dict should look like this:
         samples_pattern:
             glob: "../data/*.fastq"
-            re: "/([^_]+)_[^/]+\.fastq"
+            re: "/([^_]+)_[^/]+\\.fastq"
             name: all
             metadata: samples.all.tsv
 
@@ -57,7 +56,7 @@ def collect_sample_reads(samples_pattern_data):
 
     # find files
     read_files = glob.glob(read_file_glob)
-    if len(read_files)==0:
+    if len(read_files) == 0:
         raise Exception(
             "The sample reads wildcard '{}' did not match any files!"\
                             .format(read_file_glob)
@@ -65,22 +64,22 @@ def collect_sample_reads(samples_pattern_data):
 
     # collect files into lists by sample
     for read_file in read_files:
-        m = sample_RE.search(read_file)
-        if m is None:
+        match = sample_RE.search(read_file)
+        if match is None:
             raise Exception(
                 ("The sample matching expression ({}) failed to find a sample "
                  "name in the path: {}").format(sample_pattern, read_file)
             )
-        sample = m.group(1)
+        sample = match.group(1)
         # sanitize sample name
-        sample = re.sub(r'[^A-Za-z0-9_]','_',sample)
-        reads.setdefault(sample,[]).append(read_file)
+        sample = re.sub(r'[^A-Za-z0-9_]', '_', sample)
+        reads.setdefault(sample, []).append(read_file)
 
     return reads
 
 QC_PROTOCOLS = {
     None: [],
-    "assembly": ['renamed', 
+    "assembly": ['renamed',
                  'interleaved',
                  'noadapt',
                  'nophix',
@@ -92,7 +91,7 @@ QC_PROTOCOLS = {
 STEP_FASTQ_OUTPUTS = {
     'trim_adapt': [
         (r'\.(R[12])\.', r'.trim_adpt.\1.paired.fastq'),
-        (r'\.(R[12])\.', r'.trim_adpt.\1.unpaired.fastq')]
+        (r'\.(R[12])\.', r'.trim_adpt.\1.unpaired.fastq')],
     'pear_joined': [
         (r'\.fastq', r'.paired.assembled.trimmed.fastq'),
         (r'\.fastq', r'.paired.assembled.fastq'),
@@ -100,7 +99,7 @@ STEP_FASTQ_OUTPUTS = {
         (r'\.fastq', r'.paired.unassembled.reverse.trimmed.fastq'),
         (r'\.fastq', r'.paired.unassembled.forward.trimmed.fastq'),
         (r'\.fastq', r'.paired.unassembled.reverse.fastq'),
-        (r'\.fastq', r'.paired.unassembled.forward.fastq')]
+        (r'\.fastq', r'.paired.unassembled.forward.fastq')],
     'flash_joined': [
         (r'\.fastq', r'.paired.extendedFrags.trimmed.fastq'),
         (r'\.fastq', r'.paired.extendedFrags.fastq'),
@@ -108,7 +107,7 @@ STEP_FASTQ_OUTPUTS = {
         (r'\.fastq', r'.paired.notCombined_1.trimmed.fastq'),
         (r'\.fastq', r'.paired.notCombined_2.trimmed.fastq'),
         (r'\.fastq', r'.paired.notCombined_1.fastq'),
-        (r'\.fastq', r'.paired.notCombined_2.fastq')]
+        (r'\.fastq', r'.paired.notCombined_2.fastq')],
     'panda_joined': [
         (r'\.fastq', r'.paired.assembled.trimmed.fastq'),
         (r'\.fastq', r'.paired.assembled.fastq'),
@@ -117,7 +116,7 @@ STEP_FASTQ_OUTPUTS = {
         (r'\.fastq', r'.paired.unassembled.forward.trimmed.fastq'),
         (r'\.fastq', r'.paired.unassembled.reverse.fastq'),
         (r'\.fastq', r'.paired.unassembled.forward.fastq')]
-
+}
 
 
 QC_STEP_MERGES_PAIRS = set('interleaved', 'joined')
@@ -134,7 +133,8 @@ def get_qc_steps(config):
 
 def build_qc_chain(sample, paired, steps,
                    fasta_files,
-                   cleand_reads_by_sample):
+                   cleaned_reads_by_sample,
+                   config):
     """
     given the sample and the steps chain
     """
@@ -154,11 +154,27 @@ def build_qc_chain(sample, paired, steps,
     # want to keep track of all fasta files, start with starting files
     last_fasta_files = starting_files
     for step in steps:
+        # make sure the number of files make sense for the step
+        if not paired and step in QC_STEP_MERGES_PAIRS:
+            raise Exception((
+                "The qc protocol {} with steps {} includes a merging step "
+                "({}), but sample {} only has one file. We cannot "
+                "make sense of this. Sorry") \
+              .format(config.get('cleaning_protocol', None),
+                       repr(steps),
+                       step,
+                       sample)
+            )        
+
+        # apply the step to the file name
         last_fasta_files = get_next_fasta_files(last_fasta_files,
-                                                 step,
-                                                 paired)
+                                                step,
+                                                paired,
+                                                fasta_files
+                                               )
+
         # no longer paired if we went through a merge step
-        if len(last_fasta_files)==1:
+        if len(last_fasta_files) == 1:
             paired = False
 
     # we should end with one file
@@ -166,29 +182,27 @@ def build_qc_chain(sample, paired, steps,
         raise Exception((
             "end of QC chain must end in single (interleaved or "
             "merged) file. Sample {} has 2 files, but there is no "
-            "merging step in chain: {}".format(
+            "merging step in chain: {}").format(
                 sample,
                 repr(steps)))
-    cleaned_reads[sample] = last_fasta_files[0]
+    cleaned_reads_by_sample[sample] = last_fasta_files[0]
 
     return starting_files
 
 
 def get_next_fasta_files(last_fasta_files,
                          step,
+                         fasta_files,
                          paired):
     """
     Given a starting file(s) and a qc step, get next file or files
     """
     if step not in QC_STEP_MERGES_PAIRS:
         if paired:
-            old_last_fasta_files = list(last_fasta_files)
             last_fasta_files = [
-                new_last_fasta_files.append(
-                    get_next_fasta_file(last_fasta_file,
-                                        step,
-                                        fasta_files)
-                ) \
+                new_last_fasta_file(last_fasta_file,
+                                    step,
+                                    fasta_files) \
                 for last_fasta_file in last_fasta_files
             ]
         else:
@@ -198,16 +212,7 @@ def get_next_fasta_files(last_fasta_files,
                                     fasta_files)
             ]
     else:
-        if not paired:
-            raise Exception((
-                "The qc protocol {} with steps {} includes a merging step "
-                "({}), but sample {} only has one file. We cannot "
-                "make sense of this. Sorry") \
-              .format(config.get('cleaning_protocol',None),
-                       repr(steps),
-                       step,
-                       sample)
-            )
+
         last_fasta_files = [
             new_last_fasta_file_merged(last_fasta_files,
                                        step,
@@ -227,15 +232,15 @@ def new_last_fasta_file_merged(last_fasta_files, step, fasta_files):
 def new_last_fasta_file(last_fasta_file, step, fasta_files):
     """
     Given starting file(s) and step name
-    
-     * figure out the next file step in chain 
+
+     * figure out the next file step in chain
      * add all intermediate fasta files to list
     """
 
     # by default, insert step name before .fastq or .R1.fastq
     default_rexp = r'(?<!\.R[12])((?:\.R1)?\.fastq)'
-    defualt_subst = r'.{step}\1'.format(step=step)
-    default_fastq_outputs = (default_rexp, defualt_subst)
+    default_subst = r'.{step}\1'.format(step=step)
+    default_fastq_outputs = (default_rexp, default_subst)
 
     # get step specific substitutions
     fastq_outputs = STEP_FASTQ_OUTPUTS.get(step,
@@ -243,7 +248,7 @@ def new_last_fasta_file(last_fasta_file, step, fasta_files):
 
     # use substitutions to populate fasta file list
     for rexp, subst in fastq_outputs:
-        fasta_files.append(re.sub(rexp, subst, 
+        fasta_files.append(re.sub(rexp, subst,
                                   last_fasta_file))
 
     # use default subst to build up final file name
@@ -256,7 +261,7 @@ def new_last_fasta_file(last_fasta_file, step, fasta_files):
 def setup_qc_outputs(config, get_stats=True):
     """
     Locate the read files for each sample, set up any QC that is needed, and
-    set up a 'cleaned_reads' dict mapping sample names to (QCed) read files 
+    set up a 'cleaned_reads' dict mapping sample names to (QCed) read files
     for the assembly and mapping steps.
 
     If there is not already a "reads" dict in config, build it from the samples
@@ -266,7 +271,7 @@ def setup_qc_outputs(config, get_stats=True):
 
     QC rules depend on config['cleaning_protocol'] which can be one of:
         assembly (alias for assembly-bfc)
-        assembly-bfc 
+        assembly-bfc
         joining (alias for joing-pandaseq)
         joining-pandaseq
         joining-pear
@@ -277,10 +282,10 @@ def setup_qc_outputs(config, get_stats=True):
         'sample_1': '/path/to/sample_1.fastq',
         'sample_2': '/path/to/sample_2.fastq'
     }
-    
-    The indicated samples files may exist somewhere else or may be targets that 
+
+    The indicated samples files may exist somewhere else or may be targets that
     need to be built. In the latter case, there should be transitions set to
-    define how the base files is to be generated. For example, we are starting 
+    define how the base files is to be generated. For example, we are starting
     with raw reads, the reads above will be the cleaned versions and snakemake
     will have to figure out how to generate them.
     Snakemake understands that reads/{sample}/reads.corrected.bfc.fastq.gz
@@ -294,9 +299,9 @@ def setup_qc_outputs(config, get_stats=True):
         reads/sample-02/reads.R2.fastq: ../data/sample-02_R2.fastq
     """
 
-    reads = config.setdefault('reads',{})
+    reads = config.setdefault('reads', {})
     samples_pattern_data = config.setdefault('samples_pattern')
-    
+
     # if reads already has data and sample_pattern_data has no glob
     #  we assume that we don't want to go looking for more reads
     #  (we have defaults to try if nothing supplied)
@@ -308,7 +313,7 @@ def setup_qc_outputs(config, get_stats=True):
 
     # loop back over samples and set up cleaning or interleaving if needed
     snakefiles = []
-    transitions = config.setdefault('transitions',{})
+    transitions = config.setdefault('transitions', {})
     fasta_files = []
     cleaned_reads = {}
     for sample in list(reads.keys()):
@@ -323,7 +328,9 @@ def setup_qc_outputs(config, get_stats=True):
 
         starting_files = build_qc_chain(sample, qc_steps, len(files) == 2,
                                         fasta_files,
-                                        cleaned_reads)
+                                        cleaned_reads,
+                                        config,
+                                       )
 
 
         # check to see if they are compressed (we can handle .gz)
@@ -340,7 +347,7 @@ def setup_qc_outputs(config, get_stats=True):
                     raise Exception("It seems one file is compressed and the "
                                     "other is not:\n{}".format("\n".join(files)))
                 files_gzipped = False
-                
+
         ## Create links from start of workflow to the source read files
         # are the originals gzipped?
         suffix = ".gz" if files_gzipped else ""
@@ -356,7 +363,7 @@ def setup_qc_outputs(config, get_stats=True):
                             .format(**vars())] = files[0]
             transitions['reads/{sample}/reads.R2.fastq{suffix}'\
                             .format(**vars())] = files[1]
-            
+
     if get_stats:
         # add stats file to final outputs for each fasta file generated
         outputs = config.setdefault('outputs', set())
@@ -500,7 +507,7 @@ def dummy_join_fastq(inputs,
      * log_files is list with log file as first element
 
     Paramters:
-        
+
      * If record_id_filter given, only join read pairs listed there.
      * batch_size is how many output records to cache between writes
      * gap is how many Ns' to insert between ends
