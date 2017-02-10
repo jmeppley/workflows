@@ -2,10 +2,14 @@ setup() {
     ENV=anvi2
     ENV_DIR=`pwd`/test/conda/envs/$ENV
     ENV_FILE=test/conda/${ENV}.yml
+    ANVIENV=$ENV_DIR
     if [ "$ENV_FILE" -nt "$ENV_DIR" ]; then
         conda env create -f $ENV_FILE -p $ENV_DIR --force --quiet > /dev/null 2>&1
+        source activate $ANVIENV
+        anvi-setup-ncbi-cogs --just-do-it > $ANVIENV/.cog.log 2>&1
+        source deactivate
     fi
-    ANVIENV=$ENV_DIR
+
     ENV=assembly
     ENV_DIR=`pwd`/test/conda/envs/$ENV
     ENV_FILE=test/conda/${ENV}.yml
