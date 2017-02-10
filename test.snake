@@ -1,0 +1,33 @@
+"""
+Snakefile to run arbitrary sub workflow for testing
+
+Running through this, lets it pick up the correct path info
+
+Use, run:
+
+ snakemake -s /path/to/test.snake --config workflow=subdir/name.snake output_file
+
+EG: to run QC and pandaseq joining on aloha1b.fastq:
+ 
+ snakemake -s ../workflows/test.snake --config workflow=qc/pandas aloha1b.scripseq.ATCACG.trim_adapt.joined.fastq
+
+or EG: to get histogram of read lengths in reads.fastq:
+
+ snakemake -s ../workflows/test.snake --config workflow=common/stats.fasta reads.fastq.hist
+
+Multiple workflows can be separated by a colon (":").
+"""
+import os
+from python.common import get_version
+
+# add my tools to the path (Somewhat of a hack, maybe I'll get my stuff in
+# conda eventually)
+snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))
+pymg_dir = os.path.sep.join([snakefile_path, 'tools', 'pymg'])
+os.environ['PATH'] += os.pathsep + os.pathsep.join([pymg_dir, ])
+
+if 'workflow' not in config:
+    raise Exception("ERROR: must specity workflow(s) in the config[workflow] setting!")
+for workflow_name in config['workflow'].split(':'):
+    include: workflow_name
+
