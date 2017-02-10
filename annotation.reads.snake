@@ -70,6 +70,8 @@ extension = re.search(r'\.([a-z0-1A-Z]+)$', reads_file).group(1)
 if extension in ['fna', 'ffn', 'fa', 'fasta']:
     extension = 'fasta'
 if extension in ['fasta', 'fastq', 'bam']:
+    if extension == 'fastq':
+        include: "common/fastq.snake"
     annot_start_file = "{prefix}.{extension}".format(**vars())
     if reads_file != annot_start_file:
         transitions[annot_start_file] = reads_file
@@ -84,6 +86,12 @@ pymg_dir = os.path.sep.join([snakefile_path, 'tools', 'pymg'])
 batch_dir = os.path.sep.join([snakefile_path, 'tools', 'batch'])
 os.environ['PATH'] += os.pathsep + os.pathsep.join([pymg_dir, batch_dir])
 #
+# add my tools to the path (Somewhat of a hack, maybe I'll get my stuff in
+# conda eventually)
+snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))
+pymg_dir = os.path.sep.join([snakefile_path, 'tools', 'pymg'])
+os.environ['PATH'] += os.pathsep + os.pathsep.join([pymg_dir, ])
+#
 # End configuration
 ##########
 
@@ -91,8 +99,7 @@ include: "common/stats.snake"
 include: "common/transitions.snake"
 include: "annotation/common.sixframe.snake"
 
-# make sure read extraction comes from sam, not a nonexistent fastq:
-#ruleorder: extract_reads > fastq_to_fasta
+ruleorder: remove_colons > fastq_to_fasta
 
 # set up list of files to create
 #  - The final tabulations
@@ -111,6 +118,7 @@ annotation_file_list = \
 
 logger.debug("Snakefile config:\n" + yaml.dump(config))
 
+
 ##########
 # RULES:
 #  This lays out the dependencies and logic of the workflow
@@ -119,20 +127,21 @@ rule read_annotation_all:
     input:
         annotation_file_list
 
-rule extract_reads:
-    """
-    Pull reads out of BAM file
-    """
-    input:
-        "{prefix}.bam"
-    output:
-        temp("{prefix}.fasta")
-    benchmark:
-        "benchmarks/{prefix}_extract_reads.time"
-    log:
-        "logs/{prefix}_extract_reads.log"
-    version:
-        get_version('samtools', lines=[0,])
-    shell:
-        "samtools fasta -0 {output} {input} > {log} 2>&1"
+if extension == 'bam':
+    rule extract_reads:
+        """
+        Pull reads out of BAM file
+        """
+        input:
+            "{prefix}.bam"
+        output:
+            temp("{prefix}.fasta")
+        benchmark:
+            "benchmarks/{prefix}_extract_reads.time"
+        log:
+            "logs/{prefix}_extract_reads.log"
+        version:
+            get_version('samtools', lines=[0,])
+        shell:
+            "samtools fasta -0 {output} {input} > {log} 2>&1"
 
