@@ -1,0 +1,12 @@
+channels:
+ - bioconda
+dependencies:
+ - python=3
+ - snakemake
+ - samtools
+ -last
+ - hmmer
+ - seqtk
+ - prinseq
+ - pandas
+ - biopython

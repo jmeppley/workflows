@@ -1,0 +1,12 @@
+name: prep
+channels: 
+- bioconda
+dependencies:
+- snakemake
+- pandas
+- biopython
+- flash
+- pear
+- trimmomatic
+- sed
+- bbmap
