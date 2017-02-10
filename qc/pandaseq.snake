@@ -7,8 +7,8 @@ from python.pandaseq import scan_pandaseq_log
 rule pandaseq:
     """ Joins paired illumina reads """
     input:
-        fwd="{file_root}.R1.paired.noadapt.fastq",
-        rev="{file_root}.R2.paired.noadapt.fastq",
+        fwd="{file_root}.R1.paired.noadaptp.fastq",
+        rev="{file_root}.R2.paired.noadaptp.fastq",
     output:
         fastq="{file_root}.paired.assembled.fastq",
         log="{file_root}.paired.pandaseq_join.log",
@@ -22,11 +22,21 @@ rule pandaseq:
         """
         pandaseq -f {input.fwd} -r {input.rev} -d rBfkmS \
         -t {params.threshold} -F > {output.fastq} 2> {output.log} || true
+        # some checks
+        FMLS=`egrep -c "FML" {output.log} || :` || true
+        FML_READS=`egrep "FML" {output.log} | cut -f 4 | uniq | grep -c . || :` || true 
+        if [ "$FMLS" -gt 0 ]; then
+            echo "WARNING: $FMLS redundant kmers in $FML_READS reads!" \
+             > {output.fastq}.FML.warning
+        fi
+        ERRS=`egrep -c "^(ERR|bad) " {output.log} || :` || true
+        if [ "$ERRS" -gt 0 ]; then 
+            echo "found $ERRS error messages in pandaseq log!"
+            exit 2; 
+        fi
         """
 
 #old code to check pandaseq output
-#ERRS=`egrep -c "^(ERR|bad) " {log} || :` || true
-#if [ "$ERRS" == 0 ]; then exit 0; else exit 2; fi
 
 #rule panads_unpaired_list:
 #    input: 
@@ -83,6 +93,7 @@ rule merge_panda:
     input:
         pandaseq="{file_root}.paired.assembled.trimmed.fastq",
         dummy="{file_root}.paired.trimmed.dummy.fastq",
+        singles="{file_root}.solo.paired.noadaptp.trimmed.fastq",
         unpaired1="{file_root}.R1.unpaired.trimmed.fastq",
         unpaired2="{file_root}.R2.unpaired.trimmed.fastq",
     output:

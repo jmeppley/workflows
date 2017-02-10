@@ -18,8 +18,14 @@ rule trimmomatic_trim:
         trim_params=lambda wildcards: config.get('trimmomatic_trim_params',
                 "LEADING:10 TRAILING:10 SLIDINGWINDOW:4:20 MINLEN:50")
     shell:
+        # if input is zero lenght, just touch output
         """
-        trimmomatic SE -threads {threads} {input} {output} {params.trim_params}
+        if [ -s {input} ]; then
+            trimmomatic SE -threads {threads} {input} {output} \
+                {params.trim_params}
+        else
+            touch {output}
+        fi
         """
     
 
