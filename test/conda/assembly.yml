@@ -11,3 +11,5 @@ dependencies:
  - prinseq
  - seqtk
  - sed
+ - spades
+ - megahit
