@@ -1,6 +1,7 @@
 *.sw[op]
 *.pyc
 test/scratch
+test/conda/envs
 test/data/seqdbs/RefSeq/lastdb*
 !test/data/seqdbs/RefSeq/lastdb.faa
 !test/data/seqdbs/RefSeq/lastdb.tax
