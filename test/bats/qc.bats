@@ -1,7 +1,7 @@
 setup() {
     ENV=illumina.qc
-    ENV_DIR=`pwd`/test/conda/envs/illumina.qc
-    ENV_FILE=test/conda/illumina.qc.yml
+    ENV_DIR=`pwd`/test/conda/envs/$ENV
+    ENV_FILE=test/conda/${ENV}.yml
     if [ "$ENV_FILE" -nt "$ENV_DIR" ]; then
         conda env create -f $ENV_FILE -p $ENV_DIR --force --quiet
     fi

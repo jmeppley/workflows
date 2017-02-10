@@ -1,13 +1,13 @@
 channels:
  - bioconda
 dependencies:
- - python=3
  - snakemake
- - samtools
- - last
- - hmmer
- - seqtk
- - prinseq
  - pandas
  - biopython
- - emboss
+ - bbmap
+ - bfc
+ - bwa 
+ - samtools
+ - prinseq
+ - seqtk
+ - sed

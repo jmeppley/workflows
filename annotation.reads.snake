@@ -99,7 +99,8 @@ include: "common/stats.snake"
 include: "common/transitions.snake"
 include: "annotation/common.sixframe.snake"
 
-ruleorder: remove_colons > fastq_to_fasta
+if extension == 'fastq':
+    ruleorder: remove_colons > fastq_to_fasta
 
 # set up list of files to create
 #  - The final tabulations
