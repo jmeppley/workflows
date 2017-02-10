@@ -1,12 +1,13 @@
-from python.pear import dummy_join_fastq
+from python.qc import dummy_join_fastq
 
 include: "tmatic.snake"
+include: 'bbduk.snake'
 
 rule run_flash:
     """ Joins paired illumina reads """
     input:
-        fwd="{file_root}.R1.paired.fastq",
-        rev="{file_root}.R2.paired.fastq",
+        fwd="{file_root}.R1.paired.noadaptp.fastq",
+        rev="{file_root}.R2.paired.noadaptp.fastq",
     output:
        "{file_root}.paired.notCombined_1.fastq",
        "{file_root}.paired.notCombined_2.fastq",
@@ -45,6 +46,7 @@ rule merge_flash:
     input:
         pear="{file_root}.paired.extendedFrags.trimmed.fastq",
         dummy="{file_root}.paired.trimmed.dummy.fastq",
+        singles="{file_root}.solo.paired.noadaptp.trimmed.fastq",
         unpaired1="{file_root}.R1.unpaired.fastq",
         unpaired2="{file_root}.R2.unpaired.fastq",
     output:
