@@ -1,3 +1,6 @@
+import re
+from snakemake.logging import logger
+
 overlap_RE=re.compile(r'^\S+\s+INFO\s+BESTOLP\s+(\S+?)(?:\:(?:\d{1,2})|(?:\:[NACTG]+))?\s+(\S+)')
 error_RE=re.compile(r'^\S+\s+ERR\s+(\S+)\s+(\S+)(?:\:\d)?\s+')
 debug_RE=re.compile(r'^\S+\s+DBG')
@@ -62,21 +65,21 @@ def scan_pandaseq_log(pandaseq_log_fie, msg_stream, keep_debug=False):
 #  Processed: %d
 #  Paired:    %d
 #  Unpaired:  %d
-#  Errors (LOWQ => under quality threshold. These are normal):
-    %s#===============================\n""" % \
+#  Errors (LOWQ => under quality threshold. These are normal): %s
+#===============================\n""" % \
                         (olpCount,
-                         olpCount-unpCount-sum(error_counts.itervalues()),
+                         olpCount-unpCount-sum(error_counts.values()),
                          unpCount,
-                         error_counts(error_counts))
+                         sum(error_counts.values()))
         msg_stream.write(msg)
 
-        errCount['reads']=olpCount
-        errCount['paired']=olpCount-unpCount
-        errCount['unpaired']=unpCount
+        error_counts['reads']=olpCount
+        error_counts['paired']=olpCount-unpCount
+        error_counts['unpaired']=unpCount
 
-        logger.debug("%d errors, %d unpaired" % (sum(errCount.values()),
+        logger.debug("%d errors, %d unpaired" % (sum(error_counts.values()),
                                                  len(unpaired)))
-        return (unpaired,errCount)
+        return (unpaired, error_counts)
 
 
 def fakePairs(singles,forward,reverse,paired,gap=20,fastq=True,trim=None,inputFormat='fastq',errFile=None,batchSize=10000):
@@ -215,7 +218,7 @@ def fakePairs(singles,forward,reverse,paired,gap=20,fastq=True,trim=None,inputFo
     if trim is not None:
         msg+="# Joined: %d\n# FwdOnly: %d\n# RevOnly: %d\n# Dropped: %d\n" % (joinCount, fwdCount, revCount, nulCount)
         msg+="#======================\n# End trimming:\n"
-        for status,count in trimmingCounts.iteritems():
+        for status,count in trimmingCounts.items():
             msg+="# %s: %d\n" % (status,count)
     msg+="#======================\n"
 

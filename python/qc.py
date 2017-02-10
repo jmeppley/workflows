@@ -119,7 +119,7 @@ STEP_FASTQ_OUTPUTS = {
 }
 
 
-QC_STEP_MERGES_PAIRS = set('interleaved', 'joined')
+QC_STEP_MERGES_PAIRS = set(['interleaved', 'joined'])
 
 READ_DIRECTIONS = ['R1', 'R2']
 
