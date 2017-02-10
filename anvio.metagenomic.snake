@@ -17,6 +17,8 @@ NOTES for OSX:
 
 Anvio must be installed in the runing environmetn or in a conda environment. If it is installed in a conda environment, set the config variable anvio_env to te name of that environment.
 
+Make sure you run `anvi-setup-ncbi-cogs` once in your anvio environment.
+
 With a config file like this to run megahit on a set of fastq reads files:
 samples_pattern:
     glob: "../data/*.fastq"
@@ -98,6 +100,13 @@ for ext in ['stats', 'hist']:
 snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))
 pymg_dir = os.path.sep.join([snakefile_path, 'tools', 'pymg'])
 os.environ['PATH'] += os.pathsep + os.pathsep.join([pymg_dir, ])
+#
+# this prevents errors due to bad conda env switching
+for missing_var in ['GDAL_DRIVER_PATH',
+                    'GDAL_DATA',
+#                    'JAVA_HOME_CONDA_BACKUP',
+                    ]:
+    os.environ.setdefault(missing_var,'dummy')
 #
 # End Configuration
 ######################

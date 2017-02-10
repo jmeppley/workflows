@@ -17,5 +17,5 @@ sample_tree:
 threads:
     bwa: 10
     anvio-profile: 1
-    bfc: 3
+    bfc: 5
 anvio_env: anvio
