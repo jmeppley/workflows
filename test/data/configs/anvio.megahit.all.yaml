@@ -1,5 +1,5 @@
 samples_pattern:
-    glob: "../../data/raw_reads/*.fastq"
+    glob: "../../data/raw_reads/2014_ALOHA_XVII_1-[0-9][0-9]_DNA_S*.fastq"
     re: "/[^A-Za-z]*([A-Za-z][^/]*)_S\\d[^/]+\\.fastq"
     cleaned: False
     name: "all"
@@ -19,4 +19,3 @@ threads:
     bwa: 10
     megahit: 40
     bfc: 8
-anvio_env: anvio

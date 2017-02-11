@@ -32,11 +32,11 @@ def get_version(command, version_flag='--version',
                         command,
                         version_flag,
                         "; exit 0"])
-    out = subprocess.check_output(command,
+    out = subprocess.check_output('bash -c "{}"'.format(command),
                                   stderr=subprocess.STDOUT,
                                   shell=True).decode()
-    if re.search(r'command not found', out):
-        raise Exception("Command {} was not found:\n{}".format(command, out))
+    if re.search(r' not found', out):
+        raise Exception("Command '{}' was not found:\n{}".format(command, out))
 
 
     # select specific lines

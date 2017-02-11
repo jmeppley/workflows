@@ -9,6 +9,8 @@ include: "anvio.contigs.snake"
 v1,v2,v3 = re.search(r'^(\d+)(?:\.(\d+))?(?:\.(\d+))?',
                      config['anvio_version']).groups()
 # anvi-merge takes PROFILE.db after 2.1.0 RUNINFO.cp before
+logger.debug("CHecking to see if anvio version is better than 2.1.0. "
+             "{}:{},{},{}".format(config['anvio_version'],v1,v2,v3))
 anvi_ver_gt_210 = v1>='2' and v2>='1' and v3>='1'
 logger.debug("Anvio version {} is{} newer than 2.1.0"\
                             .format(config['anvio_version'],

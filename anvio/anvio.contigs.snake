@@ -144,8 +144,7 @@ rule anvio_contig_cogs:
     threads:
         50
     version:
-        get_version("diamond",
-                    cmd_prefix=config['anvio_prefix'],)
+        config['anvio_version']
     shell:
         """{config[anvio_prefix]}
            anvi-run-ncbi-cogs -c anvio/contigs.db --num-threads {threads} \
