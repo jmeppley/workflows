@@ -32,6 +32,7 @@ def get_version(command, version_flag='--version',
                         command,
                         version_flag,
                         "; exit 0"])
+    logger.debug("Running command:\n{}".format(command))
     out = subprocess.check_output('bash -c "{}"'.format(command),
                                   stderr=subprocess.STDOUT,
                                   shell=True).decode()
