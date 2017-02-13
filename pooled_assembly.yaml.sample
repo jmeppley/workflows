@@ -1,5 +1,0 @@
-samples_pattern:
-    glob: "../2014*_bfc/reads.corrected.bfc.fastq.gz"
-    re: "2014-(ALOHA[^/]*)_bfc"
-megahit:
-    preset: meta
