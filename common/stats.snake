@@ -14,7 +14,7 @@ if enable_hist:
         input:
             "{file_root}.{ext}"
         output:
-            "{file_root}.{ext,f(aa|fn|na|a|asta|astq)(\.gz)?}.hist"
+            "stats/{file_root}.{ext,f(aa|fn|na|a|asta|astq)(\.gz)?}.hist"
         log:
             "logs/{file_root}.{ext}.hist.log"
         benchmark:
@@ -39,7 +39,7 @@ else:
         input:
             "{file_root}.{ext}"
         output:
-            "{file_root}.{ext,f(aa|fn|na|a|asta|astq)(\.gz)?}.hist"
+            "stats/{file_root}.{ext,f(aa|fn|na|a|asta|astq)(\.gz)?}.hist"
         shell:
             "echo 'histograms.py is not installed' > {output}"
 
@@ -48,7 +48,7 @@ rule prinseq_any:
     input:
         "{file_root}.{ext}"
     output:
-        "{file_root}.{ext,f[a-z]+(\.gz)?}.stats"
+        "stats/{file_root}.{ext,f[a-z]+(\.gz)?}.stats"
     log:
         "logs/{file_root}.{ext}.stats.log"
     benchmark:

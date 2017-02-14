@@ -9,3 +9,4 @@ dependencies:
 - trimmomatic
 - sed
 - bbmap
+- prinseq

@@ -14,6 +14,8 @@ update_config(config, defaults)
 #  for adapter file folder (aka resources)
 if 'resource_dir' not in config['bbduk']:
     config['bbduk']['resource_dir'] = bbmap.get_bbduk_resource_path(config)
+    
+bbduk_version = get_version('bbduk.sh', lines=[1,],)
 
 rule trim_bbduk_adapters_paired:
     """
@@ -33,8 +35,7 @@ rule trim_bbduk_adapters_paired:
     log:
         "logs/{prefix}.noadapt_paired.log"
     version:
-        get_version('bbduk.sh',
-                    lines=[1,],)
+        bbduk_version
     params:
         adapter_file=config['bbduk']['resource_dir'] \
                         + "/adapters.fa"
@@ -60,8 +61,7 @@ rule trim_bbduk_adapters:
     log:
         "logs/{prefix}.noadapt.log"
     version:
-        get_version('bbduk.sh',
-                    lines=[1,],)
+        bbduk_version
     params:
         interleaved=lambda w: \
             'interleaved' if re.search(r'R[12]', w.suffix) is None else '',
@@ -80,15 +80,14 @@ rule trim_bbduk_phix:
     input:
         "{prefix}.fastq"
     output:
-        "{prefix}.bbduk_nophix.fastq",
-        "{prefix}.bbduk_nophix.gchist.txt"
+        "{prefix}.nophix.fastq",
+        "{prefix}.nophix.gchist.txt"
     benchmark:
-        "benchmarks/{prefix}.bbduk_nophix.fastq.time"
+        "benchmarks/{prefix}.nophix.fastq.time"
     log:
-        "logs/{prefix}.bbduk_nophix.log"
+        "logs/{prefix}.nophix.log"
     version:
-        get_version('bbduk.sh',
-                    lines=[1,],)
+        bbduk_version
     params:
         phiX_file=config['bbduk']['resource_dir'] \
                          + "/phix174_ill.ref.fa.gz",
