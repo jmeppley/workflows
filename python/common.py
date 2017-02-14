@@ -1,14 +1,17 @@
 """
-MEthods used across all or most workflows including:
+Methods used across all or most workflows including:
 
     get_version: figure out the version of a command
     parse_stats: get the read and base counts from prinseq output
     apply_defaults: set dict (usually config) defaults recursively
+
 """
 
 import os
 import re
 import subprocess
+import tempfile
+import yaml
 import pandas
 from snakemake.logging import logger
 from snakemake.utils import update_config as apply_defaults
@@ -90,3 +93,45 @@ def parse_stats(stats_file):
                               names=('module', 'key', 'value'),
                               index_col=1)['value']
     return {k:int(stats[k]) for k in ['reads', 'bases']}
+
+def add_stats_outputs(snakefile, config):
+    """
+    if config[run_stats] is set to true, figure out what fasts[aq] files
+    this workflow generates and add the T.stats and T.hist to the outputs for
+    each of file T.
+
+    We do this by calling the snakemake API to get the output summary.
+    """
+    if config.get('run_stats', False) in [True, 'True']:
+        config_copy = dict(config)
+        config_copy['run_stats'] = False
+        config_file = tempfile.NamedTemporaryFile(mode='w')
+        yaml.dump(config_copy, config_file)
+
+        command = [
+            'snakemake',
+            '-s',
+            snakefile,
+            '--configfile',
+            config_file.name,
+            '--summary',
+            '-n',
+        ]
+
+        logger.debug("Performing dry-run to get outputs")
+        logger.debug(" ".join(command))
+        out = subprocess.check_output(command).decode()
+        logger.debug("Dry run complete")
+
+        new_outputs = config.setdefault('outputs', set())
+        output_count = 0
+        for line in out.split('\n'):
+            output = line.split('\t')[0]
+            logger.debug(output)
+            if re.search(r'f(aa|fn|na|a|asta|astq)(\.gz)?$', output):
+                output_count += 1
+                for extension in ['.hist', '.stats']:
+                    new_outputs.add('stats/' + output + extension)
+
+        logger.debug("Added stats and hist files for {} fasta files"\
+                     .format(output_count))

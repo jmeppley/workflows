@@ -1,5 +1,7 @@
 from python import tmatic
 
+tmatic_version = get_version('trimmomatic','-version')
+
 rule trimmomatic_trim:
     """Trims given paired-end reads with given parameters"""
     input:
@@ -13,7 +15,7 @@ rule trimmomatic_trim:
     threads:
         20
     version:
-        get_version('trimmomatic','-version')
+        tmatic_version
     params:
         trim_params=lambda wildcards: config.get('trimmomatic_trim_params',
                 "LEADING:10 TRAILING:10 SLIDINGWINDOW:4:20 MINLEN:50")
@@ -67,7 +69,7 @@ rule trimmomatic_clean_adapters:
     threads:
         20
     version:
-        get_version('trimmomatic','-version')
+        tmatic_version
     params:
         clip_params=lambda wildcards: config.get('trimmomatic_clip_params',
                                                  "2:30:10")

@@ -11,368 +11,115 @@ records jonied by a bunch of NNN's
 """
 
 import re
-import glob
 from Bio import Seq, SeqIO, SeqRecord
 from snakemake.logging import logger
+from python.samples import collect_sample_reads
+from python.tmatic import get_chemistry_barcodes
 
-def collect_sample_reads(samples_pattern_data):
-    """
-    Use the samples_pattern entry in config to locate read files and group into
-    samples
-
-    The samples_pattern dict should look like this:
-        samples_pattern:
-            glob: "../data/*.fastq"
-            re: "/([^_]+)_[^/]+\\.fastq"
-            name: all
-            metadata: samples.all.tsv
-
-    only the 're' and 'glob' fields are used here. The glob finds files using a
-    filesystem wildcard and the re should identify (as the first matched group)
-    the sample name in the found file names.
-
-    In the above example, let the generated reads dict could look like:
-    reads:
-        sample-01: reads/sample-01/reads.corrected.bfc.fastq.gz
-        sample-02: reads/sample-02/reads.corrected.bfc.fastq.gz
-
-    or this (depending on filesystem contents):
-    reads:
-        sample-01:
-            - reads/sample-01/reads.R1.fastq
-            - reads/sample-01/reads.R2.fastq
-        sample-02:
-            - reads/sample-02/reads.R1.fastq
-            - reads/sample-02/reads.R2.fastq
-
-    """
-
-    # setup
-    reads = {}
-    sample_pattern = samples_pattern_data.get('re', r'/([^/]+)/[^/]+$')
-    sample_RE = re.compile(sample_pattern)
-    read_file_glob = samples_pattern_data.get('glob',
-                                              './*/reads.cleaned.fastq.gz')
-
-    # find files
-    read_files = glob.glob(read_file_glob)
-    if len(read_files) == 0:
-        raise Exception(
-            "The sample reads wildcard '{}' did not match any files!"\
-                            .format(read_file_glob)
-        )
-
-    # collect files into lists by sample
-    for read_file in read_files:
-        match = sample_RE.search(read_file)
-        if match is None:
-            raise Exception(
-                ("The sample matching expression ({}) failed to find a sample "
-                 "name in the path: {}").format(sample_pattern, read_file)
-            )
-        sample = match.group(1)
-        # sanitize sample name
-        sample = re.sub(r'[^A-Za-z0-9_]', '_', sample)
-        reads.setdefault(sample, []).append(read_file)
-
-    return reads
-
+# interleaved will be automatically dropped if single file given per sample
 QC_PROTOCOLS = {
-    None: [],
-    "assembly": ['renamed',
-                 'interleaved',
-                 'noadapt',
-                 'nophix',
-                 'corrected',
-                 'trimmed'],
-    "joining": ['trim_adapt', 'joined', 'trimmed', 'nophix'],
+    "rename": 'rename.interleaved',
+    "assembly": '.'.join(['renamed',
+                          'interleaved',
+                          'noadapt',
+                          'nophix',
+                          'corrected',
+                          'trimmed']),
+    "joining": '.'.join(['trim_adapt', 'joined', 'nophix']),
 }
-
-STEP_FASTQ_OUTPUTS = {
-    'trim_adapt': [
-        (r'\.(R[12])\.', r'.trim_adpt.\1.paired.fastq'),
-        (r'\.(R[12])\.', r'.trim_adpt.\1.unpaired.fastq')],
-    'pear_joined': [
-        (r'\.fastq', r'.paired.assembled.trimmed.fastq'),
-        (r'\.fastq', r'.paired.assembled.fastq'),
-        (r'\.fastq', r'.paired.trimmed.dummy.fastq'),
-        (r'\.fastq', r'.paired.unassembled.reverse.trimmed.fastq'),
-        (r'\.fastq', r'.paired.unassembled.forward.trimmed.fastq'),
-        (r'\.fastq', r'.paired.unassembled.reverse.fastq'),
-        (r'\.fastq', r'.paired.unassembled.forward.fastq')],
-    'flash_joined': [
-        (r'\.fastq', r'.paired.extendedFrags.trimmed.fastq'),
-        (r'\.fastq', r'.paired.extendedFrags.fastq'),
-        (r'\.fastq', r'.paired.trimmed.dummy.fastq'),
-        (r'\.fastq', r'.paired.notCombined_1.trimmed.fastq'),
-        (r'\.fastq', r'.paired.notCombined_2.trimmed.fastq'),
-        (r'\.fastq', r'.paired.notCombined_1.fastq'),
-        (r'\.fastq', r'.paired.notCombined_2.fastq')],
-    'panda_joined': [
-        (r'\.fastq', r'.paired.assembled.trimmed.fastq'),
-        (r'\.fastq', r'.paired.assembled.fastq'),
-        (r'\.fastq', r'.paired.trimmed.dummy.fastq'),
-        (r'\.fastq', r'.paired.unassembled.reverse.trimmed.fastq'),
-        (r'\.fastq', r'.paired.unassembled.forward.trimmed.fastq'),
-        (r'\.fastq', r'.paired.unassembled.reverse.fastq'),
-        (r'\.fastq', r'.paired.unassembled.forward.fastq')]
-}
-
-
-QC_STEP_MERGES_PAIRS = set(['interleaved', 'joined'])
 
 READ_DIRECTIONS = ['R1', 'R2']
 
-def get_qc_steps(config):
+
+def setup_qc_outputs(config):
     """
-    return list of file suffixes necessary to implement selected protocol
+    Locate the read files for each sample and return map from sample to
+    cleaned reads file.
+
+    add 'raw' files to each sample in config[sample_data]
+      (Using config[sample_data][patterns]) if missing
+
+    Add transitions (to config[transitions]) that map
+     from starting flie for QC to actual raw read files
+
+    Add 'cleaned' file to each sample in config[sample_data]
+
+    Works from the config dict using:
+        config[sample_data][{sample}][raw]
+            list of raw files in fwd, rev order
+        samples_pattern:
+            glob and re used to build above map (only used if map missing)
+            see python.sample.collect_sample_reads
+        cleaning_protocol:
+            one of 'None', 'rename', 'assembly', or 'joining'
+
     """
-    cleaning_protocol = config.get('cleaning_protocol', None)
-    qc_steps = QC_PROTOCOLS[cleaning_protocol]
-    return qc_steps
 
-def build_qc_chain(sample, paired, steps,
-                   fasta_files,
-                   cleaned_reads_by_sample,
-                   config):
-    """
-    given the sample and the steps chain
-    """
-    # keep track of fasta files that will be generated
-    #  starting with first file in chain and gothrough qc_steps
-    if paired:
-        starting_files = [
-            'reads/{sample}/reads.{dir}.fastq'.format(**vars()) \
-                for dir in READ_DIRECTIONS
-        ]
-    else:
-        starting_files = [
-            'reads/{sample}/reads.fastq'.format(**vars()),
-        ]
-    fasta_files.extend(starting_files)
+    sample_data = config['sample_data']
 
-    # want to keep track of all fasta files, start with starting files
-    last_fasta_files = starting_files
-    for step in steps:
-        # make sure the number of files make sense for the step
-        if not paired and step in QC_STEP_MERGES_PAIRS:
-            raise Exception((
-                "The qc protocol {} with steps {} includes a merging step "
-                "({}), but sample {} only has one file. We cannot "
-                "make sense of this. Sorry") \
-              .format(config.get('cleaning_protocol', None),
-                       repr(steps),
-                       step,
-                       sample)
-            )        
-
-        # apply the step to the file name
-        last_fasta_files = get_next_fasta_files(last_fasta_files,
-                                                step,
-                                                paired,
-                                                fasta_files
-                                               )
-
-        # no longer paired if we went through a merge step
-        if len(last_fasta_files) == 1:
-            paired = False
-
-    # we should end with one file
-    if paired:
-        raise Exception((
-            "end of QC chain must end in single (interleaved or "
-            "merged) file. Sample {} has 2 files, but there is no "
-            "merging step in chain: {}").format(
-                sample,
-                repr(steps)))
-    cleaned_reads_by_sample[sample] = last_fasta_files[0]
-
-    return starting_files
-
-
-def get_next_fasta_files(last_fasta_files,
-                         step,
-                         fasta_files,
-                         paired):
-    """
-    Given a starting file(s) and a qc step, get next file or files
-    """
-    if step not in QC_STEP_MERGES_PAIRS:
-        if paired:
-            last_fasta_files = [
-                new_last_fasta_file(last_fasta_file,
-                                    step,
-                                    fasta_files) \
-                for last_fasta_file in last_fasta_files
-            ]
+    # make sure we have map from samples to raw reads
+    samples_with_raw_reads = [s for s, v in sample_data.items() \
+                                if isinstance(v, dict) and 'raw' in v]
+    if len(samples_with_raw_reads) == 0:
+        if 'reads_pattern' in sample_data:
+            for sample, reads in collect_sample_reads(sample_data\
+                                                      ['reads_pattern']):
+                sample_data.setdefault(sample, {})['raw'] = reads
         else:
-            last_fasta_files = [
-                new_last_fasta_file(last_fasta_files[0],
-                                    step,
-                                    fasta_files)
-            ]
-    else:
+            raise Exception("Please supply a map from samples to raw reads "
+                            "(config[sample_data][{sample}][raw]=[fwd.fastq,rev.fastq])"
+                            " or a glob and re in"
+                            " config[sample_data][reads_pattern]")
 
-        last_fasta_files = [
-            new_last_fasta_file_merged(last_fasta_files,
-                                       step,
-                                       fasta_files)
-        ]
-    return last_fasta_files
-
-
-def new_last_fasta_file_merged(last_fasta_files, step, fasta_files):
-    """
-    drops the R1 from the file name before processing
-    """
-    dropped_dir = re.sub(r'\.R1', '', last_fasta_files[0])
-    return new_last_fasta_file(dropped_dir, step, fasta_files)
-
-
-def new_last_fasta_file(last_fasta_file, step, fasta_files):
-    """
-    Given starting file(s) and step name
-
-     * figure out the next file step in chain
-     * add all intermediate fasta files to list
-    """
-
-    # by default, insert step name before .fastq or .R1.fastq
-    default_rexp = r'(?<!\.R[12])((?:\.R1)?\.fastq)'
-    default_subst = r'.{step}\1'.format(step=step)
-    default_fastq_outputs = (default_rexp, default_subst)
-
-    # get step specific substitutions
-    fastq_outputs = STEP_FASTQ_OUTPUTS.get(step,
-                                           default_fastq_outputs)
-
-    # use substitutions to populate fasta file list
-    for rexp, subst in fastq_outputs:
-        fasta_files.append(re.sub(rexp, subst,
-                                  last_fasta_file))
-
-    # use default subst to build up final file name
-    #  (this particular file name may never get made)
-    next_fasta_file = re.sub(default_rexp,
-                             default_subst,
-                             last_fasta_file)
-    return next_fasta_file
-
-def setup_qc_outputs(config, get_stats=True):
-    """
-    Locate the read files for each sample, set up any QC that is needed, and
-    set up a 'cleaned_reads' dict mapping sample names to (QCed) read files
-    for the assembly and mapping steps.
-
-    If there is not already a "reads" dict in config, build it from the samples
-    pattern. (see collect_sample_reads() above)
-
-    returns list of snakefiles to include to get necessary QC rules
-
-    QC rules depend on config['cleaning_protocol'] which can be one of:
-        assembly (alias for assembly-bfc)
-        assembly-bfc
-        joining (alias for joing-pandaseq)
-        joining-pandaseq
-        joining-pear
-        joining-flash
-
-    the resulting reads dict should look like this:
-    config['reads']={
-        'sample_1': '/path/to/sample_1.fastq',
-        'sample_2': '/path/to/sample_2.fastq'
-    }
-
-    The indicated samples files may exist somewhere else or may be targets that
-    need to be built. In the latter case, there should be transitions set to
-    define how the base files is to be generated. For example, we are starting
-    with raw reads, the reads above will be the cleaned versions and snakemake
-    will have to figure out how to generate them.
-    Snakemake understands that reads/{sample}/reads.corrected.bfc.fastq.gz
-    is generated from a series of steps from reads/{sample}/reads.R1.fastq and
-    reads/{sample}/reads.R2.fastq. Those files don't exist, so 4 transitions
-    will also be defined:
-    transitions:
-        reads/sample-01/reads.R1.fastq: ../data/sample-01_R1.fastq
-        reads/sample-01/reads.R2.fastq: ../data/sample-01_R2.fastq
-        reads/sample-02/reads.R1.fastq: ../data/sample-02_R1.fastq
-        reads/sample-02/reads.R2.fastq: ../data/sample-02_R2.fastq
-    """
-
-    reads = config.setdefault('reads', {})
-    samples_pattern_data = config.setdefault('samples_pattern')
-
-    # if reads already has data and sample_pattern_data has no glob
-    #  we assume that we don't want to go looking for more reads
-    #  (we have defaults to try if nothing supplied)
-    if len(reads) == 0 or 'glob' in samples_pattern_data:
-        reads.update(collect_sample_reads(samples_pattern_data))
-
-    # generate naming strings for linking QC workflow steps
-    qc_steps = get_qc_steps(config)
+    # get protocol
+    cleaning_protocol = config.get('cleaning_protocol', 'None')
 
     # loop back over samples and set up cleaning or interleaving if needed
-    snakefiles = []
     transitions = config.setdefault('transitions', {})
-    fasta_files = []
-    cleaned_reads = {}
-    for sample in list(reads.keys()):
-        files = sorted(reads[sample])
+    outputs = []
+    for sample in samples_with_raw_reads:
+        raw_files = sorted(sample_data[sample]['raw'])
 
         # Bail out if we have too many files per sample
-        if len(files)>2:
+        if len(raw_files) > 2:
             raise Exception("I don't know how to deal with more than two"
                             " files per sample!\nSample={}\nFiles:\n{}"\
                                 .format(sample,
-                                        "\n".join(files)))
-
-        starting_files = build_qc_chain(sample, qc_steps, len(files) == 2,
-                                        fasta_files,
-                                        cleaned_reads,
-                                        config,
-                                       )
+                                        "\n".join(raw_files)))
 
 
-        # check to see if they are compressed (we can handle .gz)
-        #  Bail out if one file is compressed and the other isn't
-        files_gzipped = None
-        for file_name in files:
-            if re.search(r'\.gz$', file_name) is not None:
-                if files_gzipped==False:
-                    raise Exception("It seems one file is compressed and the "
-                                    "other is not:\n{}".format("\n".join(files)))
-                files_gzipped = True
-            else:
-                if files_gzipped==True:
-                    raise Exception("It seems one file is compressed and the "
-                                    "other is not:\n{}".format("\n".join(files)))
-                files_gzipped = False
-
-        ## Create links from start of workflow to the source read files
-        # are the originals gzipped?
-        suffix = ".gz" if files_gzipped else ""
-        # Do we have a pair of files or single file?
-        if len(files)==1:
-            # we are starting from interleaved, just link it in
-            transitions['reads/{sample}/reads.renamed.R12.fastq{suffix}'\
-                                .format(**vars())] = files[0]
+        # starting files (define as transitions from raw files)
+        if len(raw_files) == 2:
+            for direction, source_file in zip(READ_DIRECTIONS, raw_files):
+                transitions['{sample}.{direction}.fastq'.format(**vars())] = \
+                    source_file
         else:
-            needs_qc_or_join = True
-            # we are starting from paired files, link those
-            transitions['reads/{sample}/reads.R1.fastq{suffix}'\
-                            .format(**vars())] = files[0]
-            transitions['reads/{sample}/reads.R2.fastq{suffix}'\
-                            .format(**vars())] = files[1]
+            transitions['{sample}.fastq'.format(**vars())] = raw_files[0]
 
-    if get_stats:
-        # add stats file to final outputs for each fasta file generated
-        outputs = config.setdefault('outputs', set())
-        for ext in ['stats', 'hist']:
-            for file_name in fasta_files:
-                outputs.add(".".join((file_name, ext)))
+        # cleaned suffix
+        cleaned_suffix = QC_PROTOCOLS.get(cleaning_protocol, '')
 
-    return needs_qc_or_join
+        # special cases
+        if cleaning_protocol != 'joining' and len(raw_files) == 1:
+            # if cleaning one file for assembly, drop interleave
+            cleaned_suffix = re.sub(r'\.interleaved', '', cleaned_suffix)
+        if cleaning_protocol == 'None' and len(raw_files) == 2:
+            # if not cleaning, but two files given, interleave them
+            cleaned_suffix = 'interleaved'
+        if cleaning_protocol == 'joining':
+            # prepend trimmomatic params
+            chemistry, barcodes = get_chemistry_barcodes(sample, config)
+            cleaned_suffix = '.'.join([chemistry] + barcodes) + \
+                                '.' + cleaned_suffix
 
+
+        # result of QC
+        cleaned_reads = '{sample}.{cleaned_suffix}.fastq'\
+                                                    .format(**vars())
+        sample_data[sample]['clean'] = cleaned_reads
+        outputs.append(cleaned_reads)
+
+    return outputs
 
 def rev_comp_rec(record, qual=False, suffix=''):
     """

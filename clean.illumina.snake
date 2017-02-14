@@ -12,13 +12,38 @@ This is in the testing phase:
 
 """
 import re
-from python.common import get_version
-from python.qc import get_qc_outputs
+from python.common import get_version, add_stats_outputs
+from python.qc import setup_qc_outputs
+from snakemake.logging import logger
 
-#config.setdefault('cleaning_protocol', 'joining')
-config.setdefault('cleaning_protocol', 'joining-flash')
+# parses config to setup outputs
+outputs = config.setdefault('outputs',set())
+outputs.update(setup_qc_outputs(config))
 
-snakefiles = get_qc_outputs(config)
-for snakefile in snakefiles:
-    include: snakefile
+include: "common/transitions.snake"
+
+# all three joining programs are interchangeable
+joining_program = config.get('joining_program','pear')
+include: 'qc/{joining_program}.snake'.format(**vars())
+
+logger.debug(config)
+
+# add my tools to the path (Somewhat of a hack, maybe I'll get my stuff in
+# conda eventually)
+snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))
+pymg_dir = os.path.sep.join([snakefile_path, 'tools', 'pymg'])
+batch_dir = os.path.sep.join([snakefile_path, 'tools', 'batch'])
+os.environ['PATH'] += os.pathsep + os.pathsep.join([pymg_dir, batch_dir])
+logger.debug(os.environ['PATH'])
+#
+
+# adds fastq stats files to output (only if config[run_stats] is set to True
+if config.get('run_stats', False) in [True, 'True']:
+    add_stats_outputs(workflow.snakefile, config) 
+    include: 'common/stats.snake'
+
+# Tell snakemake what to make
+rule clean_illumina_outputs:
+    input:
+        outputs
 
