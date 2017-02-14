@@ -23,8 +23,6 @@ setup() {
 }
 
 @test "From reaads and contigs into anvio" {
-    echo $ANVIENV > test.anvi.env.txt
-    echo $PATH >> test.anvi.env.txt
     run bash -c "snakemake -s ../../../anvio.metagenomic.snake --configfile ../../data/configs/anvio.contigs.all.yaml -p -j 20 --config anvio_env=$ANVIENV --verbose > anvio.contigs.all.log 2>&1"
     [ "$status" -eq 0 ]
 }

@@ -24,9 +24,7 @@ setup() {
 }
 
 @test "From reaads through megahit to anvio" {
-    echo $ANVIENV > test.anvi.env.txt
-    echo $PATH >> test.anvi.env.txt
-    which megahit || skip "Megahit is not installed"
+    which megahit > /dev/null 2>&1 || skip "Megahit is not installed" 
     run bash -c "snakemake -s ../../../anvio.metagenomic.snake --configfile ../../data/configs/anvio.megahit.all.yaml -p -j 20 --config anvio_env=$ANVIENV > anvio.megahit.all.log 2>&1"
     [ "$status" -eq 0 ]
 }
