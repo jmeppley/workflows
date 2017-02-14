@@ -93,7 +93,7 @@ outputs = config.setdefault('outputs',set())
 # generate simple statistics (prinseq) and histogram from contigs
 for ext in ['stats', 'hist']:
     for file_name in ['contigs.fasta', 'anvio/contigs.fa']:
-        outputs.add(".".join((file_name, ext)))
+        outputs.add(".".join((os.path.join('stats',file_name), ext)))
 #
 # add my tools to the path (Somewhat of a hack, maybe I'll get my stuff in
 # conda eventually)

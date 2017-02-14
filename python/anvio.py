@@ -1,4 +1,5 @@
 import re
+import os
 import glob
 def collect_sample_reads(config, get_stats=True):
     """
@@ -150,7 +151,7 @@ def collect_sample_reads(config, get_stats=True):
         outputs = config.setdefault('outputs', set())
         for ext in ['stats', 'hist']:
             for file_name in fasta_files:
-                outputs.add(".".join((file_name, ext)))
+                outputs.add(".".join((os.path.join('stats',file_name), ext)))
 
     return needs_qc_or_join
 
