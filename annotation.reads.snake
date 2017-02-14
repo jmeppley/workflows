@@ -98,13 +98,19 @@ include: "qc/sort.rna.snake"
 if extension == 'fastq':
     ruleorder: remove_colons > fastq_to_fasta
 
+if config.get('remove_rna',True) in ['True', True]:
+    rna_step = 'non-rRNA.'
+else:
+    rna_step = ''
+
 # set up list of files to create
 #  - The final tabulations
 #  - Stats and histrogram files for reads and translated seqs
 gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs, config)
 annotation_file_list = \
-                expand("{prefix}.non-rRNA.annot.{taxdb}.lastx.{clade_rank}.vs.{db_dot_fmt}.tsv",
+                expand("{prefix}.{rna_step}annot.{taxdb}.lastx.{clade_rank}.vs.{db_dot_fmt}.tsv",
                        prefix=prefix,
+                       rna_step=rna_step,
                        taxdb=config['taxdb'],
                        clade_rank=config['clade_ranks'],
                        db_dot_fmt=gene_family_db_dot_fmts,) + \
