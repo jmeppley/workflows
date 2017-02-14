@@ -107,7 +107,7 @@ annotation_file_list = \
                        taxdb=config['taxdb'],
                        clade_rank=config['clade_ranks'],
                        db_dot_fmt=gene_family_db_dot_fmts,) + \
-                expand("{prefix}.{suffix}.{ext}", 
+                expand("stats/{prefix}.{suffix}.{ext}", 
                        ext=['stats','hist'],
                        suffix=['fasta','sixframe.faa'],
                        prefix=prefix)
