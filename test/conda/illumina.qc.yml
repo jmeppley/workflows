@@ -10,3 +10,4 @@ dependencies:
 - sed
 - bbmap
 - prinseq
+- seqtk
