@@ -1,22 +1,61 @@
 # workflows
-A collection of my Snakemake workflows for meetagenomics including assembly, annotation, and anvio preprocessing. 
+A collection of Snakemake workflows for metagenomics
 
-In this repositories are makefiles to:
+## Prerequisites
 
- * QC illumina reads (with bbmap and bfc), assemble with SPAdes, and idenitfy and annotate genes
- * QC illumina reads (with trimmamatic and pandaseq), compare to public databases, and tabulate counts by taxon and gene family.
- * Assemble multiple samples with megahit, map reads with BWA, and import everything into Anvi'o for visualization
+For the most part, all you need is (ana)conda. The only tools used that aren't available in conda are pandaseq (though, you can use pear or flash) and megahit (for OSX).
 
-## A work in progress
+## Installation
 
-This repository is in the process of being refactored, documented, and tested. Please have bear with me, but don't hesitate to contact me if you have requests.
+Just clone this repository and set up you conda environment. Each of the primary workflows (the ones in the root folder) have an associated conda
+configuration file in tests/conda. 
 
-## anvio.metagenomic.snake
+You can create the necessary conda environments with thses files. For example, to run the clean.illumina.snake workflow, create a conda environment with:
 
-The multiple sample assembly and visualization workflow is the only one remotely ready for public consumption at this point. Instructions for running can be found in the initial comments.
+```
+conda env create -n qc -f test/conda/illumina.qc.yml
+```
 
-## installation
+## tests
 
-Just clone this repository and install snakemake. I recommend using (ana)conda for this. You will also need to install software used by the workflow. The workflow comments should list the requirements.
+Currently only bats tests are available. Install bats and run 
 
+```
+bats test/bats
+```
 
+The tests will create the necessary conda environments and run some example workflows
+
+# Workflows
+
+## Illumina Prep
+
+clean.illumina.snake will take pars of raw illumina reads and create joined, cleaned reads using:
+
+ * trimmomatic (to remove adapters)
+ * bbduk (to remove more adapters)
+ * pear, pandaseq, or flash to assemble pairs
+ * custom code to connected unjoined pairs with N's
+ * trimmomatic to end trim low quality bases from everything
+
+Conda env file:
+
+ * test/conda/illumina.qc.yml
+
+## anvio metagenomics
+
+anvio.metagenomic.snake will take reads from multiple samples and create the files necessary to load into anvio metagenomic mode.
+
+ * reads cleaned (optionally) with bbduk, bfc, and trimmomatic
+ * reads assembled (or provide your own contigs) with megahit
+ * reads mapped to contigs with bwa
+ * everything imported into anvio (including sample clustering)
+
+Conda env files
+
+ * test/conda/assembly.yml (for running snakemake)
+ * test/conda/anvi2.yml (for anvio steps)
+
+## read annotation
+
+annotate.reads.snake will compare reads to reference DBs to cross compile hits to taxonomic referecens and gene faimly DBs. Lastal can be used for protein sequence dbs like RefSeq or KEGG, and hmmer for profile searches against the likes of COG and PFAM.
