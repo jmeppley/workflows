@@ -93,6 +93,7 @@ logger.debug(os.environ['PATH'])
 include: "common/stats.snake"
 include: "common/transitions.snake"
 include: "annotation/common.sixframe.snake"
+include: "qc/sort.rna.snake"
 
 if extension == 'fastq':
     ruleorder: remove_colons > fastq_to_fasta
@@ -102,7 +103,7 @@ if extension == 'fastq':
 #  - Stats and histrogram files for reads and translated seqs
 gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs, config)
 annotation_file_list = \
-                expand("{prefix}.annot.{taxdb}.lastx.{clade_rank}.vs.{db_dot_fmt}.tsv",
+                expand("{prefix}.non-rRNA.annot.{taxdb}.lastx.{clade_rank}.vs.{db_dot_fmt}.tsv",
                        prefix=prefix,
                        taxdb=config['taxdb'],
                        clade_rank=config['clade_ranks'],

@@ -1,13 +1,4 @@
 include: "../annotation/cmsearch.snake"
-include: "../common/common.snake"
-
-import os
-import sys
-snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
-sys.path[0]=os.path.join(snakefile_path,'..','python')
-from common import get_version
-
-ruleorder: filter_nonrrna_or_rrna > fastq_to_fasta
 
 rule sort_rna_default_all:
     input:
@@ -21,9 +12,11 @@ rule filter_nonrrna_or_rrna:
     """
     input:
         reads="{file_root}.{ext}",
-        hits="{file_root}.rRNA.cmsearch.gff"
+        hits="{file_root}.vs.rRNA.cmsearch.gff"
     output:
-        "{file_root}.{type,(non-)?rRNA}.{ext,fast[aq]}"
+        "{file_root}.{type}.{ext,fast[aq]}"
+    wildcard_constraints:
+        type=r'(non-rRNA|rRNA-only)'
     benchmark:
         "benchmarks/{file_root}.{type}.time"
     log:
