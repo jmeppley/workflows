@@ -21,10 +21,10 @@ rule run_flash:
     version:
         get_version('flash',lines=[0,])
     params:
-        opts=config.get('flash_opts','-M 200'),
+        opts=config.get('flash', {}).get('params', '-M 200'),
         output="{file_root}.paired"
     shell:
-        "flash -o {params.output} {params.opts} {input.fwd} {input.rev} \
+        "flash -o {params.output} {params.opts} {input.fwd} {input.rev} -t 1 \
              > {log} 2>&1"
 
 rule dummy_join:

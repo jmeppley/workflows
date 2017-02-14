@@ -17,7 +17,7 @@ rule pandaseq:
     version:
         get_version('pandaseq',"-v")
     params:
-        threshold=config.get('pandaseq_threshold','.32')
+        threshold=config.get('pandaseq', {}).get('threshold','.32')
     shell:
         """
         pandaseq -f {input.fwd} -r {input.rev} -d rBfkmS \

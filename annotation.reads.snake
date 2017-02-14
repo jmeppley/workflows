@@ -93,12 +93,12 @@ logger.debug(os.environ['PATH'])
 include: "common/stats.snake"
 include: "common/transitions.snake"
 include: "annotation/common.sixframe.snake"
-include: "qc/sort.rna.snake"
 
 if extension == 'fastq':
     ruleorder: remove_colons > fastq_to_fasta
 
 if config.get('remove_rna',True) in ['True', True]:
+    include: "qc/sort.rna.snake"
     rna_step = 'non-rRNA.'
 else:
     rna_step = ''

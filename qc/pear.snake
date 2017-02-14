@@ -21,10 +21,10 @@ rule run_pear:
         get_version('pear',"-h",
                     regular_expression=r'PEAR\s+v[.0-9]+')
     params:
-        opts=config.get('pear_opts','-p 0.01'),
+        opts=config.get('pear', {}).get('params', '-p 0.01'),
         output="{file_root}.paired"
     shell:
-        "pear -f {input.fwd} -r {input.rev} {params.opts} \
+        "pear -j 1 -f {input.fwd} -r {input.rev} {params.opts} \
         -o {params.output} > {log} 2>&1"
 
 rule dummy_join:

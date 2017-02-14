@@ -6,6 +6,7 @@ defaults={'bbduk':{'ram':'1g',
                    'phix_flags': (
                         'k=27 hdist=1 qtrim=rl trimq=17 cardinality=t '
                         'mingc=0.05 maxgc=0.95'),
+                   'threads': 20,
                    },
          }
 update_config(config, defaults)
@@ -36,6 +37,8 @@ rule trim_bbduk_adapters_paired:
         "logs/{prefix}.noadapt_paired.log"
     version:
         bbduk_version
+    threads:
+        config['bbduk']['threads']
     params:
         adapter_file=config['bbduk']['resource_dir'] \
                         + "/adapters.fa"
@@ -43,7 +46,7 @@ rule trim_bbduk_adapters_paired:
         "bbduk.sh -Xmx{config[bbduk][ram]} \
           in={input.fwd} in2={input.rev} \
           out={output.fp} out2={output.rp} outs={output.sn} \
-          {config[bbduk][adapter_flags]} \
+          {config[bbduk][adapter_flags]} threads={threads} \
           ref={params.adapter_file} 2> {log}"
 
 rule trim_bbduk_adapters:
@@ -67,9 +70,11 @@ rule trim_bbduk_adapters:
             'interleaved' if re.search(r'R[12]', w.suffix) is None else '',
         adapter_file=config['bbduk']['resource_dir'] \
                         + "/adapters.fa"
+    threads:
+        config['bbduk']['threads']
     shell:
         "bbduk.sh -Xmx{config[bbduk][ram]} \
-          in={input} out={output} \
+          in={input} out={output} threads={threads} \
           {params.interleaved} overwrite {config[bbduk][adapter_flags]} \
           ref={params.adapter_file} 2> {log}"
 
@@ -91,8 +96,10 @@ rule trim_bbduk_phix:
     params:
         phiX_file=config['bbduk']['resource_dir'] \
                          + "/phix174_ill.ref.fa.gz",
+    threads:
+        config['bbduk']['threads']
     shell:
-        "bbduk.sh -Xmx{config[bbduk][ram]} \
+        "bbduk.sh -Xmx{config[bbduk][ram]} threads={threads} \
           in={input} out={output[0]} gchist={output[1]} \
           interleaved overwrite {config[bbduk][phix_flags]} \
           ref={params.phiX_file} 2> {log}"

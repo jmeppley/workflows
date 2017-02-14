@@ -11,4 +11,24 @@ sample_data:
           - "../../data/raw_reads/2014_ALOHA_XVII_1-1B_S1_R2_001.head4k.fastq"
         chemistry: truseq
         barcode: NNNNNN
+trimmomatic:
+    threads: 10
+    illumina_clip: "2:30:10"
+    minlen: 100
+    leading: 10
+    trailing: 10
+    sliding_window: "4:20"
+bbduk:
+    threads: 5
+cmsearch:
+    threads: 10
+# only one of the following is used
+# choose which method with (EG):
+#joining_program: pandaseq
+flash:
+    params: "-M 200"
+pear:
+    params: "-p 0.001"
+pandaseq:
+    threshold: ".32"
 cleaning_protocol: joining

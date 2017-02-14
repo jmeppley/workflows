@@ -1,8 +1,14 @@
 from python.cmsearch import get_cm_model_version
+from snakemake.utils import update_config
 
-config.setdefault('threads',{})
-config.setdefault('cmsearch_models',
-                  os.path.join(snakefile_path,"annotation",'models'))
+# models dir should contain pressed cm files named rRNA.cm and tRNA.cm
+defaults={'cmsearch': {
+                   'threads': 20,
+                   'models': \
+                      os.path.join(snakefile_path,"annotation",'models'),
+                   },
+         }
+update_config(config, defaults)
 
 rule cmsearch_default_all:
     input: 
@@ -20,15 +26,15 @@ rule cmsearch:
     benchmark:
         "benchmarks/contigs.annotations.vs.{molecule}.tbl.txt"
     threads:
-        int(config['threads'].get('cmsearch',20))
+        config['cmsearch']['threads']
     version:
         lambda wildcards:\
             get_version('cmsearch',
                         '-h',
                         lines=1) + " :: " + \
-                get_cm_model_version(config['cmsearch_models'])
+                get_cm_model_version(config['cmsearch']['models'])
     params:
-        cmfile=os.path.join(config['cmsearch_models'],'{molecule}.cm'),
+        cmfile=os.path.join(config['cmsearch']['models'],'{molecule}.cm'),
         flags=lambda wildcards:\
           "--hmmonly" if wildcards.molecule=='rRNA' else ""
     shell:

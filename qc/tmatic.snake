@@ -1,5 +1,16 @@
 from python import tmatic
+from snakemake.utils import update_config
 
+# some reasonable defaults
+defaults = {
+    'trimmomatic': {
+        'threads': 20,
+        'illumina_clip': "2:30:10",
+        'minlen': 50,
+    }}
+update_config(config, defaults)
+
+# get the version once and use in all rules
 tmatic_version = get_version('trimmomatic','-version')
 
 rule trimmomatic_trim:
@@ -13,12 +24,17 @@ rule trimmomatic_trim:
     benchmark:
         "benchmarks/{file_root}_trimmomatic_trim.time"
     threads:
-        20
+        config['trimmomatic']['threads']
     version:
         tmatic_version
     params:
-        trim_params=lambda wildcards: config.get('trimmomatic_trim_params',
-                "LEADING:10 TRAILING:10 SLIDINGWINDOW:4:20 MINLEN:50")
+        trim_params=" ".join([
+            "{}:{}".format(p.upper(),config['trimmomatic'][p]) \
+            for p in ['leading', 'trailing', 'slidingwindow', 'minlen'] \
+            if p in config['trimmomatic']
+        ])
+        #trim_params="LEADING:{leading} TRAILING:{trailing} \
+        #   SLIDINGWINDOW:{sliding_window} MINLEN:{minlen}")
     shell:
         # if input is zero lenght, just touch output
         """
@@ -67,18 +83,15 @@ rule trimmomatic_clean_adapters:
     benchmark:
         "benchmarks/{prefix}_{chemistry}.{barcode}.trim_adapt.time"
     threads:
-        20
+        config['trimmomatic']['threads']
     version:
         tmatic_version
-    params:
-        clip_params=lambda wildcards: config.get('trimmomatic_clip_params',
-                                                 "2:30:10")
     shell:
         """
         trimmomatic PE -threads {threads} \
         {input.fwd} {input.rev} \
         {output[0]} {output[2]} {output[1]} {output[3]} \
-        ILLUMINACLIP:{input.primers}:{params.clip_params}
+        ILLUMINACLIP:{input.primers}:{config[trimmomatic][illumina_clip]}
         """
 
 rule trimomatic_recombine:

@@ -117,7 +117,15 @@ def setup_qc_outputs(config):
         cleaned_reads = '{sample}.{cleaned_suffix}.fastq'\
                                                     .format(**vars())
         sample_data[sample]['clean'] = cleaned_reads
-        outputs.append(cleaned_reads)
+
+        if config.get('remove_rna', True) in ['True', True]:
+            # if rrna separation requested, add rRNA-only and non-rRNA to names
+            for rrna_split in ['non-rRNA', 'rRNA-only']:
+                outputs.append(re.sub(r'\.fastq$',
+                                      '.{}.fastq'.format(rrna_split),
+                                      cleaned_reads))
+        else:
+            outputs.append(cleaned_reads)
 
     return outputs
 
