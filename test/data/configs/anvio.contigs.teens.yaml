@@ -6,6 +6,7 @@ samples_pattern:
 contigs_fasta: ../../data/contigs/contigs.aloha.fa
 min_contig_length: 500
 run_cogs: False
+skip_contig_clustering: False
 sample_tree:
     coverage_metrics:
         - mean_coverage_Q2Q3_contigs

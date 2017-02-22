@@ -72,10 +72,13 @@ rule anvio_merge_profiles:
                             filename="PROFILE.db" if anvi_ver_gt_210 \
                                         else "RUNINFO.cp",
                             sample=config['reads']),
+        cluster="" \
+            if not config.get('skip_contig_clustering', False) \
+            else "--skip-hierarchical-clustering --skip-concoct-binning"
     shell:
         """{config[anvio_prefix]}
            rm -rf {config[merged_samples_dir]}
            anvi-merge {params.profiles} -c anvio/contigs.db \
-                -o {config[merged_samples_dir]} > {log} 2>&1 
+                -o {config[merged_samples_dir]} {params.cluster} > {log} 2>&1 
            touch {output}"""
 
