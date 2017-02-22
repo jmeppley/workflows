@@ -29,8 +29,6 @@ def collect_sample_reads(config, get_stats=True):
             glob: "../data/*.fastq"
             re: "/([^_]+)_[^/]+\.fastq"
             cleaned: False
-            name: all
-            metadata: samples.all.tsv
 
     In the above example, let the generated reads dict could look like:
     reads:
@@ -91,7 +89,11 @@ def collect_sample_reads(config, get_stats=True):
     transitions = config.setdefault('transitions',{})
     fasta_files = []
     for sample in list(reads.keys()):
-        files = sorted(reads[sample])
+        files = reads[sample]
+        if isinstance(files, str):
+            files = [files, ]
+        else:
+            files = sorted(files)
 
         # Bail out if we have too many files per sample
         if len(files)>2:

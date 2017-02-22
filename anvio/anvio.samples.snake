@@ -2,6 +2,7 @@
 Collection of rules to create a sample databse for metagenomic
 analysis in anvi'o
 """
+import re
 include: "anvio.profiles.snake"
 
 config.setdefault('samples_name','all')
@@ -66,9 +67,14 @@ rule compile_sample_orders:
     run:
         lines = ["attributes\tbasic\tnewick",]
         for newick_file in input:
+            ordering_name = \
+                    re.search(r'anvio/sample_tree.{samples}\.(.+)\.newick'\
+                                                                .format(**wildcards),
+                              newick_file).group(1)
+
             with open(newick_file) as f:
                 tree = f.read().strip()
-            lines.append("coverage\t\t{}".format(tree))
+            lines.append("{}\t\t{}".format(ordering_name, tree))
         with open(output.table, 'w') as out:
             out.write("\n".join(lines))
 

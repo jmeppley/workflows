@@ -27,10 +27,10 @@ if centrifuge or dbtax:
     # add to outputs if either is configured
     config.setdefault('outputs',set()).add("anvio/status/contig-tax")
 
-for contig_output in ["anvio/status/contig-hmms",
-                      "anvio/status/contig-cogs"]:
-    config.setdefault('outputs',set()).add(contig_output)
+config.setdefault('outputs',set()).add("anvio/status/contig-hmms")
 
+if config.get('run_cogs',True) in ['True', True]:
+    config.setdefault('outputs',set()).add("anvio/status/contig-cogs")
 
 rule anvio_contigs_drop_desc:
     """ Simplify the contig names so AnVio doesn't freak out """
