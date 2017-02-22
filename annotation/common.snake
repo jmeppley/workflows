@@ -33,12 +33,17 @@ rule assign_taxa:
         taxdump=lambda w: os.path.split(config['dbs'][w.db]['path'])[0],
         taxmap=lambda w: config['dbs'][w.db]['path'] + ".tax",
         format=lambda w: 'blast' if re.search(r'^b?last[pnx]$', w.lastalg)\
-                                 else w.lastalg
+                                 else w.lastalg,
+        # Filter reading frame suffixes if translated with transeq or prodigal
+        filter=lambda w: translation_filter \
+                                if translation_rexp.search(w.prefix) \
+                                else "cat",
     version:
         get_version('assign_taxa.py')
     shell:
          "cat {input} \
-         | assign_taxa.py -o {output} -r {wildcards.rank} \
+          | {params.filter} \
+          | assign_taxa.py -o {output} -r {wildcards.rank} \
             -f {params.format} -F 0 -C first -p accs \
             -n {params.taxdump} -m {params.taxmap}"
 
@@ -61,7 +66,7 @@ rule assign_paths:
                                         else 'blast',
         # KEGG and PFAM need special handling
         params=lambda w: get_db_assignment_params(w, config),
-        # Filter reading frame suffixes if translated with transeq
+        # Filter reading frame suffixes if translated with transeq or prodigal
         filter=lambda w: translation_filter \
                                 if translation_rexp.search(w.prefix) \
                                 else "cat",
