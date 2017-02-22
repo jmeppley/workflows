@@ -4,6 +4,7 @@ setup() {
     ENV_FILE=test/conda/${ENV}.yml
     ANVIENV=$ENV_DIR
     if [ "$ENV_FILE" -nt "$ENV_DIR" ]; then
+        rm -rf "$ENV_DIR"
         conda env create -f $ENV_FILE -p $ENV_DIR --force --quiet > /dev/null 2>&1
         source activate $ANVIENV
         anvi-setup-ncbi-cogs --just-do-it > $ANVIENV/.cog.log 2>&1
@@ -17,14 +18,40 @@ setup() {
         conda env create -f $ENV_FILE -p $ENV_DIR --force --quiet > /dev/null 2>&1
     fi
     source activate $ENV_DIR
+}
+
+@test "From reads through megahit to anvio" {
+    which megahit > /dev/null 2>&1 || skip "Megahit is not installed" 
 
     rm -rf test/scratch/anvio
     mkdir -p test/scratch/anvio
     cd test/scratch/anvio
-}
 
-@test "From reaads through megahit to anvio" {
-    which megahit > /dev/null 2>&1 || skip "Megahit is not installed" 
     run bash -c "snakemake -s ../../../anvio.metagenomic.snake --configfile ../../data/configs/anvio.megahit.all.yaml -p -j 20 --config anvio_env=$ANVIENV > anvio.megahit.all.log 2>&1"
     [ "$status" -eq 0 ]
 }
+
+@test "From reads and contigs into anvio" {
+    rm -rf test/scratch/anvio.contig
+    mkdir -p test/scratch/anvio.contig
+    cd test/scratch/anvio.contig
+
+    run bash -c "snakemake -s ../../../anvio.metagenomic.snake --configfile ../../data/configs/anvio.contigs.all.yaml -p -j 20 --config anvio_env=$ANVIENV --verbose > anvio.contigs.all.log 2>&1"
+    [ "$status" -eq 0 ]
+}
+
+@test "From subset of reads and contigs into anvio" {
+    cd test/scratch/anvio.contig
+
+    run bash -c "snakemake -s ../../../anvio.metagenomic.snake --configfile ../../data/configs/anvio.contigs.teens.yaml -p -j 20 --config anvio_env=$ANVIENV --verbose > anvio.contigs.teens.log 2>&1"
+    [ "$status" -eq 0 ]
+}
+
+@test "From explicit list of and contigs into anvio" {
+    cd test/scratch/anvio.contig
+
+    run bash -c "snakemake -s ../../../anvio.metagenomic.snake --configfile ../../data/configs/anvio.contigs.explicit.yaml -p -j 20 --config anvio_env=$ANVIENV --verbose > anvio.contigs.explicit.log 2>&1"
+    [ "$status" -eq 0 ]
+}
+
+

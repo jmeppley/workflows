@@ -2,10 +2,9 @@ samples_pattern:
     glob: "../../data/raw_reads/2014_ALOHA_XVII_1-[0-9][0-9]_DNA_S*.fastq"
     re: "/[^A-Za-z]*([A-Za-z][^/]*)_S\\d[^/]+\\.fastq"
     cleaned: True
-    name: "all"
-    metadata: "samples.all.tsv"
 contigs_fasta: ../../data/contigs/contigs.aloha.fa
 min_contig_length: 500
+run_cogs: False
 sample_tree:
     coverage_metrics:
         - mean_coverage_Q2Q3_contigs
@@ -17,5 +16,4 @@ sample_tree:
 threads:
     bwa: 10
     anvio-profile: 1
-    bfc: 5
 anvio_env: anvio

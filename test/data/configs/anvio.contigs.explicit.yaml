@@ -1,8 +1,10 @@
-samples_name: "teens"
+samples_name: "explicit"
 samples_pattern:
-    glob: "../../data/raw_reads/*_1-1?_DNA*.fastq"
-    re: "/[^A-Za-z]*([A-Za-z][^/]*)_S\\d[^/]+\\.fastq"
     cleaned: True
+reads:
+    ALOHA_XVII_1_04_DNA: reads/ALOHA_XVII_1_04_DNA/reads.renamed.R12.fastq
+    ALOHA_XVII_1_15_DNA: reads/ALOHA_XVII_1_15_DNA/reads.renamed.R12.fastq
+    ALOHA_XVII_1_21_DNA: reads/ALOHA_XVII_1_21_DNA/reads.renamed.R12.fastq
 contigs_fasta: ../../data/contigs/contigs.aloha.fa
 min_contig_length: 500
 run_cogs: False
