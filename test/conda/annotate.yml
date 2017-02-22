@@ -12,3 +12,4 @@ dependencies:
  - biopython
  - emboss
  - infernal
+ - prodigal

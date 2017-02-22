@@ -62,8 +62,8 @@ rule assign_paths:
         # KEGG and PFAM need special handling
         params=lambda w: get_db_assignment_params(w, config),
         # Filter reading frame suffixes if translated with transeq
-        filter = lambda w: translation_filter \
-                                if re.search(r'nocolon\.sixframe',w.prefix) \
+        filter=lambda w: translation_filter \
+                                if translation_rexp.search(w.prefix) \
                                 else "cat",
     shell:
          "cat {input} \

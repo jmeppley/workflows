@@ -61,7 +61,7 @@ def get_version(command, version_flag='--version',
 
     # apply regular expression if given
     if regular_expression is None:
-        return out.strip()
+        return re.sub(r'[\n\r]',' ', out.strip())
     else:
         if isinstance(regular_expression, str):
             regular_expression = re.compile(regular_expression)
@@ -77,7 +77,6 @@ def get_version(command, version_flag='--version',
             except IndexError:
                 # expression mathed but no group specified, return entire match
                 return match.group()
-
 
 def parse_stats(stats_file):
     """

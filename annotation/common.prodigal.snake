@@ -1,0 +1,71 @@
+"""
+Annotate reads using six frame translation. Lastal has this built in (aka: lastx) when given the -F flag. For hmmsearch, we'll run through transeq 1st.
+
+This makefile does two things:
+
+ 1. It sets up the transeq rule (with some required name manipulation to prevent errors).
+
+ 2. It defines a version of the compile_counts rule that calls for sixframe translation.
+
+The annotation/common.snake makefile has the meat of the annotation code
+"""
+
+from python.common import get_version
+from python.annotate import get_db_assignment_params,get_db_types,\
+                     get_hit_table_name_from_wildcards_db
+
+# command for removing prodigal gene IDs to get back to read names
+translation_filter = "sed -r 's/^(S+)_\d+(\s+#)/\1\2/'"
+translation_rexp = re.compile(r'\bpred\.genes\b')
+
+# NB: the following refers to annotation/common.snake (not common/common.snake)
+include: "common.snake"
+
+rule predict_genes_prodigal:
+    """
+    Generate FAA (fasta of amino acid sequences) for genes predicted in
+    reads
+    """
+    input:
+        "{prefix}.fasta"
+    output:
+        "{prefix}.pred.genes.faa"
+    log:
+        "logs/{prefix}.predict_genes_prodigal.log"
+    benchmark:
+        "benchmarks/{prefix}.predict_genes_prodigal.time"
+    version:
+        get_version('batch_launcher.py') + '::' + \
+            get_version('prodigal', '-v', lines=[1,])
+    threads:
+        config['threads'].get('prodigal',default_threads)
+    shell:
+        # Use batch launcher to run prodigal multithreaded
+        "batch_launcher.py -N {threads} -i -i -o -a -T fasta -X local -v -- \
+          prodigal -i {input} -a {output} -p meta -q \
+          -o /dev/null > {log} 2>&1"
+
+rule compile_counts:
+    """
+    Use clade assignments and gene family assignments to compile a table of gene family counts by clade.
+
+    input has switch to skip six frame translation for lastx or lastn
+
+    dbfmt should be tbl.dbatch for fragmented dbs
+    """
+    input:
+        "{prefix}.pred.genes.annot.{taxdb}.lastp.{rank}.tsv",
+        "{prefix}.pred.genes.annot.gene_family.{db}.{dbfmt}.tsv"
+    output:
+        "{prefix}.annot.{taxdb}.lastp.{rank}.vs.{db}.{dbfmt}.tsv"
+    benchmark:
+        "benchmarks/{prefix}.compile_counts.{taxdb}.lastp.{rank}.vs.{db}.{dbfmt}.time"
+    log:
+        "logs/{prefix}.compile_counts.{taxdb}.lastp.{rank}.vs.{db}.{dbfmt}.log"
+    version:
+        get_version('compile_hit_counts.py')
+    params:
+        three_column_opt="-L" if config.get('output_style','default').lower() == 'long' else ""
+    shell:
+        "compile_hit_counts.py {params.three_column_opt} -1 {input[0]} -2 {input[1]} -o {output} -S"
+

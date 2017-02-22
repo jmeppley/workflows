@@ -1,0 +1,24 @@
+reads_file: ../../data/raw_reads/sample.reads.bam
+clade_ranks: 
+ - order
+ - genus
+output_style: long
+threads:
+    hmmer:    2
+    lastal:   10
+    prodigal: 20
+aa_conversion: prodigal
+dbs:
+    RefSeq: 
+        path: ../../data/seqdbs/RefSeq/lastdb
+        format: lastp
+        type: tax
+    KEGG: 
+        path: ../../data/seqdbs/KEGG/lastdb
+        format: lastp
+        assign_type: kegg
+    COG:
+        path: ../../data/seqdbs/COG/frag-8/COG.1.hmm
+    COGfrg:
+        path: ../../data/seqdbs/COG/frag-8/COG.{N}.hmm
+        frags: 8
