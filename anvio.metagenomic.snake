@@ -104,7 +104,7 @@ os.environ['PATH'] += os.pathsep + os.pathsep.join([pymg_dir, ])
 # this prevents errors due to bad conda env switching
 for missing_var in ['GDAL_DRIVER_PATH',
                     'GDAL_DATA',
-#                    'JAVA_HOME_CONDA_BACKUP',
+                    'JAVA_HOME_CONDA_BACKUP',
                     ]:
     os.environ.setdefault(missing_var,'dummy')
 #

@@ -14,6 +14,11 @@ sample_tree:
         - std_coverage_contigs
         - abundance_contigs
         - detection_contigs
+dbs:
+    RefSeq:
+        path: ../../data/seqdbs/RefSeq/lastdb
+        format: lastp
+        type: tax
 threads:
     lastal: 10
     bwa: 10

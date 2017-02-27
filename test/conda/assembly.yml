@@ -13,3 +13,4 @@ dependencies:
  - sed
  - spades
  - megahit
+ - last

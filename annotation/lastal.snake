@@ -25,7 +25,7 @@ rule lastal:
     version:
         get_version('lastal')
     threads:
-        lambda wildcards: config['threads'].get('lastal',default_threads)
+        lambda wildcards: config['threads'].get('lastal',5)
     params:
         db_path=lambda w: config['dbs'][w.db]['path'],
         fshift=lambda w: "-F 15" if w.alg=='x' else "",

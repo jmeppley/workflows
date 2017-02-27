@@ -152,8 +152,12 @@ rule anvio_contig_cogs:
            touch {output}"""
 
 if dbtax:
+    # parse config[dbs] to get RefSeq info
+    from python.annotate import get_db_types
+    gene_family_dbs, config['taxdb'] = get_db_types(config)
+
     # rules for annotating genes with tax from refseq
-    include: "../annotation/common.genes.snake"
+    include: "../annotation/lastal.snake"
 
     rule contigs_tax_table:
         """ uses my script to assign taxa to gene calls """
@@ -174,7 +178,10 @@ if dbtax:
             """echo "gene_callers_id\tt_phylum\tt_class\tt_order\tt_family\tt_genus\tt_species" > {output}
                assign_taxa.py -r species -R phylum -R class -R order -R family\
                -R genus -f blast -F 0 -C first -p accs -n {params.taxdump}\
-               -m {params.taxmap} {input} >> {output}"""
+               -m {params.taxmap} {input} --no-header \
+               2> {log} \
+               | perl -pe 's/^(\\d+)\\b\\S+/\\1/' \
+               >> {output} """
 
 if centrifuge:
     rule contigs_tax_table:

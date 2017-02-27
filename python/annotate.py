@@ -7,7 +7,7 @@ def get_db_types(config):
     gene_family_dbs = []
     for db in config['dbs']:
         db_type = config['dbs'][db].get('type','gene')
-        if db_type == 'tax':
+        if db_type[0:3] == 'tax':
             taxdb=db
         elif db_type == 'gene':
             gene_family_dbs.append(db)
@@ -16,7 +16,7 @@ def get_db_types(config):
         return (gene_family_dbs, taxdb)
     except NameError:
         raise Exception("No taxonomic db found. One of your configured annotation"
-                        " databases must have 'istaxdb' set to True!")
+                        " databases must have 'type' set to 'tax'!")
 
 
 def get_db_dot_fmt_strings(db_list, config):
