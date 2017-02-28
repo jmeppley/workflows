@@ -14,7 +14,7 @@ rule lastal:
     """
     input:
         lambda w: "{file_root}.{ext}".format(file_root=w.file_root,
-                ext="faa" if w.alg=='p' else 'fasta' if w.alg=='x' else 'ffn'),
+                ext="faa" if w.alg=='p' else 'fasta'),
         lambda w: config['dbs'][w.db]['path'] + ".prj"
     output:
         "{file_root}.vs.{db}.last{alg,[xpn]}"

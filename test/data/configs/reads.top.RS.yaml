@@ -1,0 +1,16 @@
+reads:
+    ALOHA_XVII_1_04_DNA: ../../data/raw_reads/2014_ALOHA_XVII_1-04_DNA_S2_R1_001.fastq
+    ALOHA_XVII_1_15_DNA: ../../data/raw_reads/2014_ALOHA_XVII_1-15_DNA_S3_R1_001.fastq
+    ALOHA_XVII_1_16_DNA: ../../data/raw_reads/2014_ALOHA_XVII_1-16_DNA_S4_R1_001.fastq
+    ALOHA_XVII_1_18_DNA: ../../data/raw_reads/2014_ALOHA_XVII_1-18_DNA_S5_R1_001.fastq
+filter:
+    F: 0
+    I: 90
+    E: .01
+top_alg: tophit
+threads:
+    lastal:   10
+dbs:
+    RefSeq: 
+        path: ../../data/seqdbs/RefSeq/lastdb
+        format: lastp

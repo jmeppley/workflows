@@ -125,12 +125,6 @@ rule anvio_genes:
            anvi-get-dna-sequences-for-gene-calls -c anvio/contigs.db \
             -o {output} > {log} 2>&1 """
 
-rule fake_genes:
-    """ create a symlink to the contig genes file with the proper extension, so the lastal rule will find it """
-    input: "contigs.genes.ffn"
-    output: temp("contigs.genes.fasta")
-    shell: "ln -s {input} {output}"
-
 rule anvio_contig_cogs:
     """ annotates contigs with COGs """
     input:
@@ -158,6 +152,12 @@ if dbtax:
 
     # rules for annotating genes with tax from refseq
     include: "../annotation/lastal.snake"
+
+    rule fake_genes:
+        """ create a symlink to the contig genes file with the proper extension, so the lastal rule will find it """
+        input: "contigs.genes.ffn"
+        output: temp("contigs.genes.fasta")
+        shell: "ln -s {input} {output}"
 
     rule contigs_tax_table:
         """ uses my script to assign taxa to gene calls """

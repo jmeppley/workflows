@@ -1,0 +1,135 @@
+"""
+A makefile to find the best hits of s aset of sequences in a given database
+
+Given:
+
+ * A set of sequences files (eg. {sample}/reads.fastq for N samples)
+
+Do the following for each set of sequences:
+
+ * search against a sequence DB (EG RefSeq or a gene catalog)
+ * assign a single top hit to each sequence
+
+Finally
+ * compile a table of hit counts by sample
+
+"""
+import re
+from python.common import get_version
+from python.tophit import get_top_hit_outputs
+from snakemake.logging import logger
+
+# add my tools to the path (Somewhat of a hack, maybe I'll get my stuff in
+# conda eventually)
+snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))
+pymg_dir = os.path.sep.join([snakefile_path, 'tools', 'pymg'])
+batch_dir = os.path.sep.join([snakefile_path, 'tools', 'batch'])
+os.environ['PATH'] += os.pathsep + os.pathsep.join([pymg_dir, batch_dir])
+logger.debug(os.environ['PATH'])
+#
+
+get_top_hit_outputs(config)
+outputs = config.setdefault('outputs',set())
+logger.debug(config)
+
+include: "annotation/lastal.snake"
+include: "common/fastq.snake"
+include: "common/transitions.snake"
+
+rule all:
+    input: outputs
+
+filter_params_patt=r'(?:_([a-zA-Z])(-?[0-9.]+))'
+filter_params_rexp=re.compile(filter_params_patt)
+rule filter_m8:
+    input: '{file_root}.{alg}'
+    output: '{file_root}.{alg}.{params}'
+    wildcard_constraints:
+        alg=r'(last[xnp]|blast[xnp]|sam)',
+        params=filter_params_patt + r'+'
+    params:
+        opts=lambda w: \
+            " ".join(["-{} {}".format(o,v) \
+                      for o,v in filter_params_rexp.findall(w.params)]),
+        fmt=lambda w: 'blast' if re.search('last', w.alg) else w.alg,
+    shell:
+        "filter_blast_m8.py {params.opts} -f {params.fmt} -o {output} {input}"
+
+rule assign_top_hits:
+    input:
+        expand('{sample}.vs.{{db}}.{{alg}}.{{filter}}', sample=config['reads'])
+    output:
+        expand('{sample}.vs.{{db}}.{{alg}}.{{filter}}.{{top}}', sample=config['reads'])
+    wildcard_constraints:
+        alg=r'(last[xnp]|blast[xnp]|sam)',
+        top=r'(tophit|toporg)'
+    params:
+        fmt=lambda w: 'blast' if re.search('last', w.alg) else w.alg,
+    shell:
+        "assign_top_hit.py -f {params.fmt} -C {wildcards.top} \
+        -o .{wildcards.top} {input}"
+
+rule count_hits:
+    """ take a hit table and count hits to each hitid """
+    input:
+        '{sample}.{search}.{top}'
+    output:
+        '{sample}.{search}.{top}.hitid.counts'
+    benchmark:
+        "benchmarks/{sample}.{search}.{top}.count.time"
+    log:
+        "logs/{sample}.{search}.{top}.count.log"
+    version:
+        get_version("count_hits.py")
+    shell:
+        "count_hits.py -v -i {input} -H 1 \
+        > {output} 2> {log}"
+
+rule compile_hit_counts:
+    """
+    Uses join utility to merge hit count tables
+
+    We use some magice to get an "outer" join:
+
+    * the -a options force joint to output all lines of all files
+    * the -o option fills in columsn from other files in unjoined lines
+    """
+    input:
+        lambda w: expand('{sample}.{filter}.{top}.hitid.counts',
+                         filter=config['db_strings'][w.db],
+                         top=w.top,
+                         sample=config['reads'])
+    output:
+        'counts.{db}.{top}.hitids'
+    params:
+        input_map=lambda w: {s:'{sample}.{filter}.{top}.hitid.counts'.format(
+                                sample=s,
+                                top=w.top,
+                                filter=config['db_strings'][w.db]) \
+                             for s in config['reads']},
+        dash_as=' '.join('-a {}'.format(i) \
+                         for i in range(len(config['reads']))),
+        fields=','.join("{}.1".format(i) \
+                        for i in range(len(config['reads']))),
+        keys=' '.join("-{} 2".format(i) \
+                      for i in range(len(config['reads']))),
+    run:
+        import pandas, re
+        for sample, input_file in params.input_map.items():
+            sample_counts = pandas.read_table(input_file, 
+                                              index_col=0,
+                                              names=[sample,])
+            try:
+                counts = counts.join(sample_counts, how='outer')
+            except NameError:
+                counts = sample_counts
+        counts.to_csv(output[0], sep='\t')
+
+
+
+
+
+###TODO: how can we assign top hit accross all samples, yet leave the separate
+#files???
+# * assign_tophits.py will take multiple files. We need to modify the
+#   rule to take advantage of this...
