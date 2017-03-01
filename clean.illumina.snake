@@ -16,27 +16,15 @@ from python.common import get_version, add_stats_outputs
 from python.qc import setup_qc_outputs
 from snakemake.logging import logger
 
-# add my tools to the path (Somewhat of a hack, maybe I'll get my stuff in
-# conda eventually)
-snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))
-pymg_dir = os.path.sep.join([snakefile_path, 'tools', 'pymg'])
-batch_dir = os.path.sep.join([snakefile_path, 'tools', 'batch'])
-os.environ['PATH'] += os.pathsep + os.pathsep.join([pymg_dir, batch_dir])
-logger.debug(os.environ['PATH'])
-#
+# adds tools (pymg, batch) to path
+include: "common/tool.path.snake"
 
 # parses config to setup outputs
 outputs = config.setdefault('outputs',set())
 outputs.update(setup_qc_outputs(config))
 
 include: "common/transitions.snake"
-if config.get('remove_rna', True) in ['True', True]:
-    include: "common/fastq.snake"
-    include: "qc/sort.rna.snake"
-
-# all three joining programs are interchangeable
-joining_program = config.get('joining_program','pear')
-include: 'qc/{joining_program}.snake'.format(**vars())
+include: "qc/setup.snake"
 
 logger.debug(config)
 

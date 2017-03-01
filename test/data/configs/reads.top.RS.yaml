@@ -1,8 +1,8 @@
-reads:
-    ALOHA_XVII_1_04_DNA: ../../data/raw_reads/2014_ALOHA_XVII_1-04_DNA_S2_R1_001.fastq
-    ALOHA_XVII_1_15_DNA: ../../data/raw_reads/2014_ALOHA_XVII_1-15_DNA_S3_R1_001.fastq
-    ALOHA_XVII_1_16_DNA: ../../data/raw_reads/2014_ALOHA_XVII_1-16_DNA_S4_R1_001.fastq
-    ALOHA_XVII_1_18_DNA: ../../data/raw_reads/2014_ALOHA_XVII_1-18_DNA_S5_R1_001.fastq
+sample_data:
+    reads_patterns:
+        cleaned: True
+        glob: "../../data/raw_reads/2014_ALOHA_XVII_1-??_DNA_S?_R1_001.fastq"
+        re: "2014_(ALOHA.+)_DNA_S"
 filter:
     F: 0
     I: 90

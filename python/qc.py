@@ -13,7 +13,7 @@ records jonied by a bunch of NNN's
 import re
 from Bio import Seq, SeqIO, SeqRecord
 from snakemake.logging import logger
-from python.samples import collect_sample_reads
+from python.samples import process_sample_data
 from python.tmatic import get_chemistry_barcodes
 
 # interleaved will be automatically dropped if single file given per sample
@@ -55,21 +55,22 @@ def setup_qc_outputs(config):
 
     """
 
-    sample_data = config['sample_data']
+    try:
+        sample_data = config['sample_data']
+    except KeyError:
+        raise Exception("Please supply a list of samples and reads or rules "
+                        "for finding them in "
+                        "config[sample_data]")
 
-    # make sure we have map from samples to raw reads
-    samples_with_raw_reads = [s for s, v in sample_data.items() \
-                                if isinstance(v, dict) and 'raw' in v]
+    # process any patterns in sample_data[reads_patterns]
+    samples = process_sample_data(sample_data)
+
+    # find samples that need QC
+    samples_with_raw_reads = [s for s in samples if 'raw' in sample_data[s]]
     if len(samples_with_raw_reads) == 0:
-        if 'reads_pattern' in sample_data:
-            for sample, reads in collect_sample_reads(sample_data\
-                                                      ['reads_pattern']):
-                sample_data.setdefault(sample, {})['raw'] = reads
-        else:
-            raise Exception("Please supply a map from samples to raw reads "
-                            "(config[sample_data][{sample}][raw]=[fwd.fastq,rev.fastq])"
-                            " or a glob and re in"
-                            " config[sample_data][reads_pattern]")
+        raise Exception("Please supply a map from samples to raw reads "
+                        " or a glob and re in"
+                        " config[sample_data][reads_patterns]")
 
     # get protocol
     cleaning_protocol = config.get('cleaning_protocol', 'None')

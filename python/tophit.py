@@ -6,6 +6,8 @@ on the values in 'reads', 'dbs', 'filter', and 'top_alg'
 """
 import os
 from snakemake.logging import logger
+from python.samples import process_sample_data
+from python.qc import setup_qc_outputs
 
 DEFAULT_FILTER = {'F': 0, 'B': 50}
 
@@ -20,7 +22,7 @@ def get_top_hit_outputs(config):
 
         dbs: dict of db names to dict containing path and format (eg: lastp)
             (currently only lastp and lastn supported)
-        reads: dict of sample names to read files (fastq, fasta, or faa)
+        sample_data: dict of sample names to sample info
         filter: dict of filter_blast_m8 options (eg: {F: 0, I: 90})
         top_alg: tophit or toporg (all dbs must include tax files for taxorg)
     """
@@ -29,10 +31,25 @@ def get_top_hit_outputs(config):
     db_strings = config.setdefault('db_strings', {})
 
     try:
-        sample_reads = config['reads']
+        sample_data = config['sample_data']
     except KeyError:
-        raise Exception("There must be a map from samples to reads called "
-                        "'reads' in your configuration!")
+        raise Exception("Please supply a list of samples and reads or rules "
+                        "for finding them in "
+                        "config[sample_data]")
+
+    # process any patterns in sample_data[reads_patterns]
+    samples = process_sample_data(sample_data)
+    if len(samples)==0:
+            raise Exception("Please supply a list of samples and reads in "
+                            "config[sample_data] or rules for finding them "
+                            "in config[sample_data][reads_patterns]")
+
+    # if any samples don't have cleaned reads, try setting up QC
+    if sum(1 for s in samples if 'clean' not in sample_data[s]) > 0:
+        setup_qc_outputs(config)
+        needs_qc = True
+    else:
+        needs_qc = False
 
     try:
         dbs = config['dbs']
@@ -41,8 +58,19 @@ def get_top_hit_outputs(config):
                         "your configuration!")
 
     is_prot = None
-    for sample, reads_file in sample_reads.items():
+    for sample in samples:
         logger.debug('processing sample: ' + sample)
+        data = sample_data[sample]
+        reads_file = data['clean']
+        if not isinstance(reads_file, str):
+            if isinstance(reads_file[0], str):
+                reads_file = reads_file[0]
+            else:
+                raise Exception(
+                    ("I'm sorry, I only know how to work with single files "
+                     " per sample. Sample {sample} seems to have multiple: "
+                     "{reads_file}").format(sample=sample,
+                                            reads_file=repr(reads_file)))
         extension = os.path.splitext(reads_file)[1]
         this_file_is_prot = extension == '.faa'
         if is_prot is None:
@@ -65,11 +93,14 @@ def get_top_hit_outputs(config):
         topalg = config.get('topalg', 'tophit')
         config['outputs'].add('counts.{dbase}.{topalg}.hitids'.format(**vars()))
 
+    return needs_qc
+
 def get_filter_string(filter_dict):
     """
     return a string like _F0_B50 for a dict like {'F': 0, 'B': 50}
     """
-    return "".join("_{}{}".format(k, v) for k, v in filter_dict.items())
+    return "".join("_{}{}".format(k, filter_dict[k]) \
+                   for k in sorted(filter_dict.keys()))
 
 def get_search_alg(dbformat, extension):
     """

@@ -6,6 +6,42 @@ METHODS for setting up workflows with multiple samples
 import re
 import glob
 
+def process_sample_data(sample_data):
+    """
+    sample_data is a top level config map that has two types of entries
+
+     - samples: keyed on sample name and containing paths and other data
+     - 'reads_patterns': list of patterns to find samples. These are passed to 
+            collect_sample_reads() below
+
+    This method processes the read patterns to find samples
+
+    AND
+
+    returns a list of sample names
+    """
+
+    # First, process the patterns
+    if 'reads_patterns' in sample_data:
+        if isinstance(sample_data['reads_patterns'], dict):
+            reads_patterns = [sample_data['reads_patterns']]
+        else:
+            reads_patterns = sample_data['reads_patterns']
+        for pattern_data in reads_patterns:
+            if pattern_data.get('cleaned', True) in [True, 'True']:
+                read_key = 'clean'
+            else:
+                read_key = 'raw'
+            for sample, reads in collect_sample_reads(pattern_data).items():
+                sample_data.setdefault(sample, {})[read_key] = reads
+
+        # Now get rid of any patterns from config
+        del sample_data['reads_patterns']
+
+    # return sample names
+    return [s for s in sample_data if s != 'reads_patterns']
+
+
 def collect_sample_reads(samples_pattern_data):
     """
     Use the samples_pattern entry in config to locate read files and group into

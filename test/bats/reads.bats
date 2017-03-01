@@ -25,10 +25,3 @@ setup() {
     [ "$status" -eq 0 ]
 }
 
-@test "Find top hits in a database" {
-    rm -rf test/scratch/top
-    mkdir -p test/scratch/top
-    cd test/scratch/top
-    run bash -c "snakemake -s ../../../annotation.tophits.snake --configfile ../../data/configs/reads.top.RS.yaml -p -k -j 20 > top.annot.log 2>&1"
-    [ "$status" -eq 0 ]
-}

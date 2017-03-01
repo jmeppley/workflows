@@ -1,0 +1,13 @@
+"""
+Sets up the environment and includes necessary snakefiles for running QC
+"""
+
+if config.get('remove_rna', True) in ['True', True]:
+    include: "../common/fastq.snake"
+    include: "sort.rna.snake"
+
+# all three joining programs are interchangeable
+joining_program = config.get('joining_program','pear')
+include: '{joining_program}.snake'.format(**vars())
+
+

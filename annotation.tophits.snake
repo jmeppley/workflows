@@ -19,22 +19,25 @@ from python.common import get_version
 from python.tophit import get_top_hit_outputs
 from snakemake.logging import logger
 
-# add my tools to the path (Somewhat of a hack, maybe I'll get my stuff in
-# conda eventually)
-snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))
-pymg_dir = os.path.sep.join([snakefile_path, 'tools', 'pymg'])
-batch_dir = os.path.sep.join([snakefile_path, 'tools', 'batch'])
-os.environ['PATH'] += os.pathsep + os.pathsep.join([pymg_dir, batch_dir])
-logger.debug(os.environ['PATH'])
-#
+# adds tools (pymg, batch) to path
+include: "common/tool.path.snake"
 
-get_top_hit_outputs(config)
+needs_qc = get_top_hit_outputs(config)
+if needs_qc:
+    include: "qc/setup.snake"
+
 outputs = config.setdefault('outputs',set())
 logger.debug(config)
+
+# adds fastq stats files to output (only if config[run_stats] is set to True
+if config.get('run_stats', False) in [True, 'True']:
+    add_stats_outputs(workflow.snakefile, config) 
+    include: 'common/stats.snake'
 
 include: "annotation/lastal.snake"
 include: "common/fastq.snake"
 include: "common/transitions.snake"
+
 
 rule all:
     input: outputs
@@ -52,17 +55,27 @@ rule filter_m8:
             " ".join(["-{} {}".format(o,v) \
                       for o,v in filter_params_rexp.findall(w.params)]),
         fmt=lambda w: 'blast' if re.search('last', w.alg) else w.alg,
+    benchmark:
+        'benchmarks/{file_root}.{alg}.filter.{params}.time'
+    version:
+        get_version('filter_blast_m8.py')
     shell:
         "filter_blast_m8.py {params.opts} -f {params.fmt} -o {output} {input}"
 
 rule assign_top_hits:
     input:
-        expand('{sample}.vs.{{db}}.{{alg}}.{{filter}}', sample=config['reads'])
+        expand('{sample}.vs.{{db}}.{{alg}}.{{filter}}',
+               sample=config['sample_data'])
     output:
-        expand('{sample}.vs.{{db}}.{{alg}}.{{filter}}.{{top}}', sample=config['reads'])
+        expand('{sample}.vs.{{db}}.{{alg}}.{{filter}}.{{top}}',
+               sample=config['sample_data'])
     wildcard_constraints:
         alg=r'(last[xnp]|blast[xnp]|sam)',
         top=r'(tophit|toporg)'
+    benchmark:
+        'benchmarks/assign_top_hits.{db}.{alg}.{filter}.{top}.time'
+    version:
+        get_version('assign_top_hit.py')
     params:
         fmt=lambda w: 'blast' if re.search('last', w.alg) else w.alg,
     shell:
@@ -98,7 +111,7 @@ rule compile_hit_counts:
         lambda w: expand('{sample}.{filter}.{top}.hitid.counts',
                          filter=config['db_strings'][w.db],
                          top=w.top,
-                         sample=config['reads'])
+                         sample=config['sample_data'])
     output:
         'counts.{db}.{top}.hitids'
     params:
@@ -106,13 +119,15 @@ rule compile_hit_counts:
                                 sample=s,
                                 top=w.top,
                                 filter=config['db_strings'][w.db]) \
-                             for s in config['reads']},
+                             for s in config['sample_data']},
         dash_as=' '.join('-a {}'.format(i) \
-                         for i in range(len(config['reads']))),
+                         for i in range(len(config['sample_data']))),
         fields=','.join("{}.1".format(i) \
-                        for i in range(len(config['reads']))),
+                        for i in range(len(config['sample_data']))),
         keys=' '.join("-{} 2".format(i) \
-                      for i in range(len(config['reads']))),
+                      for i in range(len(config['sample_data']))),
+    benchmark:
+        'benchmarks/counts.{db}.{top}.hitidis.time'
     run:
         import pandas, re
         for sample, input_file in params.input_map.items():
