@@ -8,8 +8,8 @@ filter:
     I: 90
     E: .01
 top_alg: tophit
-threads:
-    lastal:   10
+lastal:
+    threads:   10
 dbs:
     RefSeq: 
         path: ../../data/seqdbs/RefSeq/lastdb

@@ -90,7 +90,7 @@ def get_top_hit_outputs(config):
         hit_filter = get_filter_string(config.get('filter', DEFAULT_FILTER))
         db_strings[dbase] = \
                 'vs.{dbase}.{search_alg}.{hit_filter}'.format(**vars())
-        topalg = config.get('topalg', 'tophit')
+        topalg = config.get('top_alg', 'tophit')
         config['outputs'].add('counts.{dbase}.{topalg}.hitids'.format(**vars()))
 
     return needs_qc
