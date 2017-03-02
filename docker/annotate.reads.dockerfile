@@ -31,6 +31,12 @@ RUN git clone --recursive https://github.com/jmeppley/workflows /opt/workflows
 
 RUN conda env update -n root -f /opt/workflows/test/conda/annotate.yml
 
+# reduce image size
+RUN conda clean --all -y
+
+# reduce image size
+RUN rm -rf /opt/workflows/test/data
+
 WORKDIR /workdir
 
 ENTRYPOINT [ "/usr/bin/tini", "--" ]
