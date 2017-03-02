@@ -37,7 +37,11 @@ RUN conda clean --all -y
 # reduce image size
 RUN rm -rf /opt/workflows/test/data
 
+# copy in default config (can be ignored if new --configfile= argument passed in)
+#  This lets us get locally modified config, not config from github
+ADD ./config.yaml /default.config.yaml
+
 WORKDIR /workdir
 
-ENTRYPOINT [ "/usr/bin/tini", "--", "snakemake", "-s", "/opt/workflows/annotation.reads.snake", "--configfile", "config.yaml"]
+ENTRYPOINT [ "/usr/bin/tini", "--", "snakemake", "-s", "/opt/workflows/annotation.reads.snake", "--configfile", "/default.config.yaml", "-j", "20", "-p" ]
 
