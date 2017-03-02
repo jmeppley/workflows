@@ -27,9 +27,9 @@ RUN apt-get install -y curl grep sed dpkg && \
 
 ENV PATH /opt/conda/bin:$PATH
 
-RUN git checkout --recursive https://github.com/jmeppley/workflows /opt/workflows
+RUN git clone --recursive https://github.com/jmeppley/workflows /opt/workflows
 
-RUN conda env update -n root /opt/workflows/test/conda/annotate.yml
+RUN conda env update -n root -f /opt/workflows/test/conda/annotate.yml
 
 WORKDIR /workdir
 
