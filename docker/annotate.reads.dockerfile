@@ -39,6 +39,5 @@ RUN rm -rf /opt/workflows/test/data
 
 WORKDIR /workdir
 
-ENTRYPOINT [ "/usr/bin/tini", "--" ]
-CMD [ "snakemake", "-s", "/opt/workflows/annotation.reads.snake", "--configfile", "config.yaml"]
+ENTRYPOINT [ "/usr/bin/tini", "--", "snakemake", "-s", "/opt/workflows/annotation.reads.snake", "--configfile", "config.yaml"]
 
