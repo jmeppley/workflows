@@ -1,3 +1,8 @@
+SAMTOOLS_VERSION = get_version('samtools', lines=0)
+BWA_VERSION = \
+        get_version('bwa', 
+                    version_flag="", 
+                    regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
 
 #######
 # map reads to contigs with BWA:
@@ -13,10 +18,7 @@ rule index_contigs:
         "logs/bwa_index.log"
     benchmark:
         "benchmarks/bwa_pre_index.time"
-    version:
-        get_version('bwa', 
-                    version_flag="", 
-                    regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
+    version: BWA_VERSION
     shell:
         "bwa index -p mapping/contigs.index.bwa {input} > {log} 2>&1 "
 
@@ -33,10 +35,7 @@ rule map_sample_reads:
         "logs/{sample}.vs.contigs.bwa_mem.log"
     benchmark:
         "benchmarks/{sample}.vs.contigs.bwa_mem.time"
-    version:
-        get_version('bwa', 
-                    version_flag="", 
-                    regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
+    version: BWA_VERSION
     threads:
         config.get('threads',{}).get('bwa',15)
     shell:
@@ -46,30 +45,21 @@ rule map_sample_reads:
 
 
 rule sam_to_bam:
-    input:
-        "{root}.sam"
-    output:
-        "{root}.bam"
-    benchmark:
-        "benchmarks/{root}.bwa_sam_bam.time"
-    threads:
-        1
-    version:
-        get_version('samtools', lines=0)
+    input: "{root}.sam"
+    output: "{root}.bam"
+    benchmark: "benchmarks/{root}.bwa_sam_bam.time"
+    threads: 1
+    version: SAMTOOLS_VERSION
     shell:
         "samtools view -b {input} \
         | samtools sort -l 5 -@ {threads} -m 10G - \
         > {output}"
 
 rule index_bam:
-    input:
-        "{root}.bam"
-    output:
-        "{root}.bam.bai"
-    benchmark:
-        "benchmarks/{root}.bwa_index_bam.time"
-    version:
-        get_version('samtools', lines=0)
+    input: "{root}.bam"
+    output: "{root}.bam.bai"
+    benchmark: "benchmarks/{root}.bwa_index_bam.time"
+    version: SAMTOOLS_VERSION
     shell:
         "samtools index {input}"
 

@@ -80,7 +80,7 @@ def collect_sample_reads(config, get_stats=True):
     if already_cleaned:
         qc_steps = []
     else:
-        qc_steps = ['noadapt','nophix','corrected','trimmed']
+        qc_steps = ['noadapt','nophix','corrected','trimmed','dropse']
 
     # loop back over samples and set up cleaning or interleaving if needed
     needs_qc_or_join = len(qc_steps) > 0

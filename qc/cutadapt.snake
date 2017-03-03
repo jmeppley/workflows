@@ -7,7 +7,7 @@ rule trim_bbduk_adapters:
     input:
         "{prefix}.fastq"
     output:
-        "{prefix}.noadapt.fastq"
+        temp("{prefix}.noadapt.fastq")
     benchmark:
         "benchmarks/{prefix}.noadapt.fastq.time"
     log:

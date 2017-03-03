@@ -1,5 +1,7 @@
 from python.qc import get_sample_from_reads_prefix
 
+include: "common.snake"
+
 rule rename_raw_reads:
     """ Rename reads to be based on a "sample" name """
     input:
@@ -25,24 +27,3 @@ rule rename_raw_reads:
                     record.id = "{}_{}".format(name_root, i+1)
                     OUTR.write(record.format('fastq'))
                     OUTM.write("{}\t{}\n".format(old_id, record.id))
-
-rule interleave:
-    """
-    Interleave forward and reverse reads while reanaming
-    """
-    input:
-        "{prefix}.R1.fastq",
-        "{prefix}.R2.fastq",
-    output:
-        "{prefix}.interleaved.fastq",
-    log:
-        "logs/{prefix}_reads.raw.fastq.log"
-    benchmark:
-        "benchmarks/{prefix}/interleave.time"
-    version:
-        get_version('seqtk','',
-                    regular_expression=re.compile(r'Version:\s*(\S+)'))
-    shell:
-        "seqtk mergepe {input} > {output}"
-
-

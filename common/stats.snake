@@ -20,7 +20,7 @@ if enable_hist:
         benchmark:
             "benchmarks/{file_root}.{ext}.hist.time"
         version:
-            get_version('histograms.py')
+            hist_version
         params:
             cat=lambda wildcards:"gunzip -c" \
              if re.search(r'\.gz$',wildcards.ext) else "cat"

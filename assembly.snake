@@ -33,7 +33,7 @@ sys.path.append(config['pymg_dir'])
 from edl import __version__ as PYMG_VERSION
 
 include: "annotation/cmsearch.snake"
-include: "qc/bfc.s
+include: "qc/bfc.snake"
 if 'models' not in config['system_paths']:
     config['system_paths']['models']=os.path.join(snakefile_path,'models')
 if 'bbmap' not in config['system_paths']:

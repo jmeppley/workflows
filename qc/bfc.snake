@@ -11,7 +11,7 @@ rule bfc_error_correction:
     input:
         "{prefix}.fastq"
     output:
-        "{prefix}.corrected.fastq"
+        temp("{prefix}.corrected.fastq")
     benchmark:
         "benchmarks/{prefix}.kmer_trimmed.time"
     log:
@@ -23,6 +23,5 @@ rule bfc_error_correction:
     shell:
         """bfc -s {config[bfc][ram]} {config[bfc][params]} \
               -t {threads} {input} 2> {log} \
-              | seqtk dropse - \
               > {output}"""
 

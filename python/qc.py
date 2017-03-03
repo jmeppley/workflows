@@ -24,7 +24,9 @@ QC_PROTOCOLS = {
                           'noadapt',
                           'nophix',
                           'corrected',
-                          'trimmed']),
+                          'trimmed',
+                          'dropse',
+                         ]),
     "joining": '.'.join(['trim_adapt', 'joined', 'nophix']),
 }
 
