@@ -26,24 +26,3 @@ rule bfc_error_correction:
               | seqtk dropse - \
               > {output}"""
 
-if 'min_read_length' in config:
-    rule remove_short_reads:
-        """ drop reads under a specified length """
-        input:
-            "{prefix}.fastq.gz"
-        output:
-            "{prefix}.gte{min_length}.fastq.gz"
-        log:   
-            "logs/{prefix}.remove.short.reads.log"
-        benchmark:
-            "benchmarks/{prefix}.remove.short.reads.time"
-        version:
-            get_version('seqtk', version_flag='',
-                        regular_expression=r'Version:\s+(\S.*\S)')
-        shell:
-            "gunzip -c {input} \
-                | seqtk seq -L 100 \
-                | seqtk dropse \
-                | gzip -c \
-                > {output}"
-

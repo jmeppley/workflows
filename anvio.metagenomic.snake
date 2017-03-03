@@ -71,7 +71,10 @@ transitions = config.setdefault('transitions',{})
 # Get sample reads from dir and pattern if not provided
 needs_qc = collect_sample_reads(config)
 if needs_qc:
+    include: "qc/rename.snake"
+    include: "qc/bbduk.snake"
     include: "qc/bfc.snake"
+    include: "qc/tmatic.snake"
 #
 # if contigs_fasta is not set, pull in megahit
 run_assembly = 'megahit' in config
@@ -122,3 +125,5 @@ logger.debug("Snakefile config:\n" + yaml.dump(config))
 # Rules
 rule anvio_all:
     input: outputs
+
+logger.debug("Rules:\n" + "\n".join(r for r in dir(rules) if r[0]!="_"))

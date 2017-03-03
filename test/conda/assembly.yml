@@ -1,5 +1,6 @@
 channels:
  - bioconda
+ - brwnj
 dependencies:
  - snakemake
  - pandas
@@ -9,6 +10,7 @@ dependencies:
  - trimmomatic
  - bwa 
  - samtools
+ - infernal
  - prinseq
  - seqtk
  - sed

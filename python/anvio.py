@@ -80,9 +80,7 @@ def collect_sample_reads(config, get_stats=True):
     if already_cleaned:
         qc_steps = []
     else:
-        qc_steps = ['cleaned','corrected']
-    if "min_read_length" in config:
-        qc_steps.append("gte{}".format(config['min_read_length']))
+        qc_steps = ['noadapt','nophix','corrected','trimmed']
 
     # loop back over samples and set up cleaning or interleaving if needed
     needs_qc_or_join = len(qc_steps) > 0
@@ -118,14 +116,14 @@ def collect_sample_reads(config, get_stats=True):
                 files_gzipped = False
 
         # keep track of fasta files that will be generated
-        last_fasta_file = 'reads/{sample}/reads.renamed.R12.fastq'\
+        last_fasta_file = 'reads/{sample}/reads.renamed.interleaved.fastq'\
                             .format(sample=sample)
         fasta_files.append(last_fasta_file)
         qc_chain = ""
         for qc_step in qc_steps:
             qc_chain += qc_step + "."
             last_fasta_file = \
-                    'reads/{sample}/reads.renamed.R12.{qc_chain}fastq.gz'\
+                    'reads/{sample}/reads.renamed.interleaved.{qc_chain}fastq'\
                             .format(sample=sample, qc_chain=qc_chain)
             fasta_files.append(last_fasta_file)
         
@@ -138,8 +136,10 @@ def collect_sample_reads(config, get_stats=True):
         # Do we have a pair of files or single file?
         if len(files)==1:
             # we are starting from interleaved, just link it in
-            transitions['reads/{sample}/reads.renamed.R12.fastq{suffix}'\
-                                .format(**vars())] = files[0]
+            transitions[
+                'reads/{sample}/reads.renamed.interleaved.fastq{suffix}'\
+                                .format(**vars())
+            ] = files[0]
         else:
             needs_qc_or_join = True
             # we are starting from paired files, link those
