@@ -7,17 +7,24 @@ output_style: long
 threads:
     hmmer:    2
     lastal:   10
-    prodigal: 20
+    prodigal: 40
 aa_conversion: prodigal
 dbs:
     RefSeq: 
-        path: /seqdbs/RefSeq/lastdb
+        path: /seqdbs/RefSeq/80/RefSeq-80.AllProteins.faa.ldb/lastdb
         format: lastp
         type: tax
     KEGG: 
-        path: /seqdbs/KEGG/lastdb
+        path: /seqdbs/KEGG/KeggGene.pep.20160919/lastdb
         format: lastp
         assign_type: kegg
     COG:
-        path: /seqdbs/COG/frag-8/COG.{N}.hmm
-        frags: 8
+        path: /seqdbs/cdd/16_January_2015/COG/frag-10/COG.ascii.{N:02d}.hmm
+        frags: 10
+    PFAM:
+        path: /seqdbs/PFAM/30.0/frag-20/Pfam-A.{N:02d}.hmm
+        frags: 20
+    TIGR: 
+        path: /seqdbs/TIGRFAM/15.0/frag-10/TIGRFAMS.{N:02d}.hmm
+        frags: 10
+
