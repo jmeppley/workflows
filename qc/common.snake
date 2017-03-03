@@ -1,3 +1,7 @@
+from python.common import get_version
+
+SEQTK_VERSION = get_version('seqtk','',
+                            regular_expression=re.compile(r'Version:\s*(\S+)'))
 
 rule interleave:
     """
@@ -6,48 +10,20 @@ rule interleave:
     input:
         "{prefix}.R1.fastq",
         "{prefix}.R2.fastq",
-    output:
-        "{prefix}.R12.fastq",
-    log:
-        "logs/{prefix}_reads.raw.fastq.log"
-    benchmark:
-        "benchmarks/{prefix}/interleave.time"
-    version:
-        get_version('seqtk','',
-                    regular_expression=re.compile(r'Version:\s*(\S+)'))
-    shell:
-        "seqtk mergepe {input} > {output}"
+    output: "{prefix}.interleaved.fastq",
+    log: "logs/{prefix}_reads.raw.fastq.log"
+    benchmark: "benchmarks/{prefix}/interleave.time"
+    version: SEQTK_VERSION
+    shell: "seqtk mergepe {input} > {output}"
 
-rule remove_short_reads:
-    """ drop reads under a specified length """
-    input:
-        "{prefix}.fastq.gz"
-    output:
-        "{prefix}.gte{min_length}.fastq.gz"
-    log:   
-        "logs/{prefix}.remove.short.reads.log"
-    benchmark:
-        "benchmarks/{prefix}.remove.short.reads.time"
-    version:
-        get_version('seqtk', version_flag='',
-                    regular_expression=r'Version:\s+(\S.*\S)')
-    shell:
-        "gunzip -c {input} \
-            | seqtk seq -L 100 \
-            | seqtk dropse - \
-            | gzip -c \
-            > {output}"
-
-rule merge_paired_unpaired:
-    """ concatenate joined trimmed reads with unpaired trimmed reads """
-    input:
-        "{file_root}.clipped.paired.joined.trimmed.fastq",
-        "{file_root}.clipped.R1.unpaired.fastq",
-        "{file_root}.clipped.R2.unpaired.fastq",
-    output:
-        temp("{file_root}.clipped.joined.trimmed.fastq")
-    shell:
-        """
-        cat {input} > {output}
-        """
+rule drop_singles:
+    """
+    drop unpaired reads from interleaved fastq
+    """
+    input: "{prefix}.fastq"
+    output: "{prefix}.dropse.fastq"
+    benchmark: "benchmarks/{prefix}.dropse.time"
+    version: SEQTK_VERSION
+    shell: "seqtk dropse {input} > {output}"
+    
 
