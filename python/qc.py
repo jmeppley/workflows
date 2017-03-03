@@ -30,6 +30,28 @@ QC_PROTOCOLS = {
 
 READ_DIRECTIONS = ['R1', 'R2']
 
+def get_sample_from_reads_prefix(prefix, config):
+    """
+    If there is path info, assume sample is top folder name
+      EG  reads/sample/reads.R1.fastq
+    If there is no path info, look for _ in prefix
+      EG  reads_sample.R1.fastq
+    If config[sample_name] is defined, use that
+    Fall back to the prefix
+    """
+    match = re.search(r'([^/])+/[^/]+$', prefix)
+    if match:
+        return match.group(1)
+
+    match = re.search(r'^reads_(.+)$', prefix)
+    if match:
+        return match.group(1)
+
+    if 'sample_name' in config:
+        return config['sample_name']
+
+    return prefix
+  
 
 def setup_qc_outputs(config):
     """

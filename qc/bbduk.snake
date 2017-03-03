@@ -60,9 +60,9 @@ rule trim_bbduk_adapters:
     wildcard_constraints:
         suffix=r'(R[12]\.)?fastq'
     benchmark:
-        "benchmarks/{prefix}.noadapt.fastq.time"
+        "benchmarks/{prefix}.noadapt.{suffix}.time"
     log:
-        "logs/{prefix}.noadapt.log"
+        "logs/{prefix}.noadapt.{suffix}.log"
     version:
         bbduk_version
     params:

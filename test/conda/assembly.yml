@@ -6,6 +6,7 @@ dependencies:
  - biopython
  - bbmap
  - bfc
+ - trimmomatic
  - bwa 
  - samtools
  - prinseq

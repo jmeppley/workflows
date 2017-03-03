@@ -30,3 +30,8 @@ setup() {
     [ "$status" -eq 0 ]
 }
 
+@test "Prep two pair of files for assembly" {
+    run bash -c "snakemake -j 10 -s ../../../clean.illumina.snake -p --configfile ../../data/configs/illumina.yaml --verbose --config cleaning_protocol=assembly > assembly.join.log 2>&1"
+    [ "$status" -eq 0 ]
+}
+

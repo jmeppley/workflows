@@ -1,123 +1,17 @@
-import subprocess
-if 'bbmap' not in config.setdefault('system_paths',{}):
-    try:
-        cmd='find `which bbduk.sh | sed -r s/bbduk\.sh/../` ' + \
-             '-name "adapters.fa" | sed -r s#/resources/adapters.fa##'
-        config['system_paths']['bbmap'] = subprocess.check_output(cmd,
-                                                                  shell=True)\
-                                                    .decode().strip()
-    except:
-        print("Can't find bbmap resources, please set system_paths->bbmap in the snakemake config file")
-        raise
-
 # default configuration
 from python.common import apply_defaults
-defaults={'bbduk':{'ram':'1g',
-                   'adapter_flags':'ktrim=r k=23 mink=11 hdist=1 tbo tpe tbo tpe',
-                   'phix_flags':'k=27 hdist=1 qtrim=rl trimq=17 cardinality=t mingc=0.05 maxgc=0.95'},
-          'bfc':{'ram':'5g',
+defaults={'bfc':{'ram':'5g',
                  'params':'-1 -k 21'}}
 apply_defaults(config, defaults)
-
-rule rename_raw_reads:
-    """ Rename reads to be based on a "sample" name """
-    input:
-        "{path}/{sample}/{prefix}.{dir}.fastq"
-    output:
-        reads=temp("{path}/{sample,[^/]+}/{prefix,[^/]+}.renamed.{dir,R[12]}.fastq"),
-        name_map="{path}/{sample}/{prefix}.renamed.{dir}.tsv"
-    log:
-        "logs/{path}.{sample}.{prefix}.renamed.{dir}.log"
-    benchmark:
-        "benchmarks/{path}.{prefix}.renamed.{dir}.time"
-    run:
-        from Bio import SeqIO
-        name_root = wildcards.sample
-        print("Renaming root is %r from %r" % (name_root, wildcards.sample))
-        with open(output.reads,'w') as OUTR:
-            with open(output.name_map, 'w') as OUTM:
-                for i, record in enumerate(SeqIO.parse(input[0],'fastq')):
-                    old_id = record.id
-                    record.id = "{}_{}".format(name_root, i+1)
-                    OUTR.write(record.format('fastq'))
-                    OUTM.write("{}\t{}\n".format(old_id, record.id))
-
-rule interleave:
-    """
-    Interleave forward and reverse reads while reanaming
-    """
-    input:
-        "{prefix}.R1.fastq",
-        "{prefix}.R2.fastq",
-    output:
-        "{prefix}.R12.fastq",
-    log:
-        "logs/{prefix}_reads.raw.fastq.log"
-    benchmark:
-        "benchmarks/{prefix}/interleave.time"
-    version:
-        get_version('seqtk','',
-                    regular_expression=re.compile(r'Version:\s*(\S+)'))
-    shell:
-        "seqtk mergepe {input} > {output}"
-
-rule trim_bbduk_adapters:
-    """
-    remove adapters with bbduk
-    """
-    input:
-        "{prefix}.fastq"
-    output:
-        temp("{prefix}.noadapt.fastq.gz")
-    benchmark:
-        "benchmarks/{prefix}.noadapt.fastq.time"
-    log:
-        "logs/{prefix}.noadapt.log"
-    version:
-        get_version('bbduk.sh',
-                    lines=[1,],)
-    params:
-        adapter_file=config['system_paths']['bbmap'] \
-                        + "/resources/adapters.fa"
-    shell:
-        "bbduk.sh -Xmx{config[bbduk][ram]} \
-          in={input} out={output} \
-          interleaved overwrite {config[bbduk][adapter_flags]} \
-          ref={params.adapter_file} 2> {log}"
-
-rule trim_bbduk_phix:
-    """
-    remove phiX with bbduk
-    """
-    input:
-        "{prefix}.noadapt.fastq.gz"
-    output:
-        "{prefix}.cleaned.fastq.gz",
-        "{prefix}.cleaned.gchist.txt"
-    benchmark:
-        "benchmarks/{prefix}.cleaned.fastq.time"
-    log:
-        "logs/{prefix}.cleaned.log"
-    version:
-        get_version('bbduk.sh',
-                    lines=[1,],)
-    params:
-        phiX_file=config['system_paths']['bbmap'] \
-                         + "/resources/phix174_ill.ref.fa.gz",
-    shell:
-        "bbduk.sh -Xmx{config[bbduk][ram]} \
-          in={input} out={output[0]} gchist={output[1]} \
-          interleaved overwrite {config[bbduk][phix_flags]} \
-          ref={params.phiX_file} 2> {log}"
 
 rule bfc_error_correction:
     """
     Use BFC to correct errors
     """
     input:
-        "{prefix}.fastq.gz"
+        "{prefix}.fastq"
     output:
-        "{prefix}.corrected.fastq.gz"
+        "{prefix}.corrected.fastq"
     benchmark:
         "benchmarks/{prefix}.kmer_trimmed.time"
     log:
@@ -130,7 +24,7 @@ rule bfc_error_correction:
         """bfc -s {config[bfc][ram]} {config[bfc][params]} \
               -t {threads} {input} 2> {log} \
               | seqtk dropse - \
-              | gzip -c > {output}"""
+              > {output}"""
 
 if 'min_read_length' in config:
     rule remove_short_reads:

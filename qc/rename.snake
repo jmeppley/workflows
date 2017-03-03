@@ -1,0 +1,48 @@
+from python.qc import get_sample_from_reads_prefix
+
+rule rename_raw_reads:
+    """ Rename reads to be based on a "sample" name """
+    input:
+        "{prefix}.{dir}.fastq"
+    output:
+        reads=temp("{prefix}.renamed.{dir,R[12]}.fastq"),
+        name_map="{prefix}.renamed.{dir}.tsv"
+    log:
+        "logs/{prefix}.renamed.{dir}.log"
+    benchmark:
+        "benchmarks/{prefix}.renamed.{dir}.time"
+    params:
+        # Pull sample name from prefix (EG: sample/reads or reads_sample)
+        sample=lambda w: get_sample_from_reads_prefix(w.prefix, config)
+    run:
+        from Bio import SeqIO
+        name_root = params.sample
+        print("Renaming root is %r from %r" % (name_root, params.sample))
+        with open(output.reads,'w') as OUTR:
+            with open(output.name_map, 'w') as OUTM:
+                for i, record in enumerate(SeqIO.parse(input[0],'fastq')):
+                    old_id = record.id
+                    record.id = "{}_{}".format(name_root, i+1)
+                    OUTR.write(record.format('fastq'))
+                    OUTM.write("{}\t{}\n".format(old_id, record.id))
+
+rule interleave:
+    """
+    Interleave forward and reverse reads while reanaming
+    """
+    input:
+        "{prefix}.R1.fastq",
+        "{prefix}.R2.fastq",
+    output:
+        "{prefix}.interleaved.fastq",
+    log:
+        "logs/{prefix}_reads.raw.fastq.log"
+    benchmark:
+        "benchmarks/{prefix}/interleave.time"
+    version:
+        get_version('seqtk','',
+                    regular_expression=re.compile(r'Version:\s*(\S+)'))
+    shell:
+        "seqtk mergepe {input} > {output}"
+
+

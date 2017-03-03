@@ -1,9 +1,10 @@
-import os, re, sys, glob, yaml, pandas, subprocess, tempfile
-from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
-configfile: "./assembly.yaml"
+"""
+Workflow for assembling a single metagenoic sample
 
-include: "../common/common.snake"
-include: "../common/mapping_bwa.snake"
+ * renames reads to sample name
+ * cleans with bbduk
+ * runs assembler (SPAdes)
+ * annotates (rRNAs, genes)
 
 ####
 # Required conda packages:
@@ -11,16 +12,28 @@ include: "../common/mapping_bwa.snake"
 # snakemake bbmap infernal spades prodigal pandas biopython bfc (optional)
 ###
 
+"""
+import os, re, sys, glob, yaml, pandas, subprocess, tempfile
+from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
+
+include: "common/common.snake"
+include: "common/mapping_bwa.snake"
+
+try:
+    include: "assembly/{assembler}.snake".format(
+                assembler=config.get('assembler', 'spades'))
+except:
+    raise Excption("Unknown assembler: " + config['assembler'])
+
+# Some hoops to jump through because the contigs stats aren't a proper script
+# yet
 snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
-
-
-config.setdefault('system_paths',{})
-if 'pymg_dir' not in config['system_paths']:
-    config['system_paths']['pymg_dir']=snakefile_path
-else:
-    sys.path.append(config['system_paths']['pymg_dir'])
+config['pymg_dir'] = os.path.join(snakefile_path, 'tools', 'pymg')
+sys.path.append(config['pymg_dir'])
 from edl import __version__ as PYMG_VERSION
 
+include: "annotation/cmsearch.snake"
+include: "qc/bfc.s
 if 'models' not in config['system_paths']:
     config['system_paths']['models']=os.path.join(snakefile_path,'models')
 if 'bbmap' not in config['system_paths']:
