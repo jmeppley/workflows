@@ -46,7 +46,8 @@ def get_top_hit_outputs(config):
 
     # if any samples don't have cleaned reads, try setting up QC
     if sum(1 for s in samples if 'clean' not in sample_data[s]) > 0:
-        setup_qc_outputs(config)
+        cleaned_reads_list = setup_qc_outputs(config)
+        config['outputs'].update(cleaned_reads_list)
         needs_qc = True
     else:
         needs_qc = False
@@ -57,6 +58,7 @@ def get_top_hit_outputs(config):
         raise Exception("There must be a map of databases called 'dbs' in "
                         "your configuration!")
 
+    # setup starting point for reads for each sample
     is_prot = None
     for sample in samples:
         logger.debug('processing sample: ' + sample)
@@ -84,6 +86,7 @@ def get_top_hit_outputs(config):
         logger.debug("{} becomes {}".format(extension, base_ext))
         config['transitions']['{sample}{base_ext}'.format(**vars())] = reads_file
 
+    # set up databases
     for dbase in dbs:
         logger.debug('processing database: ' + dbase)
         search_alg = get_search_alg(dbs[dbase]['format'], is_prot)
@@ -92,6 +95,10 @@ def get_top_hit_outputs(config):
                 'vs.{dbase}.{search_alg}.{hit_filter}'.format(**vars())
         topalg = config.get('top_alg', 'tophit')
         config['outputs'].add('counts.{dbase}.{topalg}.hitids'.format(**vars()))
+
+
+
+
 
     return needs_qc
 
