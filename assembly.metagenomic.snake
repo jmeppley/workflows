@@ -1,0 +1,94 @@
+"""
+Workflow for assembling a single metagenoic sample
+
+ * renames reads to sample name
+ * cleans with bbduk
+ * runs assembler (SPAdes)
+ * annotates (rRNAs, genes)
+
+####
+# Required conda packages:
+#
+# snakemake bbmap infernal spades prodigal pandas biopython bfc (optional)
+###
+
+"""
+import os, re, sys, glob, yaml, pandas, subprocess, tempfile
+from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
+from python.common import get_version, parse_stats
+from python.qc import setup_qc_outputs
+
+# Some hoops to jump through because the contigs stats aren't a proper script
+# yet
+snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
+config['pymg_dir'] = os.path.join(snakefile_path, 'tools', 'pymg')
+sys.path.append(config['pymg_dir'])
+from edl import __version__ as PYMG_VERSION
+
+# Initialize transitions
+config.setdefault('transitions', {})
+
+##
+# Bring in components
+include: "common/common.snake"
+#
+# for mapping reads back to contigs
+include: "common/mapping_bwa.snake"
+#
+# set up any QC
+outputs = config.setdefault('outputs',set())
+outputs.update(setup_qc_outputs(config))
+include: "qc/setup.snake"
+#
+# the assembler (add link from assembled contigs to ./contigs.raw.fasta)
+assembler = config.get('assembler', 'spades')
+if assembler == 'spades':
+    include: "assembly/metagenomic.spades.snake"
+    config['transitions']['contigs.raw.fasta'] = 'spades/contigs.fasta'
+elif assembler == 'megahit':
+    include: "assembly/metagenomic.megahit.snake"
+    config['transitions']['contigs.raw.fasta'] = \
+                    "megahit-{params}/megahit.contigs.fa" \
+                                .format(params=config['megahit']['preset'])
+else:
+    raise Excption("Unknown assembler: " + config['assembler'])
+#
+# contig annotation (RNA, genes, coverage, stats)
+include: "assembly/contig.annotation.snake"
+#
+# rule to create links
+include: "common/transitions.snake"
+
+
+############
+# RULES
+#
+# Start with the final product(s):
+rule all:
+    input:
+        config['outputs']
+
+rule contigs_fasta:
+    """
+    Rename contigs
+    """
+    input:
+        "spades/contigs.fasta"
+    output:
+        "contigs.fasta"
+    log:
+        "logs/contigs.fasta.link.log"
+    benchmark:
+        "benchmarks/contigs.fasta.txt"
+    version:
+        "biopython-{}".format(BIOPYTHON_VERSION)
+    run:
+        root_name = config['assembly_name']
+        with open(input[0]) as INPUT:
+            with open(output[0], 'w') as OUTPUT:
+                for i, (title, sequence) \
+                    in enumerate(SeqIO.FastaIO.SimpleFastaParser(INPUT)):
+                        contig_name = "%s_c%d" % (root_name, i+1)
+                        OUTPUT.write(">%s %s\n%s\n" % (contig_name,
+                                                       title,
+                                                       sequence))

@@ -14,7 +14,7 @@ with megahit.
 # Configuration
 #
 # Default to "meta" preset for megahit
-config.setdefault('megahit',{}).setdefault('preset','meta')
+config.setdefault('megahit',{}).setdefault('preset','meta-sensitive')
 # 
 ######################
 

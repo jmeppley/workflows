@@ -1,0 +1,49 @@
+"""
+Rules and config for using spades to run an assembly
+"""
+
+# set some reasonable defaults
+from snakemake.utils import update_config
+defaults = {
+        'spades':{'ram':255,
+                  'threads':20,
+                  'tmp_dir':'.',
+                  'kmers':'21,33,55,77,99,127'},
+            }
+update_config(config, defaults)
+
+# get all the cleaned reads from config[sample_data]
+cleaned_reads = [data['cleaned'] \
+                         for sample,data in config['sample_data'].items() \
+                         if 'cleaned' in data]
+
+rule run_spades_metagenomic:
+    """
+    $(CONTIGS_LOCAL): $(R1_FASTQ) $(R2_FASTQ) | $(OUTPUT_DIR)
+        $(SPADES) -m $(SPADES_RAM) -o $(OUTPUT_DIR)/spades --pe1-1 $(R1_FASTQ) 
+        --pe1-2 $(R2_FASTQ) --only-assembler --meta
+    """
+    input: cleaned_reads
+    output: "spades/contigs.fasta"
+    log: "logs/spades.log"
+    benchmark: "benchmarks/spades.txt"
+    version: get_version('spades.py')
+    threads: int(config['spades']['threads'])
+    params:
+        ram_limit=config['spades']['ram'],
+        kmers=config['spades']['kmers'],
+        tmp_dir=tempfile.TemporaryDirectory( \
+                                suffix='tmp', \
+                                prefix='spades', \
+                                dir=config['spades']['tmp_dir']),
+        continue_flags="--continue" if "continue_spades" in config else "",
+        skip_ec='--only-assembler' if error_correction!='spades' else "",
+        inputs=' '.join(
+            ['--pe{}-12 {}'.format(i+1,f) for i,f in enumerate(cleaned_reads)])
+    shell:
+        """
+        spades.py -m {params.ram_limit} -o spades -t {threads} \
+                  -k {params.kmers} --tmp-dir {params.tmp_dir.name} \
+                  {params.inputs} \
+                  {params.continue_flags} {params.skip_ec} --meta 
+        """

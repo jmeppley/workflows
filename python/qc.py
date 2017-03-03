@@ -39,6 +39,7 @@ def get_sample_from_reads_prefix(prefix, config):
     If there is no path info, look for _ in prefix
       EG  reads_sample.R1.fastq
     If config[sample_name] is defined, use that
+    If config[assembly_name] is defined, use that
     Fall back to the prefix
     """
     match = re.search(r'([^/])+/[^/]+$', prefix)
@@ -51,6 +52,9 @@ def get_sample_from_reads_prefix(prefix, config):
 
     if 'sample_name' in config:
         return config['sample_name']
+
+    if 'assembly_name' in config:
+        return config['assembly_name']
 
     return prefix
   

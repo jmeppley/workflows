@@ -1,0 +1,322 @@
+"""
+Rules that take a contigs.fasta file and generate a bunch of information about
+the assembly
+
+ * basic stats
+ * assembly stats (N50, etc)
+ * identify rRNA genes
+ * predict proteins
+ * annotate proteins
+ * compile summary stats and annotations
+"""
+
+include: "annotation/cmsearch.snake"
+# available rRNA DBs
+rrna_db_dot_fmts=[]
+for db, db_data in config['dbs'].items():
+    if db_data.get('type')=='rrna':
+        fmt = db_data.get('format','lastdb')
+        rrna_db_dot_fmts.append("{}.{}".format(db,fmt))
+
+
+config.setdefault('outputs', set()).update(
+    [
+        "contigs.report",
+        "contigs.stats.txt",
+        "contigs.annotations.gff",
+        "contigs.annotations.coverage.tsv",
+        "contigs.annotations.faa.stats",
+        "contigs.annotations.coverage.tsv",
+    ]
+)
+
+rule prodigal:
+    """ get gene predictions form prodigal """
+    input:
+        "contigs.fasta"
+    output:
+        "contigs.prodigal.genes.gff"
+    benchmark:
+        "benchmarks/contigs.prodigal.genes.time"
+    version:
+        get_version('prodigal','-v')
+    shell:
+        "prodigal -i {input} -f gff -o {output} -p meta -q"
+
+rule merge_annotations:
+    """ 
+    merge all GFFs and drop overlaps 
+    
+    For now, we drop everything that overlaps, but I will reate a script to drop genes only if they overlap rRNA
+    """
+    input:
+        contigs="contigs.fasta",
+        rrnas="contigs.vs.rRNA.cmsearch.gff",
+        trnas="contigs.vs.tRNA.cmsearch.gff",
+        genes="contigs.prodigal.genes.gff"
+    output:
+        "contigs.annotations.gff",
+        "contigs.annotations.fna",
+        "contigs.annotations.faa"
+    params:
+        output_root="contigs.annotations"
+    benchmark:
+        "benchmarks/contigs.annotations.merge.time"
+    version:
+        get_version('merge_gffs.py')
+    shell:
+        "merge_gffs.py -r {input.rrnas} -r {input.trnas} -c {input.genes} {input.contigs} {params.output_root}"
+
+rule contig_stats_table:
+    """
+    Combine stats from fasta header with depths and read counts to 
+    make a master table of contig stats
+    """
+    input:
+        "contigs.fasta",
+        "mapping/{sample}.vs.contigs.depths",
+        "mapping/{sample}.vs.contigs.counts",
+    output:
+        "contigs.coverages.{sample}.txt",
+        "contigs.histograms.{sample}.txt"
+    benchmark:
+        "benchmarks/contig.stats.{sample}.time"
+    version:
+        "py-metagenomics-{}".format(PYMG_VERSION)
+    shell:
+        "python {config[system_paths][pymg_dir]}/edl/assembly.py get_contig_stats {input} {output} txt_width=75 log=True"
+
+rule long_rrna_gff:
+    """ find long LSU or SSU annotations """
+    input:
+        "{prefix}.gff"
+    output:
+        "{prefix}.{mol,[LS]SU}.gt{length,\d+}.gff"
+    benchmark:
+        "benchmarks/{prefix}.{mol}.gt{length}.time"
+    version:
+        get_version("filter_blast_m8")
+    shell:
+        "grep {wildcards.mol} {input} \
+          | sort \
+          | filter_blast_m8.py -s score -L {wildcards.length} -f gff \
+            --nonoverlapping \
+          > {output}"
+
+rule rrna_fasta:
+    """ extract rRNA fasta """
+    input:
+        contigs="contigs.fasta",
+        gff="{prefix}.gff"
+    output:
+        "{prefix}.gff.fna"
+    benchmark:
+        "benchmarks/{prefix}.gff.fna.time"
+    version:
+        get_version("get_sequences_from_m8.py")
+    shell:
+        "cat {input.contigs} \
+            | get_sequences_from_m8.py -f gff {input.gff} \
+            > {output}"
+
+rule map_genes_to_bwadb:
+    """
+    map genes to BWA db. 
+    There must be a bwa formatted db path configured in:
+        config['dbs'][wildcards.db]['path']
+    """
+    input:
+        "{file_root}.fna"
+    output:
+        ("{file_root}.fna.vs.{db}.sam")
+    log:
+        "logs/{file_root}.vs.{db}.sam.log"
+    benchmark:
+        "benchmarks/{file_root}.vs.{db}.sam.time"
+    version:
+        get_version('bwa', 
+                    version_flag="", 
+                    regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
+    threads:
+        lambda w: config.get('threads',{}).get('bwa',20)
+    params:
+        db_path=lambda w: config['dbs'][w.db]['path'],
+    shell:
+        "bwa mem -t {threads} {params.db_path} {input} 2> {log}  > {output}"
+
+rule rrna_report:
+    """
+    Look at the rRNA annotations and get table of nearly full length LSUs or SSUs
+    """
+    input:
+        gff="contigs.vs.rRNA.cmsearch.{mol}.gt{length}.gff",
+        hits=lambda w: expand("contigs.vs.rRNA.cmsearch.{mol}.gt{length}" + \
+                              ".gff.fna.vs.{db_dot_fmt}",
+                              db_dot_fmt=[s for s in rrna_db_dot_fmts \
+                                          if re.search(w.mol,s) is not None],
+                              mol=w.mol,
+                              length=w.length,
+                    ),
+        stats=expand("contigs.stats.{sample}.txt",
+                     sample=[s for s in config['sample_data'] \
+                               if 'cleaned' in config['sample_data'][s]])
+    output:
+        "contigs.annotations.rRNA.{mol,[LS]SU}.gt{length,\d+}.tsv"
+    params:
+        length=1200,
+        stats={s:"contigs.stats.{sample}.txt".format(sample=s) \
+                     for s in config['sample_data'] \
+                     if 'cleaned' in config['sample_data'][s]}
+    run:
+        # get map from contigs to coverage
+        coverages = \
+            {s:pandas.read_table(stats_file,
+                                 index_col=0,
+                                 usecols=['contig','md cov',])['md cov'] \
+             for s, stats_file in params.stats.items()}
+
+        # table of rRNA model hits from filtered GFF
+        features = pandas.read_table(input.gff,
+                                     header=None,
+                                     names=['contig',
+                                            'tool',
+                                            'type',
+                                            'start',
+                                            'end',
+                                            'score',
+                                            'notes'],
+                                     usecols=[0,1,2,3,4,5,8])
+
+        # add coverages for each sample
+        for sample, sample_covs in coverages.items():
+            features['cov_{}'.format(sample)] = \
+                [sample_covs[features.loc[i,'contig']]\
+                 for i in features.index]
+
+        # index on contig, start, and end, and just take a few columns
+        output_table = features.set_index(['contig', 'start', 'end'])\
+                                            [['coverage', 'type', 'score']]
+
+        # get Silva annotation(s) for each feature
+        from edl.blastm8 import generate_hits
+        from edl.util import parseMapFile
+        for hit_table in input.hits:
+            hit_table_name = re.search(r'gff\.fna\.vs\.(.+)', hit_table).group(1)
+            db, format = hit_table_name.split('.',1)
+            id_name_file = config['dbs'][db]['path'] + ".ids"
+            hit_descriptions = parseMapFile(id_name_file)
+            for gene, hits in generate_hits(hit_table, format=format):
+                # take the first hit
+                hit = list(hits)[0]
+                contig, start, end = re.search(r'^(.+)_(\d+)_(\d+)$', gene)\
+                                                                        .groups()
+                index = (contig, int(start), int(end))
+                if index not in output_table.index:
+                    index = (contig, int(end), int(start))
+                desc = hit_descriptions[hit.hit]
+                output_table.loc[index, db] = desc
+        
+        output_table.to_csv(output[0], sep='\t')
+
+rule final_report:
+    input:
+        raw_read_stats=expand("{sample}/reads.raw.fastq.stats",sample=config['inputs'].keys()),
+        read_stats=expand("reads.{read_type}.fastq.gz.stats", 
+               read_type=read_types),
+        ssu_rrnas="contigs.vs.rRNA.cmsearch.SSU.gt1200.tsv",
+        lsu_rrnas="contigs.vs.rRNA.cmsearch.LSU.gt2000.tsv",
+        gene_stats="contigs.annotations.faa.stats",
+        contig_stats="contigs.fasta.stats",
+        histograms=expand("contigs.histograms.{sample}.txt",
+                     sample=[s for s in config['sample_data'] \
+                               if 'cleaned' in config['sample_data'][s]])
+    output:
+        "contigs.report"
+    run:
+        read_stats={}
+
+        # paired reads
+        for i in input.raw_read_stats + input.read_stats:
+            m = re.search(r'reads\.([a-z]+)\.fastq\.(?:gz.)?stats',i)
+            if m is None:
+                continue
+            type=m.group(1)
+            stats = parse_stats(i)
+
+            # get sample name if this is from a sample
+            m = re.match(r'^(.+)/reads',i)
+            if m:
+                type = m.group(1) + " " + type
+            
+            read_stats['{0} reads'.format(type)]=stats['reads']
+            read_stats['{0} bases'.format(type)]=stats['bases']
+
+        # contigs
+        contig_stats={}
+        stats = parse_stats(input.contig_stats)
+        contig_stats['contigs']=stats['reads']
+        contig_stats['contig bases']=stats['bases']
+
+        # N##
+        stats=pandas.read_table(input.histograms[0],
+                                sep=':',
+                                index_col='key', 
+                                names=('key','value'),
+                                nrows=8)
+        stats=stats.set_index(stats.index.str.strip())['value']
+        contig_stats['N50']=int(stats['N50'])
+        contig_stats['N75']=int(stats['N75'])
+        contig_stats['N90']=int(stats['N90'])
+
+        # annotations
+        stats = parse_stats(input.gene_stats)
+        contig_stats['genes']=stats['reads']
+
+        # full length SSUs
+        ssu_count=-1
+        with open(input.ssu_rrnas) as INF:
+            for line in INF:
+                ssu_count+=1
+        contig_stats['SSUs']=ssu_count
+
+        # full length LSUs
+        lsu_count=-1
+        with open(input.lsu_rrnas) as INF:
+            for line in INF:
+                lsu_count+=1
+        contig_stats['LSUs']=lsu_count
+
+        report={"reads":read_stats,"assembly":contig_stats}
+        with open(output[0],'w') as OUTF:
+            OUTF.write(yaml.dump(report, default_flow_style=False))
+
+rule annotation_coverage:
+    """
+    For each anntation, pull out the median coverage for its contig
+    into a simple two column table
+    """
+    input:
+        gff="contigs.annotations.gff",
+        stats="contigs.stats.txt"
+    output:
+        table="contigs.annotations.coverage.tsv",
+    run:
+        # Read stats table, but just keep median coverage
+        cov_dict = pandas.read_table(input.stats, index_col=0, usecols=['contig','md cov'])['md cov']
+        with open(output.table,'w') as OUT:
+            with open(input.gff) as GFF:
+                feature_count = 0
+                current_contig = 0
+                for line in GFF:
+                    contig = line.split()[0].strip()
+                    if contig != current_contig:
+                        feature_count=1
+                        current_contig = contig
+                    else:
+                        feature_count+=1
+                    OUT.write("{contig}_{feature_count}\t{coverage}\n"\
+                               .format(contig=contig,
+                                       feature_count=feature_count,
+                                       coverage=cov_dict[contig]))
+
+

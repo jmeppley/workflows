@@ -24,7 +24,7 @@ rule cmsearch:
     output:
         temp("{file_root}.vs.{molecule}.cmsearch.tbl")
     benchmark:
-        "benchmarks/contigs.annotations.vs.{molecule}.tbl.txt"
+        "benchmarks/{file_root}.vs.{molecule}.tbl.txt"
     threads:
         config['cmsearch']['threads']
     version:
@@ -58,6 +58,11 @@ rule hit_table_to_gff:
     params:
         format=lambda w: w.tool
     shell:
-        "filter_blast_m8.py -v -f {params.format} --gff -o {output} {input}"
+        #"filter_blast_m8.py -v -f {params.format} --gff -o {output} {input}"
+        "sort {input} \
+         | filter_blast_m8.py -v -f {params.format} --gff \
+         | sort \
+         | filter_blast_m8.py -f gff -s score \
+         > {output}"
 
 
