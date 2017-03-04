@@ -22,6 +22,20 @@ rule index_contigs:
     shell:
         "bwa index -p mapping/contigs.index.bwa {input} > {log} 2>&1 "
 
+def get_sample_reads(wildcards):
+    """
+    reads for mapping can come from different places
+    """
+    sample = wildcards.sample
+    if sample in config['sample_data']:
+        # look in configuraation first
+        return config['sample_data'][wildcards.sample]['raw'] \
+            if 'raw' in config['sample_data'][wildcards.sample] \
+            else config['sample_data'][wildcards.sample]['clean']
+    else:
+        # otherwise, look for fastq file
+        return "{}.fastq".format(wildcards.sample)
+
 rule map_sample_reads:
     """
     map cleaned reads onto contigs
@@ -29,9 +43,7 @@ rule map_sample_reads:
     input:
         "mapping/contigs.index.bwa.bwt",
         # prefer the raw reads, but cleaned are OK
-        lambda w: config['sample_data'][w.sample]['raw'] \
-            if 'raw' in config['sample_data'][w.sample] \
-            else config['sample_data'][w.sample]['cleaned'],
+        get_sample_reads
     output:
         temp("mapping/{sample}.reads.vs.contigs.sam")
     log:

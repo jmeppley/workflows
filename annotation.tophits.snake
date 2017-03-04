@@ -29,10 +29,7 @@ if needs_qc:
 outputs = config.setdefault('outputs',set())
 logger.debug(config)
 
-# adds fastq stats files to output (only if config[run_stats] is set to True
-if config.get('run_stats', False) in [True, 'True']:
-    add_stats_outputs(workflow.snakefile, config) 
-    include: 'common/stats.snake'
+include: 'common/stats.snake'
 
 include: "annotation/lastal.snake"
 include: "common/fastq.snake"

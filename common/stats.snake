@@ -1,3 +1,12 @@
+
+# adds fastq stats files to output
+# (only runs if config[discover_fastx_for_stats] is set to True)
+# this sets up a dry run of the workflow, 
+#  finds fasta and fastq outputs,
+#  adds stats/hist files to outputs of this workflow
+# (It adds some serious startup time)
+add_stats_outputs(workflow.snakefile, config) 
+
 try:
     hist_version = get_version('histograms.py')
     try:

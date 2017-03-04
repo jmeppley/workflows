@@ -13,9 +13,24 @@ defaults = {
 update_config(config, defaults)
 
 # get all the cleaned reads from config[sample_data]
-cleaned_reads = [data['cleaned'] \
+cleaned_reads = [data['clean'] \
                          for sample,data in config['sample_data'].items() \
-                         if 'cleaned' in data]
+                         if 'clean' in data]
+
+config.setdefault('outputs', set()).update(
+    [
+        'stats/all_cleaned_reads.fastq.stats',
+        'stats/all_cleaned_reads.fastq.hist',
+    ])
+
+rule merge_reads_for_spades:
+    """
+    Spades only wants one set of paired reads, so we have to combine before assembly
+    """
+    input: cleaned_reads
+    output: temp("all_cleaned_reads.fastq")
+    benchmark: "benchmarks/all_cleaned_reads.merged.time"
+    shell: "cat {input} > {output}"
 
 rule run_spades_metagenomic:
     """
@@ -23,7 +38,8 @@ rule run_spades_metagenomic:
         $(SPADES) -m $(SPADES_RAM) -o $(OUTPUT_DIR)/spades --pe1-1 $(R1_FASTQ) 
         --pe1-2 $(R2_FASTQ) --only-assembler --meta
     """
-    input: cleaned_reads
+    #input: cleaned_reads
+    input: rules.merge_reads_for_spades.output
     output: "spades/contigs.fasta"
     log: "logs/spades.log"
     benchmark: "benchmarks/spades.txt"
@@ -37,13 +53,13 @@ rule run_spades_metagenomic:
                                 prefix='spades', \
                                 dir=config['spades']['tmp_dir']),
         continue_flags="--continue" if "continue_spades" in config else "",
-        skip_ec='--only-assembler' if error_correction!='spades' else "",
-        inputs=' '.join(
-            ['--pe{}-12 {}'.format(i+1,f) for i,f in enumerate(cleaned_reads)])
+        skip_ec='--only-assembler',
+        #inputs=' '.join(
+        #    ['--pe{}-12 {}'.format(i+1,f) for i,f in enumerate(cleaned_reads)])
     shell:
         """
         spades.py -m {params.ram_limit} -o spades -t {threads} \
                   -k {params.kmers} --tmp-dir {params.tmp_dir.name} \
-                  {params.inputs} \
+                  --pe1-12 {input} \
                   {params.continue_flags} {params.skip_ec} --meta 
         """

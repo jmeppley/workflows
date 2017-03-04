@@ -14,12 +14,20 @@ setup() {
     fi
 }
 
+@test "assemble single sample with spades" {
+    rm -rf test/scratch/spades
+    mkdir -p test/scratch/spades
+    cd test/scratch/spades
+
+    run bash -c "snakemake -j 10 -s ../../../assembly.metagenomic.snake -p --configfile ../../data/configs/spades.yaml --verbose > assembly.log 2>&1"
+}
+
 @test "Prep two pair of files for assembly" {
     rm -rf test/scratch/qc.assembly
     mkdir -p test/scratch/qc.assembly
     cd test/scratch/qc.assembly
 
-    run bash -c "snakemake -j 10 -s ../../../clean.illumina.snake -p --configfile ../../data/configs/illumina.yaml --verbose --config cleaning_protocol=assembly > assembly.join.log 2>&1"
+    run bash -c "snakemake -j 10 -s ../../../clean.illumina.snake -p --configfile ../../data/configs/illumina.yaml --verbose --config cleaning_protocol=assembly discover_fastx_for_stats=True > assembly.clean.log 2>&1"
     [ "$status" -eq 0 ]
 }
 

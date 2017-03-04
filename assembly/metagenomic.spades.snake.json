@@ -1,9 +1,4 @@
 {
- "inputs": {
-  "dummy_sample": {
-   "R1": "sample1_r1.fastq",
-   "R2": "sample1.r2.fastq",
-   "sample_num": 1,
    "sample_sheet": "SampleSheet.csv"
   }
  },

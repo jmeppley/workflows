@@ -95,15 +95,16 @@ def parse_stats(stats_file):
 
 def add_stats_outputs(snakefile, config):
     """
-    if config[run_stats] is set to true, figure out what fasts[aq] files
+    if config[discover_fastx_for_stats] is set to true,
+    figure out what fasts[aq] files
     this workflow generates and add the T.stats and T.hist to the outputs for
     each of file T.
 
     We do this by calling the snakemake API to get the output summary.
     """
-    if config.get('run_stats', False) in [True, 'True']:
+    if config.get('discover_fastx_for_stats', False) in [True, 'True']:
         config_copy = dict(config)
-        config_copy['run_stats'] = False
+        config_copy['discover_fastx_for_stats'] = False
         config_file = tempfile.NamedTemporaryFile(mode='w')
         yaml.dump(config_copy, config_file)
 

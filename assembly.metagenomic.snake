@@ -18,26 +18,26 @@ from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
 from python.common import get_version, parse_stats
 from python.qc import setup_qc_outputs
 
-# Some hoops to jump through because the contigs stats aren't a proper script
-# yet
-snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
-config['pymg_dir'] = os.path.join(snakefile_path, 'tools', 'pymg')
-sys.path.append(config['pymg_dir'])
-from edl import __version__ as PYMG_VERSION
+# add pymg to path
+include: "common/tool.path.snake"
 
 # Initialize transitions
 config.setdefault('transitions', {})
 
 ##
 # Bring in components
-include: "common/common.snake"
+#include: "common/common.snake"
+include: "common/stats.snake"
 #
 # for mapping reads back to contigs
 include: "common/mapping_bwa.snake"
 #
 # set up any QC
+config.setdefault('cleaning_protocol', 'assembly')
 outputs = config.setdefault('outputs',set())
-outputs.update(setup_qc_outputs(config))
+cleaned_reads = setup_qc_outputs(config)
+outputs.update(cleaned_reads)
+config.setdefault('remote_rna', False)
 include: "qc/setup.snake"
 #
 # the assembler (add link from assembled contigs to ./contigs.raw.fasta)
@@ -59,6 +59,7 @@ include: "assembly/contig.annotation.snake"
 # rule to create links
 include: "common/transitions.snake"
 
+logger.debug(config)
 
 ############
 # RULES
@@ -66,7 +67,8 @@ include: "common/transitions.snake"
 # Start with the final product(s):
 rule all:
     input:
-        config['outputs']
+        config['outputs'],
+        "contigs.report",
 
 rule contigs_fasta:
     """
@@ -92,3 +94,92 @@ rule contigs_fasta:
                         OUTPUT.write(">%s %s\n%s\n" % (contig_name,
                                                        title,
                                                        sequence))
+
+def get_read_files(reads_type, config):
+    for sample, sample_data in config['sample_data'].items():
+        if reads_type in sample_data:
+            reads_files = sample_data[reads_type]
+            if isinstance(reads_files, str):
+                yield reads_files
+            else:
+                for reads_file in reads_files:
+                    yield reads_file
+
+rule final_report:
+    input:
+        #raw_stats=['stats/{}.stats'.format(reads_file) \
+        #           for reads_file in get_read_files('raw', config)],
+        cleaned_stats=['stats/{}.stats'.format(reads_file) \
+                   for reads_file in get_read_files('clean', config)],
+        ssu_rrnas="contigs.vs.rRNA.cmsearch.SSU.gt1200.tsv",
+        lsu_rrnas="contigs.vs.rRNA.cmsearch.LSU.gt2000.tsv",
+        gene_stats="stats/contigs.annotations.faa.stats",
+        contig_stats="stats/contigs.fasta.stats",
+        histograms=expand("contigs.histograms.{sample}.txt",
+                     sample=[s for s in config['sample_data'] \
+                               if 'clean' in config['sample_data'][s]])
+    output:
+        "contigs.report"
+    run:
+        read_stats={}
+
+        # paired reads
+        for sample, sample_data in config['sample_data'].items():
+            #for reads_type in ['raw', 'clean']:
+            for reads_type in ['clean']:
+                if reads_type not in sample_data:
+                    continue
+                reads_files = sample_data[reads_type]
+                if isinstance(reads_files, str):
+                    reads_files = [reads_files,]
+                for reads_file in reads_files:
+                    stats_file = "stats/{}.stats".format(reads_file)
+                    stats = parse_stats(stats_file)
+                    match = re.search(r'R[12]', stats_file)
+                    if match:
+                        key_pref = sample + " " + reads_type + " " + match.group()
+                    else:
+                        key_pref = sample + " " + reads_type
+            
+                    read_stats['{} reads'.format(key_pref)]=stats['reads']
+                    read_stats['{} bases'.format(key_pref)]=stats['bases']
+
+        # contigs
+        contig_stats={}
+        stats = parse_stats(input.contig_stats)
+        contig_stats['contigs']=stats['reads']
+        contig_stats['contig bases']=stats['bases']
+
+        # N##
+        stats=pandas.read_table(input.histograms[0],
+                                sep=':',
+                                index_col='key', 
+                                names=('key','value'),
+                                nrows=8)
+        stats=stats.set_index(stats.index.str.strip())['value']
+        contig_stats['N50']=int(stats['N50'])
+        contig_stats['N75']=int(stats['N75'])
+        contig_stats['N90']=int(stats['N90'])
+
+        # annotations
+        stats = parse_stats(input.gene_stats)
+        contig_stats['genes']=stats['reads']
+
+        # full length SSUs
+        ssu_count=-1
+        with open(input.ssu_rrnas) as INF:
+            for line in INF:
+                ssu_count+=1
+        contig_stats['SSUs']=ssu_count
+
+        # full length LSUs
+        lsu_count=-1
+        with open(input.lsu_rrnas) as INF:
+            for line in INF:
+                lsu_count+=1
+        contig_stats['LSUs']=lsu_count
+
+        report={"reads":read_stats,"assembly":contig_stats}
+        with open(output[0],'w') as OUTF:
+            OUTF.write(yaml.dump(report, default_flow_style=False))
+

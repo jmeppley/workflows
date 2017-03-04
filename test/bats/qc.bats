@@ -20,7 +20,7 @@ setup() {
 }
 
 @test "Prep two pair of scriptseq files with flash" {
-    run bash -c "snakemake -j 10 -s ../../../clean.illumina.snake -p --configfile ../../data/configs/illumina.yaml --verbose --config joining_program=flash run_stats=True > flash.join.log 2>&1"
+    run bash -c "snakemake -j 10 -s ../../../clean.illumina.snake -p --configfile ../../data/configs/illumina.yaml --verbose --config joining_program=flash discover_fastx_for_stats=True > flash.join.log 2>&1"
     [ "$status" -eq 0 ]
 }
 

@@ -26,12 +26,9 @@ outputs.update(setup_qc_outputs(config))
 include: "common/transitions.snake"
 include: "qc/setup.snake"
 
-logger.debug(config)
+include: 'common/stats.snake'
 
-# adds fastq stats files to output (only if config[run_stats] is set to True
-if config.get('run_stats', False) in [True, 'True']:
-    add_stats_outputs(workflow.snakefile, config) 
-    include: 'common/stats.snake'
+logger.debug(config)
 
 # Tell snakemake what to make
 rule clean_illumina_outputs:
