@@ -20,64 +20,75 @@ Anvio must be installed in the runing environmetn or in a conda environment. If 
 Make sure you run `anvi-setup-ncbi-cogs` once in your anvio environment.
 
 With a config file like this to run megahit on a set of fastq reads files:
-samples_pattern:
-    glob: "../data/*.fastq"
-    re: "/([^_]+)_[^/]+\.fastq"
-    cleaned: False
+sample_data:
+    sample1:
+        raw: 
+         - ../data/sample1/reads.R1.fastq
+         - ../data/sample1/reads.R2.fastq
+    reads_patterns:
+         - glob: "../data/*.fastq"
+           re: "/([^_]+)_[^/]+\.fastq"
+           cleaned: False
     name: all
     metadata: samples.all.tsv
 megahit:
     preset: meta
-threads:
-    bwa:     10
-    megahit: 40
+    threads: 40
+bwa:
+    threads: 20
 centrifuge:
     path: /path/to/centrifuge
     db: dbs/p+h+v
 anvio_env: anvio
 
-The fields in samples_pattern are:
+The fields in sample_data are one of:
+ a sample name (with locatioons of clean or raw read fasta files)
+ name: a string to name files created from this group of samples
+ metadata: a tabular file of sample data (optional)
+ reads_patterns: a list of dicts dewscribing how to find and name a set of
+                 files
+
+The fields in reads_patterns elements are:
  glob: a path wildcard that will match all the fastq files you want to include
  re: a regular expression pattern that will pull the sample name from each fasta file
  cleaned: Set to true to skip QC
- name: string to use in naming combined outputs
 
-Or to skip assembly and specify a contigs file against which to compare reads:
-samples_pattern:
-    glob: "../data/*.fastq"
-    re: "/([^_]+)_[^/]+\.fastq"
-    cleaned: True
-    name: all
-    metadata: samples.all.tsv
+To skip assembly, specify a contigs file against which to compare reads:
 contigs_fasta: /path/to/contigs.fasta
-threads:
-    bwa:         10
-    anvi-profile: 3
-centrifuge:
-    path: /path/to/centrifuge
-    db: dbs/p+h+v
-anvio_env: anvio
 
 """
 from python.common import get_version
-from python.anvio import collect_sample_reads
 from snakemake.logging import logger
+from python.qc import setup_qc_outputs
 import yaml
 
 ######################
 # Configuration
+#
+# Initialize transitions and outputs
 transitions = config.setdefault('transitions',{})
-#
-# Get sample reads from dir and pattern if not provided
-needs_qc = collect_sample_reads(config)
-if needs_qc:
-    include: "qc/rename.snake"
-    include: "qc/bbduk.snake"
-    include: "qc/bfc.snake"
-    include: "qc/tmatic.snake"
-#
-# if contigs_fasta is not set, pull in megahit
-run_assembly = 'megahit' in config
+outputs = config.setdefault('outputs',set())
+
+# add pymg to path
+include: "common/tool.path.snake"
+
+## Bring in components
+# generate stats from fastx files
+include: "common/stats.snake"
+
+## set up any QC
+# use the assembly cleaning protocol
+config.setdefault('cleaning_protocol', 'assembly')
+# don't separate rRNA
+config.setdefault('remove_rna', False)
+# process the config
+cleaned_reads = setup_qc_outputs(config)
+outputs.update(cleaned_reads)
+# import needed QC rules
+include: "qc/setup.snake"
+
+# if contigs_fasta is set use it
+run_assembly = 'contigs_fasta' not in config
 if run_assembly:
     include: "assembly/metagenomic.megahit.snake"
     # output of megahit becomes start of anvio workflow
@@ -87,23 +98,14 @@ if run_assembly:
                                                 .get('preset','meta-sensitive'))
 else:
     # work from existing contigs
-    if config.setdefault('contigs_fasta','contigs.raw.fasta') != 'contigs.raw.fasta':
+    if config['contigs_fasta'] != 'contigs.raw.fasta':
         transitions['contigs.raw.fasta'] = config['contigs_fasta']
-#
-# This list will be filled in by the anvio/anvio.* snakefiles
-outputs = config.setdefault('outputs',set())
 #
 # generate simple statistics (prinseq) and histogram from contigs
 for ext in ['stats', 'hist']:
     for file_name in ['contigs.fasta', 'anvio/contigs.fa']:
         outputs.add(".".join((os.path.join('stats',file_name), ext)))
-#
-# add my tools to the path (Somewhat of a hack, maybe I'll get my stuff in
-# conda eventually)
-snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))
-pymg_dir = os.path.sep.join([snakefile_path, 'tools', 'pymg'])
-os.environ['PATH'] += os.pathsep + os.pathsep.join([pymg_dir, ])
-#
+
 # this prevents errors due to bad conda env switching
 for missing_var in ['GDAL_DRIVER_PATH',
                     'GDAL_DATA',
@@ -117,7 +119,6 @@ for missing_var in ['GDAL_DRIVER_PATH',
 # the samples snakefile will pull in profiles and contigs
 include: "anvio/anvio.samples.snake"
 include: "common/transitions.snake"
-include: "common/common.snake"
 
 logger.debug("Snakefile config:\n" + yaml.dump(config))
 

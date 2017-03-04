@@ -27,9 +27,8 @@ rule metadata_placeholder:
     output: dummy_metadata_file
     run:
         with open(output[0], 'w') as OUTF:
-            samples = sorted(list(config['reads'].keys()))
             OUTF.write("samples\tname\n")
-            for sample in samples:
+            for sample in sample_list:
                 OUTF.write("{sample}\t{sample}\n".format(sample=sample))
 
 rule samples_db:

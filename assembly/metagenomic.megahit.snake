@@ -15,9 +15,13 @@ with megahit.
 #
 # Default to "meta" preset for megahit
 config.setdefault('megahit',{}).setdefault('preset','meta-sensitive')
+config['megahit'].setdefault('threads', 40)
 # 
 ######################
 
+cleaned_reads = [data['clean'] \
+                         for sample,data in config['sample_data'].items() \
+                         if 'clean' in data]
 
 ######################
 # Rules
@@ -26,7 +30,7 @@ rule megahit:
     requires "reads" dictionary in config with map from sample names to list of fastq files of prepped reads for each sample
     """
     input:
-        [filename for sample,filename in config['reads'].items()]
+        cleaned_reads
     output:
         "megahit-{params}/megahit.contigs.fa"
     log:
@@ -37,9 +41,9 @@ rule megahit:
         get_version('megahit')
     params:
         preset=lambda w: w.params,
-        inputs=','.join([r for s,r in config['reads'].items()])
+        inputs=','.join(cleaned_reads)
     threads:
-        config.get('threads',{}).get('megahit',40)
+        config['megahit']['threads']
     shell:
         "megahit --12 {params.inputs} --presets {params.preset} -t {threads}\
          --continue -o megahit-{params.preset} --out-prefix megahit --verbose\

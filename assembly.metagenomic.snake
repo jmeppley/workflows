@@ -32,12 +32,14 @@ include: "common/stats.snake"
 # for mapping reads back to contigs
 include: "common/mapping_bwa.snake"
 #
-# set up any QC
+## set up any QC
+# use the assembly cleaning protocol
 config.setdefault('cleaning_protocol', 'assembly')
 outputs = config.setdefault('outputs',set())
 cleaned_reads = setup_qc_outputs(config)
 outputs.update(cleaned_reads)
-config.setdefault('remote_rna', False)
+# don't separate rRNA
+config.setdefault('remove_rna', False)
 include: "qc/setup.snake"
 #
 # the assembler (add link from assembled contigs to ./contigs.raw.fasta)

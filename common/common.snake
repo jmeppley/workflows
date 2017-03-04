@@ -1,3 +1,0 @@
-include: "gunzip.snake"
-include: "fastq.snake"
-include: "stats.snake"

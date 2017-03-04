@@ -5,6 +5,7 @@
 #  finds fasta and fastq outputs,
 #  adds stats/hist files to outputs of this workflow
 # (It adds some serious startup time)
+from python.common import get_version, add_stats_outputs
 add_stats_outputs(workflow.snakefile, config) 
 
 try:

@@ -12,7 +12,7 @@ This is in the testing phase:
 
 """
 import re
-from python.common import get_version, add_stats_outputs
+from python.common import get_version
 from python.qc import setup_qc_outputs
 from snakemake.logging import logger
 

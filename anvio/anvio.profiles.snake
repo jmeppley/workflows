@@ -27,6 +27,10 @@ config.setdefault('outputs',set()).add(config['merged_samples_status'])
 include: "../common/mapping_bwa.snake"
 config.setdefault('transitions',{})['contigs.fasta'] = 'anvio/contigs.fa'
 
+
+# get list of assembled samples
+sample_list = sorted([s for s in config['sample_data'].keys() \
+                                if 'clean' in config['sample_data'][s]])
 rule anvio_profile:
     input:
         "anvio/status/contig-db",
@@ -58,7 +62,7 @@ rule anvio_merge_profiles:
     input:
         contig_status="anvio/status/contig-db",
         profiles=lambda w: expand("anvio/status/profile-{sample}",
-                            sample=config['reads']),
+                            sample=sample_list),
     output:
         config['merged_samples_status']
     log:
@@ -71,7 +75,7 @@ rule anvio_merge_profiles:
         profiles=lambda w: expand("anvio/profile-{sample}/{filename}",
                             filename="PROFILE.db" if anvi_ver_gt_210 \
                                         else "RUNINFO.cp",
-                            sample=config['reads']),
+                            sample=sample_list),
         cluster="" \
             if not config.get('skip_contig_clustering', False) \
             else "--skip-hierarchical-clustering --skip-concoct-binning"
