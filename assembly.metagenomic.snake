@@ -2,15 +2,23 @@
 Workflow for assembling a single metagenoic sample
 
  * renames reads to sample name
- * cleans with bbduk
- * runs assembler (SPAdes)
- * annotates (rRNAs, genes)
+ * cleans with:
+   - bbduk (adapters)
+   - bfc (error correction)
+   - trimmomatic (quality and length)
+ * runs assembler (SPAdes or megahit)
+ * renames contigs
+    (to config[assembly_name], if given)
+    (to sample name, if only one)
+ * annotates (rRNAs, tRNA, genes)
 
 ####
 # Required conda packages:
 #
 # snakemake bbmap infernal spades prodigal pandas biopython bfc (optional)
 ###
+
+see test/data/configs/spades.yaml for an example configuration
 
 """
 import os, re, sys, glob, yaml, pandas, subprocess, tempfile
@@ -60,6 +68,19 @@ include: "assembly/contig.annotation.snake"
 #
 # rule to create links
 include: "common/transitions.snake"
+
+# 
+# Make sure assembly has name
+if 'assembly_name' not in config:
+    # if there is only one sample, use that
+    sample_names = [sample \
+                         for sample,data in config['sample_data'].items() \
+                         if 'clean' in data]
+    if len(sample_names)==1:
+        config['assembly_name'] = sample_names[0]
+    else:
+        raise Exception("Please supply a naming string for this assembly "
+                        "in config[assembly_name].")
 
 logger.debug(config)
 
