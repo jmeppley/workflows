@@ -27,7 +27,7 @@ setup() {
     mkdir -p test/scratch/qc.assembly
     cd test/scratch/qc.assembly
 
-    run bash -c "snakemake -j 10 -s ../../../clean.illumina.snake -p --configfile ../../data/configs/illumina.yaml --verbose --config cleaning_protocol=assembly discover_fastx_for_stats=True > assembly.clean.log 2>&1"
+    run bash -c "snakemake -j 10 -s ../../../clean.illumina.snake -p --configfile ../../data/configs/illumina.yaml --verbose --config cleaning_protocol=assembly remove_rna=False discover_fastx_for_stats=True > assembly.clean.log 2>&1"
     [ "$status" -eq 0 ]
 }
 

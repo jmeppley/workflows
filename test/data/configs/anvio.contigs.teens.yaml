@@ -1,8 +1,9 @@
-samples_name: "teens"
-samples_pattern:
-    glob: "../../data/raw_reads/*_1-1?_DNA*.fastq"
-    re: "/[^A-Za-z]*([A-Za-z][^/]*)_S\\d[^/]+\\.fastq"
-    cleaned: True
+sample_data:
+  name: "teens"
+  reads_patterns:
+     - glob: "../../data/raw_reads/2014_ALOHA_XVII_1-1[0-9]_DNA_S*.fastq"
+       re: "/[^A-Za-z]*([A-Za-z][^/]*)_S\\d[^/]+\\.fastq"
+       cleaned: True
 contigs_fasta: ../../data/contigs/contigs.aloha.fa
 min_contig_length: 500
 run_cogs: False
@@ -15,8 +16,16 @@ sample_tree:
         - std_coverage_contigs
         - abundance_contigs
         - detection_contigs
-threads:
-    bwa: 10
-    anvio-profile: 1
+dbs:
+    RefSeq:
+        path: ../../data/seqdbs/RefSeq/lastdb
+        format: lastp
+        type: tax
+bwa:
+    threads: 10
+bfc: 
+    threads: 8
+anvio-profile:
+    threads: 1
 anvio_env: anvio
 

@@ -5,7 +5,7 @@ analysis in anvi'o
 import re
 include: "anvio.profiles.snake"
 
-config.setdefault('samples_name','all')
+samples_name = config['sample_data'].setdefault('name','all')
 config.setdefault('sample_tree',{})
 config['sample_tree'].setdefault('distance_metrics',['euclidean',])
 config['sample_tree'].setdefault('coverage_metrics',\
@@ -13,12 +13,14 @@ config['sample_tree'].setdefault('coverage_metrics',\
 
 # set up sample files
 sample_metadata_file = "anvio/samples.{}.metadata.db"\
-                                .format(config['samples_name'])
+                                .format(samples_name)
 dummy_metadata_file = "anvio/samples.{}.dummy.metadata.db"\
-                                .format(config['samples_name'])
-# in future, allow config to specify real metadata table to override this:
-config.setdefault('transitions')[sample_metadata_file] = dummy_metadata_file
-sample_db_file = "anvio/samples.{}.db".format(config['samples_name'])
+                                .format(samples_name)
+# use dummy if metadata not supplied
+config.setdefault('transitions')[sample_metadata_file] = \
+                            config['sample_data'].get('metadata',
+                                                      dummy_metadata_file)
+sample_db_file = "anvio/samples.{}.db".format(samples_name)
 config.setdefault('outputs',set()).add(sample_db_file)
 
 rule metadata_placeholder:
