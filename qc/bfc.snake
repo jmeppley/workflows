@@ -19,7 +19,7 @@ rule bfc_error_correction:
     version:
         get_version('bfc','-v')
     threads:
-        config.get('threads',{}).get('bfc',5)
+        config.get('bfc',{}).get('threads',5)
     shell:
         """bfc -s {config[bfc][ram]} {config[bfc][params]} \
               -t {threads} {input} 2> {log} \

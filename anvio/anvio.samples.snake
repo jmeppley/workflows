@@ -5,12 +5,6 @@ analysis in anvi'o
 import re
 include: "anvio.profiles.snake"
 
-samples_name = config['sample_data'].setdefault('name','all')
-config.setdefault('sample_tree',{})
-config['sample_tree'].setdefault('distance_metrics',['euclidean',])
-config['sample_tree'].setdefault('coverage_metrics',\
-                                 ['mean_coverage_Q2Q3_contigs'])
-
 # set up sample files
 sample_metadata_file = "anvio/samples.{}.metadata.db"\
                                 .format(samples_name)

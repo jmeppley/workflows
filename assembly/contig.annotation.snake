@@ -141,7 +141,7 @@ rule map_genes_to_bwadb:
                     version_flag="", 
                     regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
     threads:
-        lambda w: config.get('threads',{}).get('bwa',20)
+        lambda w: config.get('bwa',{}).get('threads',20)
     params:
         db_path=lambda w: config['dbs'][w.db]['path'],
     shell:

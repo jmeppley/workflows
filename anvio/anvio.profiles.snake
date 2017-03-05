@@ -16,11 +16,16 @@ logger.debug("Anvio version {} is{} newer than 2.1.0"\
                             .format(config['anvio_version'],
                                     "" if anvi_ver_gt_210 else " not"))
 
-config.setdefault('samples_name','all')
+samples_name = config['sample_data'].setdefault('name','all')
+config.setdefault('sample_tree',{})
+config['sample_tree'].setdefault('distance_metrics',['euclidean',])
+config['sample_tree'].setdefault('coverage_metrics',\
+                                 ['mean_coverage_Q2Q3_contigs'])
+
 config['merged_samples_dir'] = "anvio/samples-{}-merged"\
-                                    .format(config['samples_name'])
+                                    .format(samples_name)
 config['merged_samples_status'] = "anvio/status/samples-{}-merged"\
-                                    .format(config['samples_name'])
+                                    .format(samples_name)
 config.setdefault('outputs',set()).add(config['merged_samples_status'])
 
 # import mapping rules and start from filtered contigs

@@ -95,10 +95,10 @@ def setup_qc_outputs(config):
 
     # find samples that need QC
     samples_with_raw_reads = [s for s in samples if 'raw' in sample_data[s]]
-    if len(samples_with_raw_reads) == 0:
-        raise Exception("Please supply a map from samples to raw reads "
-                        " or a glob and re in"
-                        " config[sample_data][reads_patterns]")
+    #if len(samples_with_raw_reads) == 0:
+    #    raise Exception("Please supply a map from samples to raw reads "
+    #                    " or a glob and re in"
+    #                    " config[sample_data][reads_patterns]")
 
     # get protocol
     cleaning_protocol = config.get('cleaning_protocol', 'None')

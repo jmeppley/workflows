@@ -1,7 +1,7 @@
 sample_data:
   name: "all"
   reads_patterns:
-     - glob: "../../data/raw_reads/2014_ALOHA_XVII_1-1[68]_DNA_S*.fastq"
+     - glob: "../../data/raw_reads/2014_ALOHA_XVII_1-1[568]_DNA_S*.fastq"
        re: "/[^A-Za-z]*([A-Za-z][^/]*)_S\\d[^/]+\\.fastq"
        cleaned: False
 trimmomatic:
@@ -33,7 +33,7 @@ dbs:
 bwa:
     threads: 10
 bfc: 
-    threads: 8
+    threads: 20
 anvio-profile:
     threads: 1
 anvio_env: anvio
