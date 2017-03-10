@@ -23,6 +23,7 @@ if not centrifuge:
 else:
     dbtax = False
 
+
 if centrifuge or dbtax:
     # add to outputs if either is configured
     config.setdefault('outputs',set()).add("anvio/status/contigs-tax")

@@ -61,3 +61,14 @@ setup() {
 }
 
 
+
+@test "Pangenome" {
+    rm -rf test/scratch/pang
+    mkdir -p test/scratch/pang
+    cd test/scratch/pang
+
+    run bash -c "snakemake -s ../../../anvio.pangenome.snake --configfile ../../data/configs/anvio.pangenome.yaml -p -j 20 --config anvio_env=$ANVIENV --verbose > anvio.pangenome.log 2>&1"
+    [ "$status" -eq 0 ]
+}
+
+
