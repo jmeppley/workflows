@@ -12,8 +12,7 @@ else:
 config['anvio_version'] = \
         get_version("anvi-profile",
                     cmd_prefix=config['anvio_prefix'],
-                    lines=[1,],
-                    regular_expression=r'(\d.+)')
+                    regular_expression=r'Anvi\'?o\s+[Vv]ersion.+:\s+(\d.+)')
 
 # use centrifuge if configured
 centrifuge = 'centrifuge' in config
@@ -24,14 +23,23 @@ else:
     dbtax = False
 
 
-if centrifuge or dbtax:
-    # add to outputs if either is configured
-    config.setdefault('outputs',set()).add("anvio/status/contigs-tax")
+for genome_name in config.get('genomes', ['']):
+    if genome_name=='':
+        contigs = 'contigs'
+    else:
+        contigs = 'contigs-' + genome_name
 
-config.setdefault('outputs',set()).add("anvio/status/contigs-hmms")
+    if centrifuge or dbtax:
+        # add to outputs if either is configured
+        config.setdefault('outputs',set()).add("anvio/status/{contigs}-tax"\
+                                                .format(contigs=contigs))
 
-if config.get('run_cogs',True) in ['True', True]:
-    config.setdefault('outputs',set()).add("anvio/status/contigs-cogs")
+    config.setdefault('outputs',set()).add("anvio/status/{contigs}-hmms"\
+                                                .format(contigs=contigs))
+
+    if config.get('run_cogs',True) in ['True', True]:
+        config.setdefault('outputs',set()).add("anvio/status/{contigs}-cogs"\
+                                                .format(contigs=contigs))
 
 #wildcard_constraints:
 #    contigs=r'^contigs.*'

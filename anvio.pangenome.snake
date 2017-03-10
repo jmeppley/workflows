@@ -9,6 +9,7 @@ from snakemake.logging import logger
 import yaml
 
 # set up transition to pull in external files
+pangenome_dependencies = []
 for genome in config['genomes']:
     contigs = config['genomes'][genome]['contigs']
     if isinstance(contigs, str):
@@ -31,41 +32,66 @@ for genome in config['genomes']:
         else:
             local_file = "contigs-{name}.raw.fasta".format(name=genome)
             db_file = 'anvio/contigs-{name}.db'.format(name=genome)
-        config['genomes'][genome]['contigsdb'] = db_file
-        config['genomes'][genome]['contigsdbstatus'] = \
-            'anvio/status/contigs-{name}-hmms'.format(name=genome)
-
         # configure sym link from contigs file to file in ./
         config.setdefault('transitions',{})[local_file] = contigs
+        # Save compiled contig db location
+        config['genomes'][genome]['contigsdb'] = db_file
+        # make sure we wait for hmms and cogs (if configured) to be run
+        pangenome_dependencies.append(
+            'anvio/status/contigs-{name}-{suf}'.format(name=genome,
+                                                       suf='hmms'))
+        if config.get('run_cogs', True) in ['True', True]:
+            pangenome_dependencies.append(
+                'anvio/status/contigs-{name}-{suf}'.format(name=genome,
+                                                           suf='cogs'))
+
     else:
-        # Assume this is info for internal metagenome
+        # Assume this entry is info for internal metagenome
         raise Exception("internal metagenomes from config are not yet"
                         "supported")
 
 # intermediate file names
-external_genomes_table = "anvio/{pangenome_name}-GENOMES.tab".format(**config)
+external_genomes_table = "anvio/{pangenome_name}-GENOMES.tab"
 genomes_tables = [external_genomes_table]
 if 'internal_genomes_table' in config:
     genomes_tables.append(config['internal_genomes_table'])
 
+# final output
+config.setdefault('outputs', set()).add('anvio/status/pangenome-' + \
+                                        config['pangenome_name'])
+
 include: "anvio/anvio.contigs.snake"
 include: "common/transitions.snake"
 
+
 logger.debug("Snakefile config:\n" + yaml.dump(config))
+
 
 #####
 # Rules
+rule outputs:
+    input: config['outputs']
+        
 rule pangenome_files:
-    input: "anvio/{pangenome_name}-GENOMES.h5".format(**config)
-    output: "anvio/status/{pangenome_name}".format(**config)
+    input: "anvio/{pangenome_name}-GENOMES.h5"
+    output: "anvio/status/pangenome-{pangenome_name}"
+    log: "logs/pangenome-{pangenome_name}.log"
+    benchmark: 'benchmarks/pangenome-{pangenome_name}.time'
+    version: config['anvio_version']
     shell:
         """{config[anvio_prefix]}
-           anvi-pan-genome -g {input} -J {config[pangenome_name]}
+           rm -rf anvio/{wildcards.pangenome_name}
+           anvi-pan-genome -g {input} -J {wildcards.pangenome_name} \
+            > {log} 2>&1
+           mv {wildcards.pangenome_name} anvio/
            touch {output}"""
 
 rule pangenome_db:
     input: genomes_tables
-    output: "anvio/{pangenome_name}-GENOMES.h5".format(**config)
+    output: "anvio/{pangenome_name}-GENOMES.h5"
+    log: "logs/pangenome-{pangenome_name}-table.log"
+    benchmark: 'benchmarks/pangenome-{pangenome_name}-table.time'
+    version: config['anvio_version']
     params:
         tables='-e ' + genomes_tables[0] \
                 if len(genomes_tables) == 1
@@ -73,15 +99,13 @@ rule pangenome_db:
     shell:
         """{config[anvio_prefix]}
            rm -f {output}
-           anvi-gen-genomes-storage -o {output} {params.tables}
+           anvi-gen-genomes-storage -o {output} {params.tables} \
+            > {log} 2>&1
         """
 
 rule pangenome_table:
     """ Create the text table needed by anvio pangenomic mode """
-    input: [d['contigsdbstatus'] \
-                for g,d in config['genomes'].items() \
-                if 'contigsdbstatus' in d]
-    #input: expand("anvio/contigs-{name}.db", name=config['genomes'])
+    input: pangenome_dependencies
     output: external_genomes_table
     run:
         with open(output[0], 'w') as OUTF:
@@ -91,3 +115,4 @@ rule pangenome_table:
                         name=genome,
                         db=config['genomes'][genome]['contigsdb']))
 
+ruleorder: pangenome_files > uncompress_file
