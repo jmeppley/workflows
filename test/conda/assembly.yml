@@ -2,6 +2,7 @@ channels:
  - bioconda
  - brwnj
 dependencies:
+ - python=3
  - snakemake
  - pandas
  - biopython

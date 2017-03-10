@@ -1,0 +1,93 @@
+"""
+Collect genomes into a database in prep for Anvi'o PAngenome mode
+"""
+
+####
+# set up
+from python.common import get_version
+from snakemake.logging import logger
+import yaml
+
+# set up transition to pull in external files
+for genome in config['genomes']:
+    contigs = config['genomes'][genome]['contigs']
+    if isinstance(contigs, str):
+        if re.search(r'\.f(ast)?q\.gz$', contigs):
+            include: "common/gunzip.snake"
+            include: "common/fastq.snake"
+            local_file = "contigs-{name}.raw.fastq.gz".format(name=genome)
+            db_file = 'anvio/contigs-{name}.db'.format(name=genome)
+        elif re.search(r'\.gz$', contigs):
+            include: "common/gunzip.snake"
+            local_file = "contigs-{name}.raw.fasta.gz".format(name=genome)
+            db_file = 'anvio/contigs-{name}.db'.format(name=genome)
+        elif re.search(r'\.f(ast)?q$', contigs):
+            include: "common/fastq.snake"
+            local_file = "contigs-{name}.fastq".format(name=genome)
+            db_file = 'anvio/contigs-{name}.db'.format(name=genome)
+        elif re.search(r'\.db$', contigs):
+            local_file = "contigs-{name}.db".format(name=genome)
+            db_file = local_file
+        else:
+            local_file = "contigs-{name}.raw.fasta".format(name=genome)
+            db_file = 'anvio/contigs-{name}.db'.format(name=genome)
+        config['genomes'][genome]['contigsdb'] = db_file
+        config['genomes'][genome]['contigsdbstatus'] = \
+            'anvio/status/contigs-{name}-hmms'.format(name=genome)
+
+        # configure sym link from contigs file to file in ./
+        config.setdefault('transitions',{})[local_file] = contigs
+    else:
+        # Assume this is info for internal metagenome
+        raise Exception("internal metagenomes from config are not yet"
+                        "supported")
+
+# intermediate file names
+external_genomes_table = "anvio/{pangenome_name}-GENOMES.tab".format(**config)
+genomes_tables = [external_genomes_table]
+if 'internal_genomes_table' in config:
+    genomes_tables.append(config['internal_genomes_table'])
+
+include: "anvio/anvio.contigs.snake"
+include: "common/transitions.snake"
+
+logger.debug("Snakefile config:\n" + yaml.dump(config))
+
+#####
+# Rules
+rule pangenome_files:
+    input: "anvio/{pangenome_name}-GENOMES.h5".format(**config)
+    output: "anvio/status/{pangenome_name}".format(**config)
+    shell:
+        """{config[anvio_prefix]}
+           anvi-pan-genome -g {input} -J {config[pangenome_name]}
+           touch {output}"""
+
+rule pangenome_db:
+    input: genomes_tables
+    output: "anvio/{pangenome_name}-GENOMES.h5".format(**config)
+    params:
+        tables='-e ' + genomes_tables[0] \
+                if len(genomes_tables) == 1
+                else '-e ' + genomes_tables[0] + ' -i ' + genomes_tables[1]
+    shell:
+        """{config[anvio_prefix]}
+           rm -f {output}
+           anvi-gen-genomes-storage -o {output} {params.tables}
+        """
+
+rule pangenome_table:
+    """ Create the text table needed by anvio pangenomic mode """
+    input: [d['contigsdbstatus'] \
+                for g,d in config['genomes'].items() \
+                if 'contigsdbstatus' in d]
+    #input: expand("anvio/contigs-{name}.db", name=config['genomes'])
+    output: external_genomes_table
+    run:
+        with open(output[0], 'w') as OUTF:
+            OUTF.write("name\tcontigs_db_path\n")
+            for genome in config['genomes']:
+                OUTF.write("{name}\t../{db}\n".format(
+                        name=genome,
+                        db=config['genomes'][genome]['contigsdb']))
+

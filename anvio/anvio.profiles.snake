@@ -38,7 +38,7 @@ sample_list = sorted([s for s in config['sample_data'].keys() \
                                 if 'clean' in config['sample_data'][s]])
 rule anvio_profile:
     input:
-        "anvio/status/contig-db",
+        "anvio/status/contigs-db",
         "mapping/{sample}.reads.vs.contigs.bam.bai"
     output:
         #"anvio/profile-{sample}/RUNINFO.cp"
@@ -65,7 +65,7 @@ rule anvio_profile:
 rule anvio_merge_profiles:
     """ Merge all the AnVio profiles """
     input:
-        contig_status="anvio/status/contig-db",
+        contig_status="anvio/status/contigs-db",
         profiles=lambda w: expand("anvio/status/profile-{sample}",
                             sample=sample_list),
     output:

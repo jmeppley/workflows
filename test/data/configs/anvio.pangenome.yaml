@@ -1,0 +1,8 @@
+genomes:
+    Parvarchaeum_acidophilus:
+        contigs: "../../data/contigs/GCA_000192615.1_ASM19261v1_genomic.fna.gz"
+    Parvarchaeum_acidiphilum:
+        contigs: "../../data/contigs/GCA_000192595.1_ASM19259v1_genomic.fna.gz"
+pangenome_name: Parvarchaea
+min_contig_length: 2500
+run_cogs: False

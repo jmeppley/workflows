@@ -25,38 +25,41 @@ else:
 
 if centrifuge or dbtax:
     # add to outputs if either is configured
-    config.setdefault('outputs',set()).add("anvio/status/contig-tax")
+    config.setdefault('outputs',set()).add("anvio/status/contigs-tax")
 
-config.setdefault('outputs',set()).add("anvio/status/contig-hmms")
+config.setdefault('outputs',set()).add("anvio/status/contigs-hmms")
 
 if config.get('run_cogs',True) in ['True', True]:
-    config.setdefault('outputs',set()).add("anvio/status/contig-cogs")
+    config.setdefault('outputs',set()).add("anvio/status/contigs-cogs")
+
+#wildcard_constraints:
+#    contigs=r'^contigs.*'
 
 rule anvio_contigs_drop_desc:
     """ Simplify the contig names so AnVio doesn't freak out """
     input:
-        "contigs.raw.fasta"
+        "{contigs}.raw.fasta"
     output:
-        temp("contigs.no_desc.fasta")
+        temp("{contigs}.no_desc.fasta")
     version:
         get_version('sed', lines=[1,])
     log:
-        "logs/simplify-contig-names"
+        "logs/simplify-{contigs}-names"
     benchmark:
-        "benchmarks/simplify-contig-names.time"
+        "benchmarks/simplify-{contigs}-names.time"
     shell:
         'cat {input} | sed -r "s/^>(\S+)\s*.*$/>\\1/" > {output}'
 
 rule anvio_contigs_prune:
     """ drop short contigs """
     input:
-        rules.anvio_contigs_drop_desc.output
+        "{contigs}.no_desc.fasta"
     output:
-        "anvio/contigs.fa"
+        "anvio/{contigs}.fa"
     log:
-        "logs/drop-short-contigs"
+        "logs/drop-short-{contigs}"
     benchmark:
-        "benchmarks/drop-short-contigs.time"
+        "benchmarks/drop-short-{contigs}.time"
     params:
         min_len=config.get("min_contig_length",2500)
     version:
@@ -74,74 +77,77 @@ rule contig_db:
         * runs prodigal to find genes/ORFs
     """
     input:
-        "anvio/contigs.fa"
+        "anvio/{contigs}.fa"
     output:
-        "anvio/status/contig-db"
+        "anvio/status/{contigs}-db"
     log:
-        "logs/anvio-contig-db"
+        "logs/anvio-{contigs}-db"
     benchmark:
-        "benchmarks/anvio-contig-db.time"
+        "benchmarks/anvio-{contigs}-db.time"
     version:
         config['anvio_version']
     shell:
         """{config[anvio_prefix]}
-           rm -f anvio/contigs.db anvio/contigs.h5
-           anvi-gen-contigs-database -f {input} -o anvio/contigs.db > {log} 2>&1 
+           rm -f anvio/{wildcards.contigs}.db anvio/{wildcards.contigs}.h5
+           anvi-gen-contigs-database -f {input} \
+             -o anvio/{wildcards.contigs}.db \
+             > {log} 2>&1 
            touch {output} """
 
 rule anvio_hmms:
     """ Preprocess contigs to find bacterial single copy genes """
     input:
-        "anvio/status/contig-db"
+        "anvio/status/{contigs}-db"
     output:
-        "anvio/status/contig-hmms"
+        "anvio/status/{contigs}-hmms"
     benchmark:
-        "benchmarks/contigs.hmms.time"
+        "benchmarks/{contigs}.hmms.time"
     log:
-        "logs/contigs.hmms"
+        "logs/{contigs}.hmms"
     threads:
         20
     version:
         config['anvio_version']
     shell:
         """{config[anvio_prefix]}
-           anvi-run-hmms -c anvio/contigs.db --num-threads {threads} > {log} 2>&1 
+           anvi-run-hmms -c anvio/{wildcards.contigs}.db --num-threads {threads} > {log} 2>&1 
            touch {output} """
 
 rule anvio_genes:
     """ extract gene calls (as DNS seqs) from processed contigs """
     input:
-        "anvio/status/contig-db"
+        "anvio/status/{contigs}-db"
     output:
-        "contigs.genes.ffn"
+        "anvio/{contigs}.genes.ffn"
     benchmark:
-        "benchmarks/contigs.genes.time"
+        "benchmarks/{contigs}.genes.time"
     log:
-        "logs/contigs.genes"
+        "logs/{contigs}.genes"
     version:
         config['anvio_version']
     shell:
         """{config[anvio_prefix]}
-           anvi-get-dna-sequences-for-gene-calls -c anvio/contigs.db \
+           anvi-get-dna-sequences-for-gene-calls -c anvio/{wildcards.contigs}.db \
             -o {output} > {log} 2>&1 """
 
 rule anvio_contig_cogs:
     """ annotates contigs with COGs """
     input:
-        "anvio/status/contig-db"
+        "anvio/status/{contigs}-db"
     output:
-        "anvio/status/contig-cogs"
+        "anvio/status/{contigs}-cogs"
     benchmark:
-        "benchmarks/contigs.cogs.time"
+        "benchmarks/{contigs}.cogs.time"
     log:
-        "logs/contigs.cogs"
+        "logs/{contigs}.cogs"
     threads:
         50
     version:
         config['anvio_version']
     shell:
         """{config[anvio_prefix]}
-           anvi-run-ncbi-cogs -c anvio/contigs.db --num-threads {threads} \
+           anvi-run-ncbi-cogs -c anvio/{wildcards.contigs}.db \
+            --num-threads {threads} \
             --search-with diamond > {log} 2>&1 
            touch {output}"""
 
@@ -155,20 +161,21 @@ if dbtax:
 
     rule fake_genes:
         """ create a symlink to the contig genes file with the proper extension, so the lastal rule will find it """
-        input: "contigs.genes.ffn"
-        output: temp("contigs.genes.fasta")
-        shell: "ln -s {input} {output}"
+        input: "anvio/{contigs}.genes.ffn"
+        output: temp("anvio/{contigs}.genes.fasta")
+        params: rel_name=lambda w: w.contigs + ".genes.ffn"
+        shell: "rm -f {output} && ln -s {params.rel_name} {output}"
 
     rule contigs_tax_table:
         """ uses my script to assign taxa to gene calls """
         input:
-            "contigs.genes.vs.RefSeq.lastx",
+            "anvio/{contigs}.genes.vs.RefSeq.lastx",
         output:
-            "contigs.annotation.tax_matrix.tsv"
+            "anvio/{contigs}.annotation.tax_matrix.tsv"
         log:
-            "logs/contigs_tax_table"
+            "logs/{contigs}_tax_table"
         benchmark:
-            "benchmarks/contigs.tax.table.time"
+            "benchmarks/{contigs}.tax.table.time"
         params:
             taxdump=os.path.split(config['dbs']["RefSeq"]['path'])[0],
             taxmap=config['dbs']['RefSeq']['path'] + ".tax",
@@ -190,10 +197,10 @@ if centrifuge:
             the first output file is created silently, so it's not in the 
             shell command. """
         input:
-            "contigs.genes.ffn"
+            "anvio/contigs.genes.ffn"
         output:
-            "centrifuge_report.tsv",
-            "centrifuge_hits.tsv",
+            temp("centrifuge_report.tsv"),
+            temp("centrifuge_hits.tsv"),
         log:
             "logs/contigs_centrifuge"
         benchmark:
@@ -218,9 +225,9 @@ if centrifuge or dbtax:
         """
         input:
             table=rules.contigs_tax_table.output,
-            contig="anvio/status/contig-db"
+            contig="anvio/status/{contigs}-db"
         output:
-            "anvio/status/contig-tax"
+            "anvio/status/{contigs}-tax"
         log:
             "logs/anvio-import-taxonomy.log"
         params:
@@ -229,7 +236,7 @@ if centrifuge or dbtax:
             config['anvio_version']
         shell:
             """{config[anvio_prefix]}
-               anvi-import-taxonomy -c anvio/contigs.db \
+               anvi-import-taxonomy -c anvio/{wildcards.contigs}.db \
                  -i {input.table} -p {params.format} > {log} 2>&1 
                touch {output}"""
 
