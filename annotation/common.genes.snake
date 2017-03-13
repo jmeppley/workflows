@@ -18,6 +18,7 @@ default_threads=config.setdefault('threads',{}).get('default', 3)
 # End configuration
 ##########
 
+translation_rexp = re.compile(r'^NEVER_TRANSLATE_GENES$')
 include: "common.snake"
 
 rule compile_counts:
