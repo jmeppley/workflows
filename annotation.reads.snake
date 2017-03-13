@@ -10,12 +10,9 @@ snakemake -s /path/to/workflows/annotate.reads.snake --configfile annotate.reads
 
 The following conda packages are necessary:
 conda create -n snakemake -c bioconda python=3 snakemake samtools last hmmer
-emboss
+emboss prodigal
 
-Plus the tools here:
-https://github.com/jmeppley/py-metagenomics
-
-You will need to run the makefiles in py-metagenomics/databases or provide your own sequence dbs.
+You will need to run the makefiles in tools/pymg/databases or provide your own sequence dbs.
 
 With a config file that looks like this:
 reads_file: /path/to/file.bam
