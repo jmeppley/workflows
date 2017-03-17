@@ -33,7 +33,17 @@ rule merge_reads_for_spades:
     input: cleaned_reads
     output: temp("all_cleaned_reads.fastq")
     benchmark: "benchmarks/all_cleaned_reads.merged.time"
-    shell: "cat {input} > {output}"
+    params:
+        count=len(cleaned_reads),
+    shell: 
+        """
+        if [ "{params.count}" == "1" ]; then
+            # just link if it's one file
+            ln -s {input} {output}
+        else
+            cat {input} > {output}
+        fi
+        """
 
 rule run_spades_metagenomic:
     """
