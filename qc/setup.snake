@@ -6,6 +6,10 @@ if config.get('remove_rna', True) in ['True', True]:
     include: "../common/fastq.snake"
     include: "sort.rna.snake"
 
+# if we were given raw reads
+#if sum(1 for s in config['sample_data'] \
+#         if 'raw' in config['sample_data'][s]
+#      )>0:
 # includes based on cleaning protocol
 protocol = config.get('cleaning_protocol', 'joining')
 if protocol == 'joining':

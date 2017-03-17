@@ -138,7 +138,8 @@ def setup_qc_outputs(config):
         if cleaning_protocol == 'joining':
             # prepend trimmomatic params
             chemistry, barcodes = get_chemistry_barcodes(sample, config)
-            cleaned_suffix = '.'.join([chemistry] + barcodes) + \
+            barcodes = ":".join(barcodes)
+            cleaned_suffix = '.'.join([chemistry, barcodes]) + \
                                 '.' + cleaned_suffix
 
 

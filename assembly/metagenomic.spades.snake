@@ -4,11 +4,14 @@ Rules and config for using spades to run an assembly
 
 # set some reasonable defaults
 from snakemake.utils import update_config
+# kmers only applies to metagenomic
+# use rnakmer for transcript assembly
 defaults = {
         'spades':{'ram':255,
                   'threads':20,
                   'tmp_dir':'.',
-                  'kmers':'21,33,55,77,99,127'},
+                  'kmers':'21,33,55,77,99,127',
+                  'rnakmer':'55'},
             }
 update_config(config, defaults)
 
@@ -40,26 +43,28 @@ rule run_spades_metagenomic:
     """
     #input: cleaned_reads
     input: rules.merge_reads_for_spades.output
-    output: "spades/contigs.fasta"
+    output: "spades/{product}.fasta"
+    wildcard_constraints:
+        product=r'(contigs|transcripts)',
     log: "logs/spades.log"
     benchmark: "benchmarks/spades.txt"
     version: get_version('spades.py')
     threads: int(config['spades']['threads'])
     params:
+        mode=lambda w: {'contigs':'--meta','transcripts':'--rna'}[w.product],
+        kmers=lambda w: config['spades']['kmers'] if w.product=='contigs' \
+                            else config['spades']['rnakmer'],
         ram_limit=config['spades']['ram'],
-        kmers=config['spades']['kmers'],
         tmp_dir=tempfile.TemporaryDirectory( \
                                 suffix='tmp', \
                                 prefix='spades', \
                                 dir=config['spades']['tmp_dir']),
         continue_flags="--continue" if "continue_spades" in config else "",
         skip_ec='--only-assembler',
-        #inputs=' '.join(
-        #    ['--pe{}-12 {}'.format(i+1,f) for i,f in enumerate(cleaned_reads)])
     shell:
         """
-        spades.py -m {params.ram_limit} -o spades -t {threads} \
+        spades.py {params.mode} -m {params.ram_limit} -t {threads} \
                   -k {params.kmers} --tmp-dir {params.tmp_dir.name} \
-                  --pe1-12 {input} \
-                  {params.continue_flags} {params.skip_ec} --meta 
+                  --pe1-12 {input} -o spades \
+                  {params.continue_flags} {params.skip_ec} 
         """

@@ -1,16 +1,16 @@
 """
-Workflow for assembling metagenomic samples
+Workflow for assembling transcriptomic samples
 
- * renames reads to sample name(s)
- * cleans with:
+ * renames reads to sample names
+ * optionally cleans with:
    - bbduk (adapters)
    - bfc (error correction)
    - trimmomatic (quality and length)
- * runs assembler (SPAdes or megahit)
- * renames contigs
+ * runs assembler (SPAdes only, for now)
+ * renames transcripts
     (to config[assembly_name], if given)
     (to sample name, if only one)
- * annotates (rRNAs, tRNA, genes)
+ * separates into rRNA and transcripts
 
 ####
 # Required conda packages:
@@ -54,17 +54,19 @@ include: "qc/setup.snake"
 assembler = config.get('assembler', 'spades')
 if assembler == 'spades':
     include: "assembly/metagenomic.spades.snake"
-    config['transitions']['contigs.raw.fasta'] = 'spades/contigs.fasta'
+    config['transitions']['contigs.raw.fasta'] = 'spades/transcripts.fasta'
 elif assembler == 'megahit':
-    include: "assembly/metagenomic.megahit.snake"
-    config['transitions']['contigs.raw.fasta'] = \
-                    "megahit-{params}/megahit.contigs.fa" \
-                                .format(params=config['megahit']['preset'])
+    raise Excption("Unsupported RNA assembler: " + config['assembler'])
 else:
     raise Excption("Unknown assembler: " + config['assembler'])
 #
 # contig annotation (RNA, genes, coverage, stats)
 include: "assembly/contig.annotation.snake"
+#
+# separate rRNA from transcripts at end
+include: "qc/sort.rna.snake"
+outputs.add('contigs.non-rRNA.fasta')
+outputs.add('contigs.rRNA-only.fasta')
 #
 # rule to create links
 include: "common/transitions.snake"
@@ -91,7 +93,7 @@ logger.debug(config)
 rule all:
     input:
         config['outputs'],
-        "contigs.report",
+        "assembly.{}.report".format(config['assembly_name']),
 
 rule contigs_fasta:
     """
@@ -142,7 +144,7 @@ rule final_report:
                      sample=[s for s in config['sample_data'] \
                                if 'clean' in config['sample_data'][s]])
     output:
-        "contigs.report"
+        "assembly.{assembly_name}.report"
     run:
         read_stats={}
 
@@ -202,7 +204,9 @@ rule final_report:
                 lsu_count+=1
         contig_stats['LSUs']=lsu_count
 
-        report={"reads":read_stats,"assembly":contig_stats}
+        report={"reads":read_stats,
+                "assembly":contig_stats,
+                "assembly_name":wildcards.assembly_name}
         with open(output[0],'w') as OUTF:
             OUTF.write(yaml.dump(report, default_flow_style=False))
 
