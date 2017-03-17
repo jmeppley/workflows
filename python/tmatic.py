@@ -26,7 +26,7 @@ def get_primer_template(chemistry):
     return primer_templates[chemistry]
 
 def process_barcode_string(barcode_string):
-    barcodes = barcode_string.split(":")
+    barcodes = barcode_string.split(".")
     barcode_data = {}
     for N in [1, 2]:
         barcode = barcodes[N-1] if len(barcodes)>=N else barcodes[0]

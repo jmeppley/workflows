@@ -15,7 +15,7 @@ tmatic_version = get_version('trimmomatic','-version')
 
 wildcard_constraints:
     chemistry=r'(truseq|scripseq|nextera)',
-    barcode=r'[ACTGN]+(\:[ACTGN]+)?',
+    barcode=r'[ACTGN]+(\.[ACTGN]+)?',
 
 rule trimmomatic_trim:
     """Trims given paired-end reads with given parameters"""
@@ -44,7 +44,7 @@ rule trimmomatic_trim:
         """
         if [ -s {input} ]; then
             trimmomatic SE -threads {threads} {input} {output} \
-                {params.trim_params}
+                {params.trim_params} > {log} 2>&1
         else
             touch {output}
         fi
@@ -90,9 +90,10 @@ rule trimmomatic_clean_adapters:
     shell:
         """
         trimmomatic PE -threads {threads} \
-        {input.fwd} {input.rev} \
-        {output[0]} {output[2]} {output[1]} {output[3]} \
-        ILLUMINACLIP:{input.primers}:{config[trimmomatic][illumina_clip]}
+         {input.fwd} {input.rev} \
+         {output[0]} {output[2]} {output[1]} {output[3]} \
+         ILLUMINACLIP:{input.primers}:{config[trimmomatic][illumina_clip]} \
+         > {log} 2>&1
         """
 
 rule trimomatic_recombine:
