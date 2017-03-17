@@ -107,11 +107,7 @@ for ext in ['stats', 'hist']:
         outputs.add(".".join((os.path.join('stats',file_name), ext)))
 
 # this prevents errors due to bad conda env switching
-for missing_var in ['GDAL_DRIVER_PATH',
-                    'GDAL_DATA',
-                    'JAVA_HOME_CONDA_BACKUP',
-                    ]:
-    os.environ.setdefault(missing_var,'dummy')
+include: "common/conda.env.hack.snake"
 #
 # End Configuration
 ######################

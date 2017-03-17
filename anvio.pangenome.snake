@@ -62,7 +62,8 @@ config.setdefault('outputs', set()).add('anvio/status/pangenome-' + \
 
 include: "anvio/anvio.contigs.snake"
 include: "common/transitions.snake"
-
+# this prevents errors due to bad conda env switching
+include: "common/conda.env.hack.snake"
 
 logger.debug("Snakefile config:\n" + yaml.dump(config))
 
