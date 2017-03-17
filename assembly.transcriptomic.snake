@@ -71,6 +71,9 @@ outputs.add('contigs.rRNA-only.fasta')
 # rule to create links
 include: "common/transitions.snake"
 
+# make sure tanstion source files don't get deleted
+config['outputs'].update(config['transitions'].values())
+
 # 
 # Make sure assembly has name
 if 'assembly_name' not in config:
