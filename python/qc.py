@@ -65,7 +65,7 @@ def setup_qc_outputs(config):
     cleaned reads file.
 
     add 'raw' files to each sample in config[sample_data]
-      (Using config[sample_data][patterns]) if missing
+      (Using config[sample_data][reads_patterns]) if missing
 
     Add transitions (to config[transitions]) that map
      from starting flie for QC to actual raw read files
@@ -93,18 +93,25 @@ def setup_qc_outputs(config):
     # process any patterns in sample_data[reads_patterns]
     samples = process_sample_data(sample_data)
 
+    transitions = config.setdefault('transitions', {})
+
+    # Loop over samples that came with their own clean reads
+    #  and replace with locally named file and add transition
+    samples_with_clean_reads = [s for s in samples if 'clean' in sample_data[s]]
+    for sample in samples_with_clean_reads:
+        remote_cleaned_reads = sample_data[sample]['clean']
+        local_cleaned_reads = '{sample}.clean.fastq'.format(**vars())
+        if local_cleaned_reads != remote_cleaned_reads:
+            transitions[local_cleaned_reads] = remote_cleaned_reads
+            sample_data[sample]['clean'] = local_cleaned_reads
+
     # find samples that need QC
     samples_with_raw_reads = [s for s in samples if 'raw' in sample_data[s]]
-    #if len(samples_with_raw_reads) == 0:
-    #    raise Exception("Please supply a map from samples to raw reads "
-    #                    " or a glob and re in"
-    #                    " config[sample_data][reads_patterns]")
 
     # get protocol
     cleaning_protocol = config.get('cleaning_protocol', 'None')
 
     # loop back over samples and set up cleaning or interleaving if needed
-    transitions = config.setdefault('transitions', {})
     outputs = []
     for sample in samples_with_raw_reads:
         raw_files = sorted(sample_data[sample]['raw'])

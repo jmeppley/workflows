@@ -97,12 +97,14 @@ else:
     include: "annotation/common.sixframe.snake"
     converted_suffix = "sixframe.faa"
 
-if extension == 'fastq':
+if extension == 'fastq' and aa_conversion != 'prodigal':
     ruleorder: remove_colons > fastq_to_fasta
 
 if config.get('remove_rna',True) in ['True', True]:
     include: "qc/sort.rna.snake"
     rna_step = 'non-rRNA.'
+    if extension == 'fastq':
+        ruleorder: filter_nonrrna_or_rrna > fastq_to_fasta
 else:
     rna_step = ''
 
