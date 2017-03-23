@@ -11,8 +11,6 @@ The annotation/common.snake makefile has the meat of the annotation code
 """
 
 from python.common import get_version
-from python.annotate import get_db_assignment_params,get_db_types,\
-                     get_hit_table_name_from_wildcards_db
 
 # command for removing prodigal gene IDs to get back to read names
 translation_filter = "perl -pe 's/^(\S+)_\d+(\s+)/\\1\\2/'"

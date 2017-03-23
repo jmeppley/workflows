@@ -10,11 +10,11 @@ threads:
 dbs:
     RefSeq: 
         path: ../../data/seqdbs/RefSeq/lastdb
-        format: lastx
+        format: lastp
         type: tax
     KEGG: 
         path: ../../data/seqdbs/KEGG/lastdb
-        format: lastx
+        format: lastp
         assign_type: kegg
     COG:
         path: ../../data/seqdbs/COG/frag-8/COG.1.hmm

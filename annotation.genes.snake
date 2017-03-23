@@ -95,7 +95,7 @@ config['taxdbfmt'] = config['dbs'][config['taxdb']].get('format','lastx')
 # set up list of files to create
 #  - The final tabulations
 #  - Stats and histrogram files for genes
-gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs, config)
+gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs, config, 'faa')
 annotation_file_list = \
                 expand("{prefix}.annot.{taxdb}.{taxdbfmt}.{clade_rank}.vs.{db_dot_fmt}.tsv",
                        prefix=prefix,

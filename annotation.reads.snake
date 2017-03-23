@@ -47,7 +47,7 @@ The reads can be embedded in a bam file or given as fasta or fastq.
 import yaml
 import os
 from python.common import get_version
-from python.annotate import get_db_dot_fmt_strings
+from python.annotate import get_db_dot_fmt_strings, get_last_alg
 
 #########
 # CONFIGURATION
@@ -93,12 +93,16 @@ aa_conversion = config.get('aa_conversion', 'sixframe')
 if aa_conversion == 'prodigal':
     include: "annotation/common.prodigal.snake"
     converted_suffix = "pred.genes.faa"
+    fastq_query_extension='faa'
 else:
     include: "annotation/common.sixframe.snake"
     converted_suffix = "sixframe.faa"
+    fastq_query_extension='fasta'
 
 if extension == 'fastq' and aa_conversion != 'prodigal':
     ruleorder: remove_colons > fastq_to_fasta
+if extension == 'bam' and aa_conversion == 'prodigal':
+    ruleorder: predict_genes_prodigal > extract_reads
 
 if config.get('remove_rna',True) in ['True', True]:
     include: "qc/sort.rna.snake"
@@ -109,28 +113,32 @@ else:
     rna_step = ''
 
 # how to search against taxdb
-config['taxdbfmt'] = config['dbs'][config['taxdb']].get('format','lastx')
+config['taxalg'] = get_last_alg(config['dbs'][config['taxdb']]\
+                                                .get('format','lastp'),
+                                fastq_query_extension)
 
 # set up list of files to create
 #  - The final tabulations
 #  - Stats and histrogram files for reads and translated seqs
-gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs, config)
+gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs,
+                                                 config,
+                                                 fastq_query_extension)
 annotation_file_list = \
-                expand("{prefix}.{rna_step}annot.{taxdb}.{taxdbfmt}.{clade_rank}.vs.{db_dot_fmt}.tsv",
-                       prefix=prefix,
-                       taxdbfmt=config['taxdbfmt'],
-                       rna_step=rna_step,
-                       taxdb=config['taxdb'],
-                       clade_rank=config['clade_ranks'],
-                       db_dot_fmt=gene_family_db_dot_fmts,) + \
-                expand("stats/{prefix}.{rna_step}{suffix}.{ext}", 
-                       ext=['stats','hist'],
-                       suffix=['fasta', converted_suffix],
-                       rna_step=rna_step,
-                       prefix=prefix)
+            expand("{prefix}.{rna_step}annot.{taxdb}.{taxalg}.{clade_rank}.vs.{db_dot_fmt}.tsv",
+                   prefix=prefix,
+                   taxalg=config['taxalg'],
+                   rna_step=rna_step,
+                   taxdb=config['taxdb'],
+                   clade_rank=config['clade_ranks'],
+                   db_dot_fmt=gene_family_db_dot_fmts,) + \
+            expand("stats/{prefix}.{rna_step}{suffix}.{ext}", 
+                   ext=['stats','hist'],
+                   suffix=['fasta', converted_suffix],
+                   rna_step=rna_step,
+                   prefix=prefix)
 
 logger.debug("Snakefile config:\n" + yaml.dump(config))
-
+logger.debug(repr(annotation_file_list))
 
 ##########
 # RULES:

@@ -81,7 +81,7 @@ rule pangenome_files:
     version: config['anvio_version']
     shell:
         """{config[anvio_prefix]}
-           rm -rf anvio/{wildcards.pangenome_name}
+           rm -rf anvio/{wildcards.pangenome_name} {wildcards.pangenome_name}
            anvi-pan-genome -g {input} -J {wildcards.pangenome_name} \
             > {log} 2>&1
            mv {wildcards.pangenome_name} anvio/

@@ -24,7 +24,7 @@ rule cmsearch:
     output:
         temp("{file_root}.vs.{molecule}.cmsearch.tbl")
     benchmark:
-        "benchmarks/{file_root}.vs.{molecule}.tbl.txt"
+        "benchmarks/{file_root}.vs.{molecule}.tbl.time"
     threads:
         config['cmsearch']['threads']
     version:

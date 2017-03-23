@@ -1,6 +1,3 @@
-from python.annotate import get_db_assignment_params,get_db_types,\
-                            get_hit_table_name_from_wildcards_db
-#configfile: "annotation.yaml"
 #########
 # CONFIGURATION
 #

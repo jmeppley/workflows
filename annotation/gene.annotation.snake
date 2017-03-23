@@ -17,7 +17,7 @@ prefix = "genes" if "genes_faa" not in config \
                  else os.path.splitext(config['genes_faa'])[0]
 config.setdefault('prefix',prefix)
 
-gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs, config)
+gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs, config, 'faa')
 #print(gene_family_db_dot_fmts )
 
 output_tables = \

@@ -12,7 +12,7 @@ import sys
 snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
 sys.path[0]=os.path.join(snakefile_path,'..','python')
 from common import get_version, parse_stats
-from annotate import get_db_dot_fmt_strings
+from annotate import get_db_dot_fmt_strings, get_last_alg
 
 ####
 # INCLUDES and CONFIG
@@ -41,7 +41,11 @@ clean_prefixes = expand("{sample}_reads.clipped.joined.trimmed",
 include: "../annotation/silva.snake"
 #
 # get special list for building file names
-gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs, config)
+gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs,
+                                                 config,
+                                                 'fasta')
+taxalg = get_last_alg(config['dbs'][config['taxdb']].get('format','lastp'),
+                      'fasta')
 #
 ####
 
@@ -65,15 +69,17 @@ rule report_all:
                            prefix=config['annotation_prefixes'], 
                            type=['fasta','sixframe.faa']),
         annot_tabs=\
-            expand("{prefix}.annot.{taxdb}.lastx.{clade}.vs.{db_dot_fmt}.tsv",
+            expand("{prefix}.annot.{taxdb}.{taxalg}.{clade}.vs.{db_dot_fmt}.tsv",
                        taxdb=config['taxdb'],
+                       taxalg=taxalg,
                        db_dot_fmt=gene_family_db_dot_fmts,
                        prefix=config['annotation_prefixes'],
                        clade=config['clade_ranks'],),
         tax_counts=\
-            expand("{prefix}.nocolon.annot.{taxdb}.lastx.{clade}.count.tsv",
+            expand("{prefix}.nocolon.annot.{taxdb}.{taxalg}.{clade}.count.tsv",
                    prefix=config['annotation_prefixes'],
                    taxdb=config['taxdb'],
+                   taxalg=taxalg,
                    clade=config['clade_ranks']),
         # rrna counts
         rrna_counts=\
@@ -141,7 +147,7 @@ rule report_all:
             OUT.write("== Taxon counts found by rank in RefSeq (lastx) ==\n")
             OUT.write("rank\ttaxon count\tread count\n")
             for input_file in input.tax_counts:
-                rank = re.search(r'\.lastx\.([a-z]+)\.count\.tsv', input_file).group(1)
+                rank = re.search(r'\.last[nx]\.([a-z]+)\.count\.tsv', input_file).group(1)
                 read_counts = pandas.read_table(input_file,
                                                 header=None, 
                                                 index_col=0, 

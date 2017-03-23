@@ -24,7 +24,7 @@ rule filter_nonrrna_or_rrna:
     version:
         get_version("screen_list.py")
     params:
-        keep=lambda w: "-k" if w.type=='rRNA' else ""
+        keep=lambda w: "-k" if w.type!='non-rRNA' else ""
     shell:
         "screen_list.py {params.keep} -l {input.hits} -C 0 \
                         -f {wildcards.ext} -v {input.reads} \

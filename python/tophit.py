@@ -8,6 +8,7 @@ import os
 from snakemake.logging import logger
 from python.samples import process_sample_data
 from python.qc import setup_qc_outputs
+from python.annotate import get_last_alg
 
 DEFAULT_FILTER = {'F': 0, 'B': 50}
 
@@ -89,7 +90,7 @@ def get_top_hit_outputs(config):
     # set up databases
     for dbase in dbs:
         logger.debug('processing database: ' + dbase)
-        search_alg = get_search_alg(dbs[dbase]['format'], is_prot)
+        search_alg = get_last_alg(dbs[dbase]['format'], is_prot)
         hit_filter = get_filter_string(config.get('filter', DEFAULT_FILTER))
         db_strings[dbase] = \
                 'vs.{dbase}.{search_alg}.{hit_filter}'.format(**vars())
@@ -108,28 +109,4 @@ def get_filter_string(filter_dict):
     """
     return "".join("_{}{}".format(k, filter_dict[k]) \
                    for k in sorted(filter_dict.keys()))
-
-def get_search_alg(dbformat, extension):
-    """
-    right now looks for last db type (lastp or lastn) and extension (faa or
-    not) and returns lastp, lastx, or lastn.
-
-    Support for other dbs can be added on request.
-    """
-    if dbformat == 'lastp':
-        if extension == 'faa':
-            search_alg = 'lastp'
-        else:
-            search_alg = 'lastx'
-    elif dbformat == 'lastn':
-        if extension == 'faa':
-            raise Exception("I'm sorry, I don't know how to search for faa "
-                            "sequences in a lastp database!")
-
-        else:
-            search_alg = 'lastn'
-    else:
-        raise Exception(("I'm sorry, but the database format '{}' is not yet "
-                         "supported").format(dbformat))
-    return search_alg
 

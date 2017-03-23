@@ -1,4 +1,4 @@
-from python.annotate import get_db_types
+from python.annotate import get_db_types, get_db_assignment_params
 
 #########
 # CONFIGURATION
@@ -19,6 +19,23 @@ default_threads=config.setdefault('threads',{}).get('default', 3)
 include: "lastal.snake"
 include: "hmmer.snake"
 
+def get_read_name_filter(wildcards):
+    """
+    Figure out if we need to translate read names. Usually this takes gene 
+    names back to reads.
+
+    Return the sed command to rename fasta records if needed or return cat
+    to leave data unchanged
+    """
+    try:
+        if translation_rexp.search(w.prefix):
+            return translation_filter
+    except NameError:
+        pass
+
+    # if ecpr doesnt match or is not defined:
+    return "cat"
+
 rule assign_taxa:
     """
     Turn a hit table of reads vs RefSeq into a table of read taxon assignments
@@ -35,9 +52,7 @@ rule assign_taxa:
         format=lambda w: 'blast' if re.search(r'^b?last[pnx]$', w.lastalg)\
                                  else w.lastalg,
         # Filter reading frame suffixes if translated with transeq or prodigal
-        filter=lambda w: translation_filter \
-                                if translation_rexp.search(w.prefix) \
-                                else "cat",
+        filter=get_read_name_filter,
     version:
         get_version('assign_taxa.py')
     shell:
@@ -67,9 +82,7 @@ rule assign_paths:
         # KEGG and PFAM need special handling
         params=lambda w: get_db_assignment_params(w, config),
         # Filter reading frame suffixes if translated with transeq or prodigal
-        filter=lambda w: translation_filter \
-                                if translation_rexp.search(w.prefix) \
-                                else "cat",
+        filter=get_read_name_filter,
     shell:
          "cat {input} \
           | {params.filter} \
