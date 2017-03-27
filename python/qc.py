@@ -110,6 +110,8 @@ def setup_qc_outputs(config):
             sample_data[sample].setdefault('protocol', 'None')
         else:
             local_cleaned_reads = '{sample}.clean.fastq'.format(**vars())
+            if re.search(r'\.gz$', remote_cleaned_reads) is not None:
+                local_cleaned_reads += ".gz"
             if local_cleaned_reads != remote_cleaned_reads:
                 transitions[local_cleaned_reads] = remote_cleaned_reads
                 sample_data[sample]['clean'] = local_cleaned_reads
@@ -136,13 +138,32 @@ def setup_qc_outputs(config):
                                         "\n".join(raw_files)))
 
 
+        # check to see if they are compressed (we can handle .gz)
+        #  Bail out if one file is compressed and the other isn't
+        files_gzipped = None
+        for file_name in raw_files:
+            if re.search(r'\.gz$', file_name) is not None:
+                if files_gzipped==False:
+                    raise Exception("It seems one file is compressed and the "
+                                    "other is "
+                                    "not:\n{}".format("\n".join(raw_files)))
+                files_gzipped = True
+            else:
+                if files_gzipped==True:
+                    raise Exception("It seems one file is compressed and the "
+                                    "other is "
+                                    "not:\n{}".format("\n".join(raw_files)))
+                files_gzipped = False
+
+
         # starting files (define as transitions from raw files)
+        extension = "fastq.gz" if files_gzipped else "fastq"
         if len(raw_files) == 2:
             for direction, source_file in zip(READ_DIRECTIONS, raw_files):
-                transitions['{sample}.{direction}.fastq'.format(**vars())] = \
-                    source_file
+                transitions['{sample}.{direction}.{extension}'\
+                                                .format(**vars())] = source_file
         else:
-            transitions['{sample}.fastq'.format(**vars())] = raw_files[0]
+            transitions['{sample}.{extension}'.format(**vars())] = raw_files[0]
 
         # cleaned suffix
         cleaned_suffix = QC_PROTOCOLS.get(cleaning_protocol, '')
@@ -169,6 +190,7 @@ def setup_qc_outputs(config):
 
         if config.get('remove_rna', True) in ['True', True]:
             # if rrna separation requested, add rRNA-only and non-rRNA to names
+            logger.debug("adding separated rrna reads to output")
             for rrna_split in ['non-rRNA', 'rRNA-only']:
                 outputs.append(re.sub(r'\.fastq$',
                                       '.{}.fastq'.format(rrna_split),
