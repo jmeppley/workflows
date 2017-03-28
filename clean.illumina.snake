@@ -11,7 +11,7 @@ This is in the testing phase:
  * this workflow will link them together based on output file names
 
 """
-import re
+import re, yaml
 from python.common import get_version
 from python.qc import setup_qc_outputs
 from snakemake.logging import logger
@@ -28,7 +28,7 @@ include: "qc/setup.snake"
 
 include: 'common/stats.snake'
 
-logger.debug(config)
+logger.debug("Snakefile config:\n" + yaml.dump(config))
 
 # Tell snakemake what to make
 rule clean_illumina_outputs:
