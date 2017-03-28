@@ -1,0 +1,20 @@
+assembly_name: megahit
+assembler: megahit
+sample_data:
+  reads_patterns:
+     - glob: "../../data/raw_reads/2014_ALOHA_XVII_1-1[568]_DNA_S*.fastq"
+       re: "/[^A-Za-z]*([A-Za-z][^/]*)_S\\d[^/]+\\.fastq"
+       cleaned: False
+trimmomatic:
+    threads: 10
+    minlen: 100
+    leading: 10
+    trailing: 10
+    sliding_window: "4:20"
+bbduk:
+    threads: 5
+cmsearch:
+    threads: 10
+megahit:
+    preset: meta-sensitive
+    threads: 40
