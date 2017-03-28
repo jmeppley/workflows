@@ -11,6 +11,8 @@ records jonied by a bunch of NNN's
 """
 
 import re
+import yaml
+from collections import defaultdict
 from Bio import Seq, SeqIO, SeqRecord
 from snakemake.logging import logger
 from python.samples import process_sample_data
@@ -130,14 +132,6 @@ def setup_qc_outputs(config):
                                         config.get('cleaning_protocol',
                                                    'None'))
 
-        # Bail out if we have too many files per sample
-        if len(raw_files) > 2:
-            raise Exception("I don't know how to deal with more than two"
-                            " files per sample!\nSample={}\nFiles:\n{}"\
-                                .format(sample,
-                                        "\n".join(raw_files)))
-
-
         # check to see if they are compressed (we can handle .gz)
         #  Bail out if one file is compressed and the other isn't
         files_gzipped = None
@@ -154,11 +148,16 @@ def setup_qc_outputs(config):
                                     "other is "
                                     "not:\n{}".format("\n".join(raw_files)))
                 files_gzipped = False
-
+        extension = "fastq.gz" if files_gzipped else "fastq"
 
         # starting files (define as transitions from raw files)
-        extension = "fastq.gz" if files_gzipped else "fastq"
-        if len(raw_files) == 2:
+        if len(raw_files) > 2:
+            # The reads are probably split up into lanes
+            for direction, file_list in setup_merge_by_lanes(raw_files,
+                                                             sample).items():
+                transitions['{sample}.{direction}.{extension}'\
+                                                .format(**vars())] = file_list
+        elif len(raw_files) == 2:
             for direction, source_file in zip(READ_DIRECTIONS, raw_files):
                 transitions['{sample}.{direction}.{extension}'\
                                                 .format(**vars())] = source_file
@@ -199,6 +198,36 @@ def setup_qc_outputs(config):
             outputs.append(cleaned_reads)
 
     return outputs
+
+def setup_merge_by_lanes(raw_files, sample):
+    """
+    Pair files, and setup merge into a single pair of files
+    """
+    pairs = defaultdict(dict)
+    for file_name in raw_files:
+        # key off of file name with "R1" or "R2" removed
+        if re.search(r'[-._]R1[-._]', file_name):
+            pair_key = re.sub(r'[-._]R1[-._]', '', file_name)
+            pairs[pair_key]['R1'] = file_name
+        elif re.search(r'[-._]R2[-._]', file_name):
+            pair_key = re.sub(r'[-._]R2[-._]', '', file_name)
+            pairs[pair_key]['R2'] = file_name
+        else:
+            raise Exception("This does not appear to be a pairred file! " + 
+                            file_name)
+
+    logger.debug(yaml.dump(pairs))
+
+    concatenations = {'R1': [], 'R2': []}
+    for pair in sorted(pairs.keys()):
+        for direction in concatenations.keys():
+            if direction not in pairs[pair]:
+                raise Exception("Lane has no pair: " + repr(pairs[pair]))
+            concatenations[direction].append(pairs[pair][direction])
+
+    logger.debug(yaml.dump(concatenations))
+    return concatenations
+
 
 def rev_comp_rec(record, qual=False, suffix=''):
     """

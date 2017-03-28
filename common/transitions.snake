@@ -10,21 +10,31 @@ quickly becomes impractical.
 If we use a symblic link, though, the output of one set of rules with a complicated name, can also be the simply named input of another set of rules.
 
 Another use if for when the input file is in another part of the file system. We can link it to a simply named file to start the workflow.
+
+We can also concat multiple files into one here by giving list of files
 """
 
-# dynamically generate overly specific regex constrain that lists all file names
+def get_transition_command(wildcards):
+    """ choose 'ln -s' for single files, cat for multiple. Also use abs paths """
+    input_files = config['transitions'][wildcards.transition_file_name]
+    if isinstance(input_files, str):
+        # Single input file, just link it
+        return "ln -s {}".format(os.path.abspath(input_files))
+    # otherwise, we have a list of files to concatenate
+    return "cat {} >".format(" ".join(os.path.abspath(f) for f in input_files))
+
+# To prevent transition rule from matchin every file on earth:
+#  dynamically generate overly specific regex constraint that lists all file names
 pattern = "(" + "|".join(config.get('transitions',{}).keys()) + ")"
+wildcard_constraints:
+    transition_file_name=pattern
 
 # transition rule will only match one of the configured files
-rule transition_link:
-    """ Creates a symbolic link from a config mapping """
-    input: lambda w: config['transitions'][w.file_name]
-    #input: lambda w: config.get('transitions',{}).get(w.file_name,'nonexistent')
-    output: "{file_name}"
-    wildcard_constraints:
-        file_name=pattern
+rule transition_link_or_cat:
+    """ Creates a symbolic link to or concatenates files from a config mapping """
+    input: lambda w: config['transitions'][w.transition_file_name]
+    output: "{transition_file_name}"
     params:
-        abs_input = \
-            lambda w: os.path.abspath(config['transitions'][w.file_name])
-    shell: "rm -f {output} && ln -s {params.abs_input} {output}"
+        command = get_transition_command,
+    shell: "rm -f {output} && {params.command} {output}"
 

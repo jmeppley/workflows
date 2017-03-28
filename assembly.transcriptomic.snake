@@ -87,7 +87,7 @@ if 'assembly_name' not in config:
         raise Exception("Please supply a naming string for this assembly "
                         "in config[assembly_name].")
 
-logger.debug(config)
+logger.debug("Snakefile config:\n" + yaml.dump(config))
 
 ############
 # RULES
