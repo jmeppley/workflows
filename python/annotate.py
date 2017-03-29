@@ -32,6 +32,8 @@ def get_last_alg(dbformat, extension):
                             "sequences in a lastp database!")
         else:
             search_alg = 'lastn'
+    elif dbformat == 'bwadb':
+        search_alg = 'bwa.sam'
     else:
         raise Exception(("I'm sorry, but the database format '{}' is not yet "
                          "supported").format(dbformat))

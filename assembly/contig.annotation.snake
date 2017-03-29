@@ -12,11 +12,14 @@ the assembly
 
 include: "../common/mapping_bwa.snake"
 include: "../annotation/cmsearch.snake"
+include: "../annotation/lastal.snake"
 # available rRNA DBs
+from python.annotate import get_last_alg
 rrna_db_dot_fmts=[]
 for db, db_data in config.get('dbs',{}).items():
     if db_data.get('type')=='rrna':
-        fmt = db_data.get('format','lastdb')
+        fmt = db_data.get('format','lastn')
+        fmt = get_last_alg(fmt, 'fna')
         rrna_db_dot_fmts.append("{}.{}".format(db,fmt))
 
 # Some extra hoops to jump through because the contigs stats aren't a proper 
@@ -112,9 +115,9 @@ rule rrna_fasta:
         contigs="contigs.fasta",
         gff="{prefix}.gff"
     output:
-        "{prefix}.gff.fna"
+        "{prefix}.gff.fasta"
     benchmark:
-        "benchmarks/{prefix}.gff.fna.time"
+        "benchmarks/{prefix}.gff.fasta.time"
     version:
         get_version("get_sequences_from_m8.py")
     shell:
@@ -129,13 +132,13 @@ rule map_genes_to_bwadb:
         config['dbs'][wildcards.db]['path']
     """
     input:
-        "{file_root}.fna"
+        "{file_root}.fasta"
     output:
-        ("{file_root}.fna.vs.{db}.sam")
+        ("{file_root}.vs.{db}.bwa.sam")
     log:
-        "logs/{file_root}.vs.{db}.sam.log"
+        "logs/{file_root}.vs.{db}.bwa.sam.log"
     benchmark:
-        "benchmarks/{file_root}.vs.{db}.sam.time"
+        "benchmarks/{file_root}.vs.{db}.bwa.sam.time"
     version:
         get_version('bwa', 
                     version_flag="", 
@@ -154,7 +157,7 @@ rule rrna_report:
     input:
         gff="contigs.vs.rRNA.cmsearch.{mol}.gt{length}.gff",
         hits=lambda w: expand("contigs.vs.rRNA.cmsearch.{mol}.gt{length}" + \
-                              ".gff.fna.vs.{db_dot_fmt}",
+                              ".gff.vs.{db_dot_fmt}",
                               db_dot_fmt=[s for s in rrna_db_dot_fmts \
                                           if re.search(w.mol,s) is not None],
                               mol=w.mol,
@@ -209,10 +212,16 @@ rule rrna_report:
         from edl.util import parseMapFile
         for hit_table in input.hits:
             hit_table_name = re.search(r'gff\.fna\.vs\.(.+)', hit_table).group(1)
-            db, format = hit_table_name.split('.',1)
+            words = hit_table_name.split('.',1)
+            db = words[0]
+            hit_format = words[-1]
+            if hit_format.startswith('last'):
+                hit_format = 'last'
+            elif hit_format.startswith('blast'):
+                hit_format = 'blastplus'
             id_name_file = config['dbs'][db]['path'] + ".ids"
             hit_descriptions = parseMapFile(id_name_file)
-            for gene, hits in generate_hits(hit_table, format=format):
+            for gene, hits in generate_hits(hit_table, format=hit_format):
                 # take the first hit
                 hit = list(hits)[0]
                 contig, start, end = re.search(r'^(.+)_(\d+)_(\d+)$', gene)\

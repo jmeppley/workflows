@@ -115,12 +115,19 @@ def add_stats_outputs(snakefile, config):
             '--configfile',
             config_file.name,
             '--summary',
+            '--rerun-incomplete',
             '-n',
         ]
 
         logger.debug("Performing dry-run to get outputs")
         logger.debug(" ".join(command))
-        out = subprocess.check_output(command).decode()
+        try:
+            out = subprocess.check_output(command).decode()
+        except:
+            logger.wawrning("Cannot get fastx files, there is something wrong "
+                            "with your workflow!")
+            return
+
         logger.debug("Dry run complete")
 
         new_outputs = config.setdefault('outputs', set())
