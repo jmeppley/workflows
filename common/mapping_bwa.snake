@@ -1,8 +1,13 @@
+include: "../common/tool.path.snake"
+from edl import __version__ as PYMG_VERSION
 SAMTOOLS_VERSION = get_version('samtools', lines=0)
 BWA_VERSION = \
         get_version('bwa', 
                     version_flag="", 
                     regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
+from snakemake.utils import update_config
+update_config(config, {'bwa': {'threads': 15}})
+config['cov_col'] = 'md cov'
 
 #######
 # map reads to contigs with BWA:
@@ -51,8 +56,7 @@ rule map_sample_reads:
     benchmark:
         "benchmarks/{sample}.vs.contigs.bwa_mem.time"
     version: BWA_VERSION
-    threads:
-        config.get('bwa',{}).get('threads',15)
+    threads: config['bwa']['threads']
     shell:
         "bwa mem -p -t {threads} mapping/contigs.index.bwa {input[1]} \
             2> {log} \
@@ -118,3 +122,23 @@ rule mapped_read_depths:
         input="mapping/{sample}.vs.contigs.bam"
     shell:
         "samtools depth {params.input} > {output}"
+
+rule contig_stats_table:
+    """
+    Combine stats from fasta header with depths and read counts to 
+    make a master table of contig stats
+    """
+    input:
+        "contigs.fasta",
+        "mapping/{sample}.reads.vs.contigs.depths",
+        "mapping/{sample}.reads.vs.contigs.read_counts",
+    output:
+        "contigs.coverages.{sample}.txt",
+        "contigs.histograms.{sample}.txt"
+    benchmark:
+        "benchmarks/contig.stats.{sample}.time"
+    version:
+        "py-metagenomics-{}".format(PYMG_VERSION)
+    shell:
+        "python {config[pymg_dir]}/edl/assembly.py get_contig_stats {input} {output} txt_width=75 log=True"
+
