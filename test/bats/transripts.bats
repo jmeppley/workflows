@@ -23,7 +23,7 @@ setup() {
     fi
 }
 
-@test "assemble single sample with spades" {
+@test "assemble single transcriptome with spades" {
     rm -rf test/scratch/transcripts
     mkdir -p test/scratch/transcripts
     cd test/scratch/transcripts
