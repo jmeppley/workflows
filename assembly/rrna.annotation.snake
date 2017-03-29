@@ -1,0 +1,126 @@
+include: "../annotation/cmsearch.snake"
+# available rRNA DBs
+rrna_db_dot_fmts=[]
+for db, db_data in config.get('dbs',{}).items():
+    if db_data.get('type') == 'rrna':
+        fmt = db_data.get('format', 'lastdb')
+        rrna_db_dot_fmts.append("{}.{}".format(db,fmt))
+
+sample_coverages = \
+        {s:"contigs.coverages.{sample}.txt".format(sample=s) \
+                     for s in config['sample_data'] \
+                     if 'clean' in config['sample_data'][s]}
+
+def get_rna_search_hits(w):
+    """ return list of search results using wildcard info """
+    hits = []
+    for db_dot_fmt in rrna_db_dot_fmts:
+        hits.append(("contigs.vs.rRNA.cmsearch.{mol}.gt{length}"
+                     ".gff.fna.vs.{db_dot_fmt}"
+                    ).format(db_dot_fmt=db_dot_fmt,
+                             length=w.length,
+                             mol=w.mol))
+    return hits
+
+rule long_rrna_gff:
+    """ find long LSU or SSU annotations """
+    input:
+        "{prefix}.gff"
+    output:
+        "{prefix}.{mol,[LS]SU}.gt{length,\d+}.gff"
+    benchmark:
+        "benchmarks/{prefix}.{mol}.gt{length}.time"
+    version:
+        get_version("filter_blast_m8.py")
+    shell:
+        "grep {wildcards.mol} {input} \
+          | sort \
+          | filter_blast_m8.py -s score -L {wildcards.length} -f gff \
+            --nonoverlapping \
+          > {output}"
+
+rule rrna_fasta:
+    """ extract rRNA fasta """
+    input:
+        fasta="{root}.fasta",
+        gff="{root}.vs.{search}.gff"
+    output:
+        "{root}.vs.{search}.gff.fna"
+    benchmark:
+        "benchmarks/{root}.vs.{search}.gff.fna.time"
+    version:
+        get_version("get_sequences_from_m8.py")
+    shell:
+        "cat {input.fastq} \
+            | get_sequences_from_m8.py -f gff {input.gff} \
+            > {output}"
+
+rule rrna_report:
+    """
+    Look at the rRNA annotations and get table of nearly full length LSUs or SSUs
+    """
+    input:
+        gff="contigs.vs.rRNA.cmsearch.{mol}.gt{length}.gff",
+        hits=get_rna_search_hits,
+        stats=sample_coverages.values(),
+    output:
+        "contigs.vs.rRNA.cmsearch.{mol}.gt{length}.tsv"
+    wildcard_constraints:
+        mol=r'[LS]SU',
+        length=r'\d+',
+    run:
+        # get map from contigs to coverage
+        coverages = {}
+        for sample, stats_file in sample_coverages.items():
+            cov_table = pandas.read_table(stats_file,
+                                          index_col=0,
+                                          header=0,
+                                         )
+            coverages[sample] = cov_table[config['cov_col']]
+
+        # table of rRNA model hits from filtered GFF
+        features = pandas.read_table(input.gff,
+                                     header=None,
+                                     names=['contig',
+                                            'tool',
+                                            'type',
+                                            'start',
+                                            'end',
+                                            'score',
+                                            'notes'],
+                                     usecols=[0,1,2,3,4,5,8])
+
+        # add coverages for each sample
+        coverage_col_names = []
+        for sample, sample_covs in coverages.items():
+            col_name = 'cov_{}'.format(sample)
+            coverage_col_names.append(col_name)
+            features[col_name] = \
+                [sample_covs[features.loc[i,'contig']]\
+                 for i in features.index]
+
+        # index on contig, start, and end, and just take a few columns
+        output_index_columns = ['contig', 'start', 'end']
+        output_columns = coverage_col_names + ['type', 'score']
+        output_table = features.set_index(output_index_columns)[output_columns]
+
+        # get Silva annotation(s) for each feature
+        from edl.blastm8 import generate_hits
+        from edl.util import parseMapFile
+        for hit_table in input.hits:
+            hit_table_name = re.search(r'gff\.fna\.vs\.(.+)', hit_table).group(1)
+            db, format = hit_table_name.split('.',1)
+            id_name_file = config['dbs'][db]['path'] + ".ids"
+            hit_descriptions = parseMapFile(id_name_file)
+            for gene, hits in generate_hits(hit_table, format=format):
+                # take the first hit
+                hit = list(hits)[0]
+                contig, start, end = re.search(r'^(.+)_(\d+)_(\d+)$', gene)\
+                                                                        .groups()
+                index = (contig, int(start), int(end))
+                if index not in output_table.index:
+                    index = (contig, int(end), int(start))
+                desc = hit_descriptions[hit.hit]
+                output_table.loc[index, db] = desc
+
+        output_table.to_csv(output[0], sep='\t')
