@@ -34,7 +34,6 @@ config.setdefault('transitions', {})
 
 ##
 # Bring in components
-#include: "common/common.snake"
 #
 # for mapping reads back to contigs
 include: "common/mapping_bwa.snake"
@@ -96,7 +95,7 @@ rule all:
 
 rule contigs_fasta:
     """
-    Rename contigs
+    Rename contigs to sample or assembly name
     """
     input:
         "spades/contigs.fasta"
@@ -120,6 +119,9 @@ rule contigs_fasta:
                                                        sequence))
 
 def get_read_files(reads_type, config):
+    """
+    code to get all the reads files for all samples
+    """
     for sample, sample_data in config['sample_data'].items():
         if reads_type in sample_data:
             reads_files = sample_data[reads_type]

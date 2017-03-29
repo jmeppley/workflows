@@ -1,0 +1,4 @@
+channels:
+    - BioBuilds
+dependencies:
+    - salmon

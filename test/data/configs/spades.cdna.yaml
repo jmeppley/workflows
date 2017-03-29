@@ -1,0 +1,20 @@
+assembly_name: spades
+sample_data:
+    HOT234_200m_4k:
+        raw:
+          - "../../data/raw_reads/cdna_R1.fastq"
+          - "../../data/raw_reads/cdna_R2.fastq"
+        chemistry: scripseq
+        barcode: ATCACG
+trimmomatic:
+    threads: 10
+    minlen: 100
+    leading: 10
+    trailing: 10
+    sliding_window: "4:20"
+bbduk:
+    threads: 5
+cmsearch:
+    threads: 10
+spades:
+    ram: 10

@@ -1,0 +1,17 @@
+channels:
+ - bioconda
+dependencies:
+ - python=3
+ - snakemake
+ - pandas
+ - biopython
+ - bbmap
+ - bfc
+ - trimmomatic
+ - bwa 
+ - samtools
+ - infernal
+ - prinseq
+ - seqtk
+ - sed
+ - spades

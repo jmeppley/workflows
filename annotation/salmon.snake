@@ -1,0 +1,76 @@
+if 'salmon_env' not in config:
+    config['salmon_prefix']=""
+else:
+    config['salmon_prefix'] = "source activate {}\n".format(config['salmon_env'])
+
+config['salmon_version'] = get_version("salmon",
+                                       cmd_prefix=config['salmon_prefix'],)
+
+from snakemake.utils import update_config
+update_config(config, {'salmon': {'threads': 4, 'lib_type': 'A'}})
+config['cov_col'] = 'TPM'
+
+def get_sample_reads(w):
+    """ return read files for sample """
+    if 'raw' in config['sample_data'][w.sample]:
+        return config['sample_data'][w.sample]['raw']
+    else:
+        return config['sample_data'][w.sample]['clean']
+
+def get_sample_reads_option(w):
+    """ return option string for salmon reads """
+    if 'raw' in config['sample_data'][w.sample]:
+        flags = ['-{} {}'.format(i+1, f) \
+                   for i, f \
+                   in enumerate(config['sample_data'][w.sample]['raw'])]
+        return ' '.join(flags)
+    else:
+        return '-r ' + config['sample_data'][w.sample]['clean']
+
+rule index_contigs_salmon:
+    """ process a set of transcripts for salmon quanitfication """
+    input: "{contigs}.fasta"
+    output: "salmon/{contigs}.index/header.json"
+    log: "logs/salmon.{contigs}.index"
+    benchmark: "benchmarks/salmon.{contigs}.index.time"
+    params: 
+        outdir=lambda w: "salmon/{}.index".format(w.contigs)
+    version: config['salmon_version']
+    shell:
+        """
+        {config[salmon_prefix]}
+        rm -rf {params.outdir}
+        salmon index -t {input} -i {params.outdir} -p {threads} > {log} 2>&1
+        """
+
+rule quant_reads_salmon:
+    """ quantify a set of reads a gainst a salmon index """
+    input:
+        index="salmon/{contigs}.index/header.json",
+        reads=get_sample_reads,
+    output: "salmon/{sample}.vs.{contigs}.quant/quant.sf"
+    log: "logs/salmon.{sample}.vs.{contigs}.quant.log"
+    benchmark: "benchmarks/salmon.{sample}.vs.{contigs}.time"
+    version: config['salmon_version']
+    params:
+        reads=get_sample_reads_option,
+        outdir=lambda w: "salmon/{sample}.vs.{contigs}.quant".format(
+                                sample=w.sample,
+                                contigs=w.contigs),
+        indir=lambda w: "salmon/{contigs}.index".format(contigs=w.contigs),
+    shell:
+        """
+        {config[salmon_prefix]}
+        rm -rf {params.outdir}
+        salmon quant -i {params.indir} -p {threads} \
+         -l {config[salmon][lib_type]} \
+         {params.reads} -o {params.outdir} \
+         > {log} 2>&1
+        """
+
+rule coverages_file:
+    " Use quant.sf file as coverages file "
+    input: "salmon/{sample}.vs.{contigs}.quant/quant.sf"
+    output: "{contigs}.coverages.{sample}.txt"
+    shell: "ln -s {input} {output}"
+
