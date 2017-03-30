@@ -1,9 +1,11 @@
 include: "../annotation/cmsearch.snake"
 # available rRNA DBs
 rrna_db_dot_fmts=[]
+from python.annotate import get_last_alg
 for db, db_data in config.get('dbs',{}).items():
     if db_data.get('type') == 'rrna':
         fmt = db_data.get('format', 'lastdb')
+        fmt = get_last_alg(fmt, 'fna')
         rrna_db_dot_fmts.append("{}.{}".format(db,fmt))
 
 sample_coverages = \
@@ -15,25 +17,29 @@ def get_rna_search_hits(w):
     """ return list of search results using wildcard info """
     hits = []
     for db_dot_fmt in rrna_db_dot_fmts:
-        hits.append(("contigs.vs.rRNA.cmsearch.{mol}.gt{length}"
-                     ".gff.fna.vs.{db_dot_fmt}"
+        hits.append(("contigs.vs.rRNA.cmsearch.{rmol}.gt{length}"
+                     ".gff.vs.{db_dot_fmt}"
                     ).format(db_dot_fmt=db_dot_fmt,
                              length=w.length,
-                             mol=w.mol))
+                             rmol=w.rmol))
     return hits
+
+wildcard_constraints:
+    rmol=r'[LS]SU',
+    length=r'\d+',
 
 rule long_rrna_gff:
     """ find long LSU or SSU annotations """
     input:
         "{prefix}.gff"
     output:
-        "{prefix}.{mol,[LS]SU}.gt{length,\d+}.gff"
+        "{prefix}.{rmol}.gt{length}.gff"
     benchmark:
-        "benchmarks/{prefix}.{mol}.gt{length}.time"
+        "benchmarks/{prefix}.{rmol}.gt{length}.time"
     version:
         get_version("filter_blast_m8.py")
     shell:
-        "grep {wildcards.mol} {input} \
+        "grep {wildcards.rmol} {input} \
           | sort \
           | filter_blast_m8.py -s score -L {wildcards.length} -f gff \
             --nonoverlapping \
@@ -45,9 +51,9 @@ rule rrna_fasta:
         fasta="{root}.fasta",
         gff="{root}.vs.{search}.gff"
     output:
-        "{root}.vs.{search}.gff.fna"
+        "{root}.vs.{search}.gff.fasta"
     benchmark:
-        "benchmarks/{root}.vs.{search}.gff.fna.time"
+        "benchmarks/{root}.vs.{search}.gff.fasta.time"
     version:
         get_version("get_sequences_from_m8.py")
     shell:
@@ -60,14 +66,11 @@ rule rrna_report:
     Look at the rRNA annotations and get table of nearly full length LSUs or SSUs
     """
     input:
-        gff="contigs.vs.rRNA.cmsearch.{mol}.gt{length}.gff",
+        gff="contigs.vs.rRNA.cmsearch.{rmol}.gt{length}.gff",
         hits=get_rna_search_hits,
         stats=sample_coverages.values(),
     output:
-        "contigs.vs.rRNA.cmsearch.{mol}.gt{length}.tsv"
-    wildcard_constraints:
-        mol=r'[LS]SU',
-        length=r'\d+',
+        "contigs.vs.rRNA.cmsearch.{rmol}.gt{length}.tsv"
     run:
         # get map from contigs to coverage
         coverages = {}

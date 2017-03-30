@@ -12,6 +12,7 @@ the assembly
 
 include: "../common/mapping_bwa.snake"
 include: "rrna.annotation.snake"
+include: "../annotation/lastal.snake"
 
 config.setdefault('outputs', set()).add("contigs.annotations.gff")
 for sample in config['sample_data']:
@@ -62,13 +63,13 @@ rule map_genes_to_bwadb:
         config['dbs'][wildcards.db]['path']
     """
     input:
-        "{file_root}.fna"
+        "{file_root}.fasta"
     output:
-        ("{file_root}.fna.vs.{db}.sam")
+        ("{file_root}.vs.{db}.bwa.sam")
     log:
-        "logs/{file_root}.vs.{db}.sam.log"
+        "logs/{file_root}.vs.{db}.bwa.sam.log"
     benchmark:
-        "benchmarks/{file_root}.vs.{db}.sam.time"
+        "benchmarks/{file_root}.vs.{db}.bwa.sam.time"
     version:
         get_version('bwa', 
                     version_flag="", 
