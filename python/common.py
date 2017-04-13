@@ -124,7 +124,7 @@ def add_stats_outputs(snakefile, config):
         try:
             out = subprocess.check_output(command).decode()
         except:
-            logger.wawrning("Cannot get fastx files, there is something wrong "
+            logger.warning("Cannot get fastx files, there is something wrong "
                             "with your workflow!")
             return
 
