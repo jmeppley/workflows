@@ -11,8 +11,8 @@ records jonied by a bunch of NNN's
 """
 
 import re
-import yaml
 from collections import defaultdict
+import yaml
 from Bio import Seq, SeqIO, SeqRecord
 from snakemake.logging import logger
 from python.samples import process_sample_data
@@ -59,7 +59,7 @@ def get_sample_from_reads_prefix(prefix, config):
         return config['assembly_name']
 
     return prefix
-  
+
 
 def setup_qc_outputs(config):
     """
@@ -143,13 +143,13 @@ def setup_qc_outputs(config):
         files_gzipped = None
         for file_name in raw_files:
             if re.search(r'\.gz$', file_name) is not None:
-                if files_gzipped==False:
+                if files_gzipped is False:
                     raise Exception("It seems one file is compressed and the "
                                     "other is "
                                     "not:\n{}".format("\n".join(raw_files)))
                 files_gzipped = True
             else:
-                if files_gzipped==True:
+                if files_gzipped:
                     raise Exception("It seems one file is compressed and the "
                                     "other is "
                                     "not:\n{}".format("\n".join(raw_files)))
@@ -158,11 +158,15 @@ def setup_qc_outputs(config):
 
         # starting files (define as transitions from raw files)
         if len(raw_files) > 2:
-            # The reads are probably split up into lanes
+            # The reads are probably split up into lanes, merge into one pair
+            new_raw_files = []
             for direction, file_list in setup_merge_by_lanes(raw_files,
                                                              sample).items():
-                transitions['{sample}.{direction}.{extension}'\
-                                                .format(**vars())] = file_list
+                merged_file = '{sample}.{direction}.{extension}'.format(**vars())
+                transitions[merged_file] = file_list
+                new_raw_files.append(merged_file)
+            raw_files = new_raw_files
+            sample_data[sample]['raw'] = new_raw_files
         elif len(raw_files) == 2:
             for direction, source_file in zip(READ_DIRECTIONS, raw_files):
                 transitions['{sample}.{direction}.{extension}'\
@@ -219,7 +223,7 @@ def setup_merge_by_lanes(raw_files, sample):
             pair_key = re.sub(r'[-._]R2[-._]', '', file_name)
             pairs[pair_key]['R2'] = file_name
         else:
-            raise Exception("This does not appear to be a pairred file! " + 
+            raise Exception("This does not appear to be a pairred file! " +
                             file_name)
 
     logger.debug(yaml.dump(pairs))

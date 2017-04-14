@@ -34,11 +34,7 @@ config.setdefault('transitions', {})
 
 ##
 # Bring in components
-#include: "common/common.snake"
 include: "common/stats.snake"
-#
-# for mapping reads back to contigs
-include: "common/mapping_bwa.snake"
 #
 ## set up any QC
 # don't separate rRNA in reads
@@ -60,19 +56,23 @@ elif assembler == 'megahit':
 else:
     raise Excption("Unknown assembler: " + config['assembler'])
 #
-# contig annotation (RNA, genes, coverage, stats)
-include: "assembly/contig.annotation.snake"
-#
 # separate rRNA from transcripts at end
 include: "qc/sort.rna.snake"
-outputs.add('contigs.non-rRNA.fasta')
-outputs.add('contigs.rRNA-only.fasta')
+for seqtype in ['non-rRNA', 'rRNA-only']:
+    for extension in ['stats', 'hist']:
+        outputs.add('stats/contigs.{}.fasta.{}'.format(seqtype, extension))
+#
+# contig annotation (RNA, genes, coverage, stats)
+include: "annotation/salmon.snake"
+include: "assembly/rrna.annotation.snake"
 #
 # rule to create links
 include: "common/transitions.snake"
 
 # make sure tanstion source files don't get deleted
-config['outputs'].update(config['transitions'].values())
+from snakemake.io import flag
+for file_name in list(config['outputs']) + list(config['transitions'].values()):
+    flag(file_name, "temp", False)
 
 # 
 # Make sure assembly has name
@@ -86,6 +86,7 @@ if 'assembly_name' not in config:
     else:
         raise Exception("Please supply a naming string for this assembly "
                         "in config[assembly_name].")
+config['outputs'].add("assembly.{assembly_name}.report".format(**config))
 
 logger.debug("Snakefile config:\n" + yaml.dump(config))
 
@@ -96,14 +97,13 @@ logger.debug("Snakefile config:\n" + yaml.dump(config))
 rule all:
     input:
         config['outputs'],
-        "assembly.{}.report".format(config['assembly_name']),
 
 rule contigs_fasta:
     """
     Rename contigs
     """
     input:
-        "spades/contigs.fasta"
+        "contigs.raw.fasta"
     output:
         "contigs.fasta"
     log:
@@ -135,17 +135,13 @@ def get_read_files(reads_type, config):
 
 rule final_report:
     input:
-        #raw_stats=['stats/{}.stats'.format(reads_file) \
-        #           for reads_file in get_read_files('raw', config)],
+        raw_stats=['stats/{}.stats'.format(reads_file) \
+                   for reads_file in get_read_files('raw', config)],
         cleaned_stats=['stats/{}.stats'.format(reads_file) \
                    for reads_file in get_read_files('clean', config)],
         ssu_rrnas="contigs.vs.rRNA.cmsearch.SSU.gt1200.tsv",
         lsu_rrnas="contigs.vs.rRNA.cmsearch.LSU.gt2000.tsv",
-        gene_stats="stats/contigs.annotations.faa.stats",
         contig_stats="stats/contigs.fasta.stats",
-        histograms=expand("contigs.histograms.{sample}.txt",
-                     sample=[s for s in config['sample_data'] \
-                               if 'clean' in config['sample_data'][s]])
     output:
         "assembly.{assembly_name}.report"
     run:
@@ -153,8 +149,8 @@ rule final_report:
 
         # paired reads
         for sample, sample_data in config['sample_data'].items():
-            #for reads_type in ['raw', 'clean']:
-            for reads_type in ['clean']:
+            #for reads_type in ['clean']:
+            for reads_type in ['raw', 'clean']:
                 if reads_type not in sample_data:
                     continue
                 reads_files = sample_data[reads_type]
@@ -177,21 +173,6 @@ rule final_report:
         stats = parse_stats(input.contig_stats)
         contig_stats['contigs']=stats['reads']
         contig_stats['contig bases']=stats['bases']
-
-        # N##
-        stats=pandas.read_table(input.histograms[0],
-                                sep=':',
-                                index_col='key', 
-                                names=('key','value'),
-                                nrows=8)
-        stats=stats.set_index(stats.index.str.strip())['value']
-        contig_stats['N50']=int(stats['N50'])
-        contig_stats['N75']=int(stats['N75'])
-        contig_stats['N90']=int(stats['N90'])
-
-        # annotations
-        stats = parse_stats(input.gene_stats)
-        contig_stats['genes']=stats['reads']
 
         # full length SSUs
         ssu_count=-1
