@@ -110,6 +110,12 @@ def setup_qc_outputs(config):
             # transitions will be set up as part of QC below
             sample_data[sample].setdefault('raw', remote_cleaned_reads)
             sample_data[sample].setdefault('protocol', 'None')
+        elif len(remote_cleaned_reads)==0:
+            raise Exception("No clean reads for sample {}:\n{}".format(sample,
+                                                repr(sample_data[sample])))
+        elif not isinstance(remote_cleaned_reads, str) and \
+                len(remote_cleaned_reads)==1:
+            remote_cleaned_reads = remote_cleaned_reads[0]
         else:
             local_cleaned_reads = '{sample}.clean.fastq'.format(**vars())
             if re.search(r'\.gz$', remote_cleaned_reads) is not None:
