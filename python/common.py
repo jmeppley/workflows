@@ -14,8 +14,6 @@ import tempfile
 import yaml
 import pandas
 from snakemake.logging import logger
-from snakemake.utils import update_config as apply_defaults
-
 
 def get_version(command, version_flag='--version',
                 cmd_prefix='',
@@ -142,3 +140,12 @@ def add_stats_outputs(snakefile, config):
 
         logger.debug("Added stats and hist files for {} fasta files"\
                      .format(output_count))
+
+
+def apply_defaults(config, defaults):
+    """ recursively appy defaults to nested dicts """
+    for param, pdefaults in defaults.items():
+        if isinstance(pdefaults, dict):
+            apply_defaults(config.setdefault(param, {}), pdefaults)
+        else:
+            config.setdefault(param, pdefaults)

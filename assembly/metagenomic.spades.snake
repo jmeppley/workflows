@@ -3,7 +3,7 @@ Rules and config for using spades to run an assembly
 """
 
 # set some reasonable defaults
-from snakemake.utils import update_config
+from python.common import apply_defaults
 # kmers only applies to metagenomic
 # use rnakmer for transcript assembly
 defaults = {
@@ -13,7 +13,7 @@ defaults = {
                   'kmers':'21,33,55,77,99,127',
                   'rnakmer':'55'},
             }
-update_config(config, defaults)
+apply_defaults(config, defaults)
 
 # get all the cleaned reads from config[sample_data]
 cleaned_reads = [data['clean'] \

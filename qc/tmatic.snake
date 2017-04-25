@@ -1,5 +1,5 @@
 from python import tmatic
-from snakemake.utils import update_config
+from python.common import apply_defaults
 
 # some reasonable defaults
 defaults = {
@@ -8,7 +8,7 @@ defaults = {
         'illumina_clip': "2:30:10",
         'minlen': 50,
     }}
-update_config(config, defaults)
+apply_defaults(config, defaults)
 
 # get the version once and use in all rules
 tmatic_version = get_version('trimmomatic','-version')

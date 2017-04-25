@@ -99,7 +99,7 @@ rule contigs_fasta:
     Rename contigs
     """
     input:
-        "spades/contigs.fasta"
+        "contigs.raw.fasta"
     output:
         "contigs.fasta"
     log:
