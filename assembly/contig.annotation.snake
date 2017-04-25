@@ -211,9 +211,12 @@ rule rrna_report:
         from edl.blastm8 import generate_hits
         from edl.util import parseMapFile
         for hit_table in input.hits:
-            hit_table_name = re.search(r'gff\.fna\.vs\.(.+)', hit_table).group(1)
-            words = hit_table_name.split('.',1)
+            hit_table_name = re.search(r'\.gff\.vs\.(.+)', hit_table).group(1)
+            # should be, eg, SilvaSSU.lastn or SilvaSSU.bwa.sam
+            words = hit_table_name.split('.')
+            # first word is DB name
             db = words[0]
+            # last word is fmt for parsing
             hit_format = words[-1]
             if hit_format.startswith('last'):
                 hit_format = 'last'
