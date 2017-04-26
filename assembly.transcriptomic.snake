@@ -139,8 +139,10 @@ rule final_report:
                    for reads_file in get_read_files('raw', config)],
         cleaned_stats=['stats/{}.stats'.format(reads_file) \
                    for reads_file in get_read_files('clean', config)],
-        ssu_rrnas="contigs.vs.rRNA.cmsearch.SSU.gt1200.tsv",
-        lsu_rrnas="contigs.vs.rRNA.cmsearch.LSU.gt2000.tsv",
+        ssu_rrnas="contigs.vs.rRNA.cmsearch.SSU.gt{length}.tsv"\
+                            .format(length=config.get('long_ssu_length',1200)),
+        lsu_rrnas="contigs.vs.rRNA.cmsearch.LSU.gt{length}.tsv"\
+                            .format(length=config.get('long_lsu_length',2000)),
         contig_stats="stats/contigs.fasta.stats",
     output:
         "assembly.{assembly_name}.report"
