@@ -32,15 +32,17 @@ rule megahit:
     input:
         cleaned_reads
     output:
-        "megahit-{params}/megahit.contigs.fa"
+        "megahit-{preset}/megahit.contigs.fa"
     log:
-        "logs/megahit-{params}.log"
+        "logs/megahit-{preset}.log"
     benchmark:
-        "benchmarks/megahit-{params}.time"
+        "benchmarks/megahit-{preset}.time"
     version:
         get_version('megahit')
     params:
-        preset=lambda w: w.params,
+        preset=lambda w: w.preset,
+        continue_flags=lambda w: "--continue" \
+            if os.path.isdir('megahit-{}'.format(w.preset)) else "",
         inputs=','.join(cleaned_reads)
     threads:
         config['megahit']['threads']

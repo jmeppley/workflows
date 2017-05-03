@@ -3,6 +3,7 @@ Rules and config for using spades to run an assembly
 """
 
 # set some reasonable defaults
+import os
 from python.common import apply_defaults
 # kmers only applies to metagenomic
 # use rnakmer for transcript assembly
@@ -69,7 +70,7 @@ rule run_spades_metagenomic:
                                 suffix='tmp', \
                                 prefix='spades', \
                                 dir=config['spades']['tmp_dir']),
-        continue_flags="--continue" if "continue_spades" in config else "",
+        continue_flags="--continue" if os.path.isdir('spades') else "",
         skip_ec='--only-assembler',
     shell:
         """
