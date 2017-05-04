@@ -49,6 +49,13 @@ rule prodigal:
     shell:
         "prodigal -i {input} -f gff -o {output} -p meta -q"
 
+rule prodigal_complete:
+    """ filter for just the complete genes """
+    input: "contigs.prodigal.genes.gff"
+    output: "contigs.prodigal.complete.genes.gff"
+    benchmark: "benchmarks/contigs.prodigal.complete.genes.gff"
+    shell: "grep 'partial=00' {input} > {output}"
+
 rule merge_annotations:
     """ 
     merge all GFFs and drop overlaps 
@@ -59,7 +66,7 @@ rule merge_annotations:
         contigs="contigs.fasta",
         rrnas="contigs.vs.rRNA.cmsearch.gff",
         trnas="contigs.vs.tRNA.cmsearch.gff",
-        genes="contigs.prodigal.genes.gff"
+        genes="contigs.prodigal.complete.genes.gff"
     output:
         "contigs.annotations.gff",
         "contigs.annotations.fna",
