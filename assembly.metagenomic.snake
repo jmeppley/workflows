@@ -119,9 +119,15 @@ rule contigs_fasta:
                                                        title,
                                                        sequence))
 
-def get_read_files(reads_type, config):
+def get_read_files(reads_types, config):
+    # support either list of types or single type string (usu clean or raw)
+    if isinstance(reads_types, str):
+        reads_types = [reads_types,]
+
+    # get sample_data for each sample
     for sample, sample_data in config['sample_data'].items():
-        if reads_type in sample_data:
+        # only process types that exist in data for this sample
+        for reads_type in set(reads_types).intersection(sample_data.keys()):
             reads_files = sample_data[reads_type]
             if isinstance(reads_files, str):
                 yield reads_files
@@ -131,10 +137,9 @@ def get_read_files(reads_type, config):
 
 rule final_report:
     input:
-        #raw_stats=['stats/{}.stats'.format(reads_file) \
-        #           for reads_file in get_read_files('raw', config)],
-        cleaned_stats=['stats/{}.stats'.format(reads_file) \
-                   for reads_file in get_read_files('clean', config)],
+        read_stats=['stats/{}.stats'.format(reads_file) \
+                    for reads_file \
+                    in get_read_files(['raw','clean'], config)],
         ssu_rrnas="contigs.vs.rRNA.cmsearch.SSU.gt1200.tsv",
         lsu_rrnas="contigs.vs.rRNA.cmsearch.LSU.gt2000.tsv",
         gene_stats="stats/contigs.annotations.faa.stats",
@@ -149,8 +154,7 @@ rule final_report:
 
         # paired reads
         for sample, sample_data in config['sample_data'].items():
-            #for reads_type in ['raw', 'clean']:
-            for reads_type in ['clean']:
+            for reads_type in ['raw', 'clean']:
                 if reads_type not in sample_data:
                     continue
                 reads_files = sample_data[reads_type]

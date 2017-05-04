@@ -129,7 +129,9 @@ def setup_qc_outputs(config):
                     sample_data[sample]['clean'] = local_cleaned_reads
 
     # find samples that need QC
-    samples_with_raw_reads = [s for s in samples if 'raw' in sample_data[s]]
+    samples_with_raw_reads = [s for s in samples \
+                                              if 'raw' in sample_data[s] \
+                                              and 'clean' not in sample_data[s]]
 
     # loop back over samples and set up cleaning or interleaving if needed
     outputs = []
