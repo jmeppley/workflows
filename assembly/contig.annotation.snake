@@ -54,7 +54,7 @@ rule prodigal_complete:
     input: "contigs.prodigal.genes.gff"
     output: "contigs.prodigal.complete.genes.gff"
     benchmark: "benchmarks/contigs.prodigal.complete.genes.gff"
-    shell: "grep 'partial=00' {input} || true > {output}"
+    shell: "grep 'partial=00' {input} > {output} || true"
 
 rule merge_annotations:
     """ 
@@ -99,10 +99,21 @@ rule contig_stats_table:
     shell:
         "python {config[pymg_dir]}/edl/assembly.py get_contig_stats {input} {output} txt_width=75 log=True"
 
+rule rrna_gff:
+    """ find LSU or SSU annotations """
+    input:
+        "{prefix}.gff"
+    output:
+        temp("{prefix}.{mol,[LS]SU}.gff")
+    benchmark:
+        "benchmarks/{prefix}.{mol}.time"
+    shell:
+        "grep {wildcards.mol} {input} > {output} || true"
+
 rule long_rrna_gff:
     """ find long LSU or SSU annotations """
     input:
-        "{prefix}.gff"
+        "{prefix}.{mol}.gff"
     output:
         "{prefix}.{mol,[LS]SU}.gt{length,\d+}.gff"
     benchmark:
@@ -110,8 +121,7 @@ rule long_rrna_gff:
     version:
         get_version("filter_blast_m8.py")
     shell:
-        "grep {wildcards.mol} {input} || true \
-          | sort \
+        "sort {input} \
           | filter_blast_m8.py -s score -L {wildcards.length} -f gff \
             --nonoverlapping \
           > {output}"
