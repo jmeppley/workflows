@@ -54,7 +54,7 @@ rule prodigal_complete:
     input: "contigs.prodigal.genes.gff"
     output: "contigs.prodigal.complete.genes.gff"
     benchmark: "benchmarks/contigs.prodigal.complete.genes.gff"
-    shell: "grep 'partial=00' {input} > {output}"
+    shell: "grep 'partial=00' {input} || true > {output}"
 
 rule merge_annotations:
     """ 
@@ -110,7 +110,7 @@ rule long_rrna_gff:
     version:
         get_version("filter_blast_m8.py")
     shell:
-        "grep {wildcards.mol} {input} \
+        "grep {wildcards.mol} {input} || true \
           | sort \
           | filter_blast_m8.py -s score -L {wildcards.length} -f gff \
             --nonoverlapping \
