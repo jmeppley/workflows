@@ -10,6 +10,7 @@ records jonied by a bunch of NNN's
 
 """
 
+import os
 import re
 from collections import defaultdict
 import yaml
@@ -61,6 +62,13 @@ def get_sample_from_reads_prefix(prefix, config):
     return prefix
 
 
+def is_in_working_dir(path):
+    """
+    Check if given path is in the working directory
+    """
+    return not os.path.relpath(path).startswith("..")
+
+
 def setup_qc_outputs(config):
     """
     Locate the read files for each sample and return map from sample to
@@ -99,7 +107,7 @@ def setup_qc_outputs(config):
 
     # Loop over samples that came with their own clean reads and:
     #  1) set up pairs to be interleaved
-    #  2) replace with locally named file and add transition
+    #  2) replace with locally named file and add transition if not in workdir 
     samples_with_clean_reads = [s for s in samples if 'clean' in sample_data[s]]
     for sample in samples_with_clean_reads:
         remote_cleaned_reads = sample_data[sample]['clean']
@@ -117,15 +125,19 @@ def setup_qc_outputs(config):
                 len(remote_cleaned_reads)==1:
             remote_cleaned_reads = remote_cleaned_reads[0]
         else:
-            local_cleaned_reads = '{sample}.clean.fastq'.format(**vars())
-            if re.search(r'\.gz$', remote_cleaned_reads) is not None:
-                local_cleaned_reads += ".gz"
-            if local_cleaned_reads != remote_cleaned_reads:
-                transitions[local_cleaned_reads] = remote_cleaned_reads
-                sample_data[sample]['clean'] = local_cleaned_reads
+            if not is_in_working_dir(remote_cleaned_reads):
+                logger.debug("{} is not in working dir".format(remote_cleaned_reads))
+                local_cleaned_reads = '{sample}.clean.fastq'.format(**vars())
+                if re.search(r'\.gz$', remote_cleaned_reads) is not None:
+                    local_cleaned_reads += ".gz"
+                if local_cleaned_reads != remote_cleaned_reads:
+                    transitions[local_cleaned_reads] = remote_cleaned_reads
+                    sample_data[sample]['clean'] = local_cleaned_reads
 
     # find samples that need QC
-    samples_with_raw_reads = [s for s in samples if 'raw' in sample_data[s]]
+    samples_with_raw_reads = [s for s in samples \
+                                              if 'raw' in sample_data[s] \
+                                              and 'clean' not in sample_data[s]]
 
     # loop back over samples and set up cleaning or interleaving if needed
     outputs = []

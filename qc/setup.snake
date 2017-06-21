@@ -23,7 +23,7 @@ elif protocol == 'assembly':
     include: 'tmatic.snake'
 elif protocol == 'rename':
     include: 'rename.snake'
-else:
+elif protocol not in ['None', None]:
     raise Exception('QC protocol "{}" is not supported.'.format(protocol))
 
 
