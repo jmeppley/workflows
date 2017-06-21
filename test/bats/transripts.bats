@@ -28,5 +28,5 @@ setup() {
     mkdir -p test/scratch/transcripts
     cd test/scratch/transcripts
 
-    run bash -c "snakemake -j 10 -s ../../../assembly.transcriptomic.snake -p --configfile ../../data/configs/spades.cdna.yaml --config salmon_env=$SALMONENV --verbose > assembly.log 2>&1"
+    run bash -c "snakemake -j 10 -s ../../../assembly.transcriptomic.snake -p --configfile ../../data/configs/spades.cdna.yaml --config salmon_env=$SALMONENV long_ssu_length=150 long_lsu_length=150 --verbose > assembly.log 2>&1"
 }

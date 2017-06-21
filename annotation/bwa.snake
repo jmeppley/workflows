@@ -1,0 +1,52 @@
+BWA_VERSION = \
+        get_version('bwa', 
+                    version_flag="", 
+                    regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
+
+
+rule map_genes_to_bwadb:
+    """
+    map genes to BWA db. 
+    There must be a bwa formatted db path configured in:
+        config['dbs'][wildcards.db]['path']
+    """
+    input:
+        fasta="{file_root}.fasta",
+        db=lambda w: config['dbs'][w.db]['path'] + ".bwt"
+    output:
+        ("{file_root}.vs.{db}.bwa.sam")
+    log:
+        "logs/{file_root}.vs.{db}.bwa.sam.log"
+    benchmark:
+        "benchmarks/{file_root}.vs.{db}.bwa.sam.time"
+    version: BWA_VERSION
+    threads:
+        lambda w: config.get('bwa',{}).get('threads',20)
+    params:
+        db_path=lambda w: config['dbs'][w.db]['path'],
+    shell:
+        "bwa mem -t {threads} {params.db_path} {input.fasta} 2> {log}  > {output}"
+
+rule index_bwadb:
+    """ prepare DB for mapping with BWA """
+    input:
+        "{bwadb_name}.fasta"
+    output:
+        "{bwadb_name}/bwadb.bwt"
+    log:
+        "logs/bwadb_index.log"
+    benchmark:
+        "benchmarks/bwadb_index.time"
+    version: BWA_VERSION
+    shell:
+        "bwa index -p {wildcards.bwadb_name}/bwadb {input} > {log} 2>&1 "
+
+rule bwa_index_file:
+    """ generate tab file mapping hit ids to descriptions """
+    input: "{file_root}.fasta"
+    output: "{file_root}/bwadb.ids"
+    shell:
+        "cat {input} | sed -r 's/^>(\\S+)\\s+(\\S.*)$/\\1\\t\\2/' > {output}"
+
+    
+
