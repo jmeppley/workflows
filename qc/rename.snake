@@ -20,8 +20,8 @@ rule rename_raw_reads:
         from Bio import SeqIO
         name_root = params.sample
         print("Renaming root is %r from %r" % (name_root, params.sample))
-        with open(output.reads,'w') as OUTR:
-            with open(output.name_map, 'w') as OUTM:
+        with open(output.reads[0],'w') as OUTR:
+            with open(output.name_map[0], 'w') as OUTM:
                 for i, record in enumerate(SeqIO.parse(input[0],'fastq')):
                     old_id = record.id
                     record.id = "{}_{}".format(name_root, i+1)
