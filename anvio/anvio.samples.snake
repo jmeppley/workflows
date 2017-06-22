@@ -70,7 +70,7 @@ rule compile_sample_orders:
             with open(newick_file) as f:
                 tree = f.read().strip()
             lines.append("{}\t\t{}".format(ordering_name, tree))
-        with open(output.table, 'w') as out:
+        with open(output.table[0], 'w') as out:
             out.write("\n".join(lines))
 
 rule cluster_samples:
