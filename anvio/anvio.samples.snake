@@ -3,6 +3,7 @@ Collection of rules to create a sample databse for metagenomic
 analysis in anvi'o
 """
 import re
+from python.common import get_file_name
 include: "anvio.profiles.snake"
 
 # set up sample files
@@ -70,7 +71,7 @@ rule compile_sample_orders:
             with open(newick_file) as f:
                 tree = f.read().strip()
             lines.append("{}\t\t{}".format(ordering_name, tree))
-        with open(output.table[0], 'w') as out:
+        with open(get_file_name(output.table), 'w') as out:
             out.write("\n".join(lines))
 
 rule cluster_samples:
