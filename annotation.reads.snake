@@ -78,11 +78,7 @@ else:
 #
 # add my tools to the path (Somewhat of a hack, maybe I'll get my stuff in
 # conda eventually)
-snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))
-pymg_dir = os.path.sep.join([snakefile_path, 'tools', 'pymg'])
-batch_dir = os.path.sep.join([snakefile_path, 'tools', 'batch'])
-os.environ['PATH'] += os.pathsep + os.pathsep.join([pymg_dir, batch_dir])
-logger.debug(os.environ['PATH'])
+include: "common/tool.path.snake"
 #
 # End configuration
 ##########
