@@ -17,6 +17,7 @@ from Bio import Seq, SeqIO, SeqRecord
 from snakemake.logging import logger
 from python.samples import process_sample_data
 from python.tmatic import get_chemistry_barcodes
+from python.common import get_file_name
 
 # interleaved will be automatically dropped if single file given per sample
 QC_PROTOCOLS = {
@@ -391,9 +392,9 @@ def dummy_join_fastq(inputs,
     }
     faked_joins = []
 
-    fwd_records = SeqIO.parse(inputs.fwd, 'fastq')
-    rev_records = SeqIO.parse(inputs.rev, 'fastq')
-    with open(outputs[0], 'w') as out_fastq_stream:
+    fwd_records = SeqIO.parse(get_file_name(inputs.fwd), 'fastq')
+    rev_records = SeqIO.parse(get_file_name(inputs.rev), 'fastq')
+    with open(get_file_name(outputs), 'w') as out_fastq_stream:
         for frec, rrec in merge_record_iters(fwd_records, rev_records,
                                              **kwargs):
             # join seqs
