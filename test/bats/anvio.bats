@@ -55,6 +55,8 @@ setup() {
 
 @test "From explicit list of and contigs into anvio" {
     cd test/scratch/anvio.contig
+    rm contigs.raw.fasta
+    cp ../../data/contigs/contigs.aloha.fa contigs.raw.fasta
 
     run bash -c "snakemake -s ../../../anvio.metagenomic.snake --configfile ../../data/configs/anvio.contigs.explicit.yaml -p -j 20 --config anvio_env=$ANVIENV --verbose > anvio.contigs.explicit.log 2>&1"
     [ "$status" -eq 0 ]

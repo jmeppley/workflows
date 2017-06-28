@@ -142,7 +142,6 @@ def add_stats_outputs(snakefile, config):
         logger.debug("Added stats and hist files for {} fasta files"\
                      .format(output_count))
 
-
 def apply_defaults(config, defaults):
     """ recursively appy defaults to nested dicts """
     for param, pdefaults in defaults.items():
@@ -150,3 +149,20 @@ def apply_defaults(config, defaults):
             apply_defaults(config.setdefault(param, {}), pdefaults)
         else:
             config.setdefault(param, pdefaults)
+
+def get_file_name(list_or_string):
+    """
+    Different versions of snakemake seem to have different approaches to this syntax:
+
+    rule x:
+        input:
+            file1="some.file"
+            file2="other.file"
+
+    Sometimes input.file1 is a string and sometimes it is list containing a string.
+
+    So I'm inserting this method into all the python code that uses named files.
+    """
+    if isinstance(list_or_string, str):
+        return list_or_string
+    return next(iter(list_or_string))
