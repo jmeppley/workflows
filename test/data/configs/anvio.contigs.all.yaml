@@ -26,4 +26,3 @@ bfc:
     threads: 8
 anvio-profile:
     threads: 1
-anvio_env: anvio
