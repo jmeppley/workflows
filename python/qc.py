@@ -119,6 +119,8 @@ def setup_qc_outputs(config):
             sample_data[sample].setdefault('raw', remote_cleaned_reads)
             sample_data[sample].setdefault('protocol', 'None')
         else:
+            if not isinstance(remote_cleaned_reads, str):
+                remote_cleaned_reads = remote_cleaned_reads[0]
             if not is_in_working_dir(remote_cleaned_reads):
                 logger.debug("{} is not in working dir".format(remote_cleaned_reads))
                 local_cleaned_reads = '{sample}.clean.fastq'.format(**vars())
