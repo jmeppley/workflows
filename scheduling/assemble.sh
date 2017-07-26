@@ -12,23 +12,22 @@
 
 CONFIG=${1:-assembly.yaml}
 CONDA_ENV=${2:-assembly}
+WORKFLOW_PATH=${3:-/lus/scratch/usr/jmeppley/opt/workflows}
 
 # keep a log of SLURM job IDs in assembly folder
 date >> ./.slurm.history
 echo -n -e "${SLURM_JOB_ID}\t" >> ./.slurm.history
 
-# Start log file with details of job
-LOG=assembly.log
-date >> $LOG
-echo "Running job ${SLURM_JOB_ID} in $DIR" >> $LOG
-echo -n -e "HOST:\t" >> $LOG
-hostname >> $LOG
-
-echo loading assembly env... >> $LOG
+# report details of job
+date
+echo "Running job ${SLURM_JOB_ID} in $DIR"
+echo -n -e "HOST:\t"
+hostname
+echo ""
+echo loading assembly env...
 source activate $CONDA_ENV
 
-COMMAND="snakemake -s/home/jmeppley/apps/opt/workflows/assembly.metagenomic.snake --configfile ${CONFIG} -p -k -j 20 $DRYRUN --notemp"
+COMMAND="snakemake -s${WORKFLOW_PATH}/assembly.metagenomic.snake --configfile ${CONFIG} -p -k -j 20 $DRYRUN --notemp"
 echo $COMMAND
-echo $COMMAND >> $LOG
-echo "" >> $LOG
-eval $COMMAND >> $LOG 2>&1
+echo ""
+eval $COMMAND
