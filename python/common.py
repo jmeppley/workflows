@@ -120,18 +120,26 @@ def add_stats_outputs(snakefile, config):
         logger.debug("Performing dry-run to get outputs")
         logger.debug(" ".join(command))
         try:
-            out = subprocess.check_output(command).decode()
+            complete = subprocess.run(command,
+                                      stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE)
         except:
             logger.warning("Cannot get fastx files, there is something wrong "
                             "with your workflow!")
             raise
             return
 
+        if complete.returncode != 0:
+            logger.warning("STDOUT:\n" + get_str(complete.stdout))
+            logger.warning("STDERR:\n" + get_str(complete.stderr))
+            raise Exception("Cannot get fastx files, there is something wrong "
+                            "with your workflow!")
+
         logger.debug("Dry run complete")
 
         new_outputs = config.setdefault('outputs', set())
         output_count = 0
-        for line in out.split('\n'):
+        for line in complete.stdout.decode().split('\n'):
             output = line.split('\t')[0]
             logger.debug(output)
             if re.search(r'f(aa|fn|na|a|asta|astq)(\.gz)?$', output):
@@ -142,6 +150,10 @@ def add_stats_outputs(snakefile, config):
         logger.debug("Added stats and hist files for {} fasta files"\
                      .format(output_count))
 
+def get_str(possibly_byte_array):
+    if isinstance(possibly_byte_array, str):
+        return possibly_byte_array
+    return possibly_byte_array.decode()
 
 def apply_defaults(config, defaults):
     """ recursively appy defaults to nested dicts """
