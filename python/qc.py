@@ -215,7 +215,7 @@ def setup_qc_outputs(config):
         if config.get('remove_rna', True) in ['True', True]:
             # if rrna separation requested, add rRNA-only and non-rRNA to names
             logger.debug("adding separated rrna reads to output")
-            for rrna_split in ['non-rRNA', 'rRNA-only']:
+            for rrna_split in ['non-rRNA', 'SSU', 'LSU']:
                 outputs.append(re.sub(r'\.fastq$',
                                       '.{}.fastq'.format(rrna_split),
                                       cleaned_reads))
