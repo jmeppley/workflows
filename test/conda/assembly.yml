@@ -1,5 +1,6 @@
 channels:
  - bioconda
+ - conda-forge
  - brwnj
 dependencies:
  - python=3

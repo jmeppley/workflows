@@ -126,6 +126,8 @@ def setup_qc_outputs(config):
                 len(remote_cleaned_reads)==1:
             remote_cleaned_reads = remote_cleaned_reads[0]
         else:
+            if not isinstance(remote_cleaned_reads, str):
+                remote_cleaned_reads = remote_cleaned_reads[0]
             if not is_in_working_dir(remote_cleaned_reads):
                 logger.debug("{} is not in working dir".format(remote_cleaned_reads))
                 local_cleaned_reads = '{sample}.clean.fastq'.format(**vars())
