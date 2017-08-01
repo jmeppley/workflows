@@ -43,7 +43,7 @@ rule megahit:
         preset=lambda w: w.preset,
         continue_flags=lambda w: "--continue" \
             if os.path.isdir('megahit-{}'.format(w.preset)) else "",
-        inputs=','.join(cleaned_reads)
+        inputs=','.join(*cleaned_reads)
     threads:
         config['megahit']['threads']
     shell:
