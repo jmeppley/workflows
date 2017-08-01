@@ -20,6 +20,7 @@ setup() {
     cd test/scratch/spades
 
     run bash -c "snakemake -j 10 -s ../../../assembly.metagenomic.snake -p --configfile ../../data/configs/spades.yaml --verbose > assembly.log 2>&1"
+    [ "$status" -eq 0 ]
 }
 
 @test "assemble single sample with megahit" {
@@ -28,6 +29,7 @@ setup() {
     cd test/scratch/megahit
 
     run bash -c "snakemake -j 10 -s ../../../assembly.metagenomic.snake -p --configfile ../../data/configs/megahit.yaml --verbose > assembly.log 2>&1"
+    [ "$status" -eq 0 ]
 }
 
 @test "Prep two pair of files for assembly" {

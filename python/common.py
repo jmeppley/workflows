@@ -9,6 +9,7 @@ Methods used across all or most workflows including:
 
 import os
 import re
+import logging
 import subprocess
 import tempfile
 import yaml
@@ -110,12 +111,23 @@ def add_stats_outputs(snakefile, config):
             'snakemake',
             '-s',
             snakefile,
+            '--nolock',
             '--configfile',
             config_file.name,
             '--summary',
             '--rerun-incomplete',
             '-n',
         ]
+
+        print("logger: {}\n {}".format(logger, dir(logger)))
+        for item in dir(logger):
+            print("logger.{}".format(item))
+            try:
+                print(eval("logger.{}()".format(item)))
+            except:
+                print(eval("logger.{}".format(item)))
+        if logger.logger.getEffectiveLevel() >= logging.DEBUG:
+            command += ['--verbose']
 
         logger.debug("Performing dry-run to get outputs")
         logger.debug(" ".join(command))

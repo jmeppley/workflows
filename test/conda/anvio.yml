@@ -3,8 +3,8 @@ channels:
  - conda-forge
  - brwnj
 dependencies:
- - python=3
- - snakemake
+ - python=3.5
+ - snakemake<4
  - gsl
  - anvio
  - pandas
