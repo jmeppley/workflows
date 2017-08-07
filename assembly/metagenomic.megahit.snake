@@ -23,6 +23,9 @@ cleaned_reads = [data['clean'] \
                          for sample,data in config['sample_data'].items() \
                          if 'clean' in data]
 
+logger.debug("Sample reads: " + repr(config['sample_data']))
+logger.debug("Cleaned reads: " + repr(cleaned_reads))
+
 ######################
 # Rules
 rule megahit:
@@ -43,7 +46,7 @@ rule megahit:
         preset=lambda w: w.preset,
         continue_flags=lambda w: "--continue" \
             if os.path.isdir('megahit-{}'.format(w.preset)) else "",
-        inputs=','.join(*cleaned_reads)
+        inputs=','.join(cleaned_reads)
     threads:
         config['megahit']['threads']
     shell:

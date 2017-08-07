@@ -110,6 +110,7 @@ def setup_qc_outputs(config):
     #  1) set up pairs to be interleaved
     #  2) replace with locally named file and add transition if not in workdir 
     samples_with_clean_reads = [s for s in samples if 'clean' in sample_data[s]]
+    drop_clean_reads_for_these_samples = []
     for sample in samples_with_clean_reads:
         remote_cleaned_reads = sample_data[sample]['clean']
         if not isinstance(remote_cleaned_reads, str) and \
@@ -117,14 +118,14 @@ def setup_qc_outputs(config):
             # list or tuple or multiple files: send through QC to be
             # interleaved
             # transitions will be set up as part of QC below
+            # add raw and remove clean so QC will get setup below
             sample_data[sample].setdefault('raw', remote_cleaned_reads)
+            drop_clean_reads_for_these_samples.append(sample)
+            # set protocol to None, so the pair just gets interleaved
             sample_data[sample].setdefault('protocol', 'None')
         elif len(remote_cleaned_reads)==0:
             raise Exception("No clean reads for sample {}:\n{}".format(sample,
                                                 repr(sample_data[sample])))
-        elif not isinstance(remote_cleaned_reads, str) and \
-                len(remote_cleaned_reads)==1:
-            remote_cleaned_reads = remote_cleaned_reads[0]
         else:
             if not isinstance(remote_cleaned_reads, str):
                 remote_cleaned_reads = remote_cleaned_reads[0]
@@ -136,6 +137,9 @@ def setup_qc_outputs(config):
                 if local_cleaned_reads != remote_cleaned_reads:
                     transitions[local_cleaned_reads] = remote_cleaned_reads
                     sample_data[sample]['clean'] = local_cleaned_reads
+
+    for sample in drop_clean_reads_for_these_samples:
+        del sample_data[sample]['clean']
 
     # find samples that need QC
     samples_with_raw_reads = [s for s in samples \
