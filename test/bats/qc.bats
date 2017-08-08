@@ -30,3 +30,9 @@ setup() {
     [ "$status" -eq 0 ]
 }
 
+@test "Split reads into rRNA or not" {
+    ln -s ../../data/raw_reads/2014_ALOHA_XVII_1-1B_S1_R2_001.head40k.fastq aloha1b.R2.fastq
+    run bash -c "snakemake -j 10 -s ../../../test.snake -p --config workflow=qc/sort.rna.snake file_root=aloha1b.R2 -k sort_rna_default_all > sort.rna.log 2>&1"
+    [ "$status" -eq 0 ]
+}
+

@@ -23,6 +23,9 @@ cleaned_reads = [data['clean'] \
                          for sample,data in config['sample_data'].items() \
                          if 'clean' in data]
 
+logger.debug("Sample reads: " + repr(config['sample_data']))
+logger.debug("Cleaned reads: " + repr(cleaned_reads))
+
 ######################
 # Rules
 rule megahit:

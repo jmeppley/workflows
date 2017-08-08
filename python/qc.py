@@ -110,6 +110,7 @@ def setup_qc_outputs(config):
     #  1) set up pairs to be interleaved
     #  2) replace with locally named file and add transition if not in workdir 
     samples_with_clean_reads = [s for s in samples if 'clean' in sample_data[s]]
+    drop_clean_reads_for_these_samples = []
     for sample in samples_with_clean_reads:
         remote_cleaned_reads = sample_data[sample]['clean']
         if not isinstance(remote_cleaned_reads, str) and \
@@ -117,15 +118,17 @@ def setup_qc_outputs(config):
             # list or tuple or multiple files: send through QC to be
             # interleaved
             # transitions will be set up as part of QC below
+            # add raw and remove clean so QC will get setup below
             sample_data[sample].setdefault('raw', remote_cleaned_reads)
+            drop_clean_reads_for_these_samples.append(sample)
+            # set protocol to None, so the pair just gets interleaved
             sample_data[sample].setdefault('protocol', 'None')
         elif len(remote_cleaned_reads)==0:
             raise Exception("No clean reads for sample {}:\n{}".format(sample,
                                                 repr(sample_data[sample])))
-        elif not isinstance(remote_cleaned_reads, str) and \
-                len(remote_cleaned_reads)==1:
-            remote_cleaned_reads = remote_cleaned_reads[0]
         else:
+            if not isinstance(remote_cleaned_reads, str):
+                remote_cleaned_reads = remote_cleaned_reads[0]
             if not is_in_working_dir(remote_cleaned_reads):
                 logger.debug("{} is not in working dir".format(remote_cleaned_reads))
                 local_cleaned_reads = '{sample}.clean.fastq'.format(**vars())
@@ -134,6 +137,9 @@ def setup_qc_outputs(config):
                 if local_cleaned_reads != remote_cleaned_reads:
                     transitions[local_cleaned_reads] = remote_cleaned_reads
                     sample_data[sample]['clean'] = local_cleaned_reads
+
+    for sample in drop_clean_reads_for_these_samples:
+        del sample_data[sample]['clean']
 
     # find samples that need QC
     samples_with_raw_reads = [s for s in samples \
@@ -213,7 +219,7 @@ def setup_qc_outputs(config):
         if config.get('remove_rna', True) in ['True', True]:
             # if rrna separation requested, add rRNA-only and non-rRNA to names
             logger.debug("adding separated rrna reads to output")
-            for rrna_split in ['non-rRNA', 'rRNA-only']:
+            for rrna_split in ['non-rRNA', 'SSU', 'LSU']:
                 outputs.append(re.sub(r'\.fastq$',
                                       '.{}.fastq'.format(rrna_split),
                                       cleaned_reads))

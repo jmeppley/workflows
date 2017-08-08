@@ -1,10 +1,24 @@
 include: "../annotation/cmsearch.snake"
+include: "../common/fastq.snake"
+
+wildcard_constraints:
+    rna_mol=r'[LS]SU',
+    seq_type=r'(non-rRNA|rRNA-only|SSU|LSU)'
 
 rule sort_rna_default_all:
     input:
-        expand("{file_root}.{type}.fastq",
+        expand("{file_root}.{seq_type}.fastq",
                file_root=config.get('file_root','reads'),
-               type=['rRNA','non-rRNA'])
+               seq_type=['rRNA-only','non-rRNA', 'SSU', 'LSU'])
+
+rule filter_rrna_tbl:
+    input: "{file_root}.vs.rRNA.cmsearch.gff"
+    output: "{file_root}.vs.rRNA.cmsearch.{rna_mol}.gff"
+    version: get_version('filter_blast_m8.py')
+    shell: "filter_blast_m8.py {input} -f gff --nonoverlapping \
+            | grep {wildcards.rna_mol} \
+            > {output}"
+
 
 rule filter_nonrrna_or_rrna:
     """
@@ -12,19 +26,20 @@ rule filter_nonrrna_or_rrna:
     """
     input:
         reads="{file_root}.{ext}",
-        hits="{file_root}.vs.rRNA.cmsearch.gff"
+        hits=lambda w: ("{file_root}.vs.rRNA.cmsearch.gff" \
+                         if re.match('[LS]SU', w.seq_type) is None \
+                         else "{file_root}.vs.rRNA.cmsearch.{seq_type}.gff" \
+                       ).format(**w)
     output:
-        "{file_root}.{type}.{ext,fast[aq]}"
-    wildcard_constraints:
-        type=r'(non-rRNA|rRNA-only)'
+        "{file_root}.{seq_type}.{ext,fast[aq]}"
     benchmark:
-        "benchmarks/{file_root}.{type}.time"
+        "benchmarks/{file_root}.{seq_type}.time"
     log:
-        "logs/{file_root}.{type}.log"
+        "logs/{file_root}.{seq_type}.log"
     version:
         get_version("screen_list.py")
     params:
-        keep=lambda w: "-k" if w.type!='non-rRNA' else ""
+        keep=lambda w: "-k" if w.seq_type!='non-rRNA' else ""
     shell:
         "screen_list.py {params.keep} -l {input.hits} -C 0 \
                         -f {wildcards.ext} -v {input.reads} \
