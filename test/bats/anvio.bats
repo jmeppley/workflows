@@ -1,4 +1,5 @@
 setup() {
+    mkdir -p test/conda/envs
     ENV=anvio
     ENV_DIR=`pwd`/test/conda/envs/$ENV
     ENV_FILE=test/conda/${ENV}.yml
