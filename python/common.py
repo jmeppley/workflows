@@ -119,14 +119,7 @@ def add_stats_outputs(snakefile, config):
             '-n',
         ]
 
-        print("logger: {}\n {}".format(logger, dir(logger)))
-        for item in dir(logger):
-            print("logger.{}".format(item))
-            try:
-                print(eval("logger.{}()".format(item)))
-            except:
-                print(eval("logger.{}".format(item)))
-        if logger.logger.getEffectiveLevel() >= logging.DEBUG:
+        if logger.logger.getEffectiveLevel() <= logging.DEBUG:
             command += ['--verbose']
 
         logger.debug("Performing dry-run to get outputs")
