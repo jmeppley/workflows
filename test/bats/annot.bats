@@ -16,4 +16,7 @@ setup() {
     cd test/scratch/annot
     run bash -c "snakemake -s ../../../annotation.genes.snake --configfile ../../data/configs/genes.annot.yaml -p -k -j 20 > genes.annot.prod.log 2>&1"
     [ "$status" -eq 0 ]
+    run bash -c "snakemake -s ../../../annotation.genes.snake --configfile ../../data/configs/genes.annot.yaml -p -k -j 20 -n 2>&1"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" == "Nothing to be done." ]
 }
