@@ -1,5 +1,8 @@
 include: "../annotation/cmsearch.snake"
 include: "../annotation/bwa.snake"
+
+from python.common import get_file_name
+
 # available rRNA DBs
 rrna_db_dot_fmts=[]
 from python.annotate import get_last_alg
@@ -86,7 +89,7 @@ rule rrna_report:
             coverages[sample] = cov_table[config['cov_col']]
 
         # table of rRNA model hits from filtered GFF
-        features = pandas.read_table(input.gff,
+        features = pandas.read_table(get_file_name(input.gff),
                                      header=None,
                                      names=['contig',
                                             'tool',
@@ -114,7 +117,7 @@ rule rrna_report:
         # get Silva annotation(s) for each feature
         from edl.blastm8 import generate_hits
         from edl.util import parseMapFile
-        hit_table_name = re.search(r'gff\.vs\.(.+)', input.hits).group(1)
+        hit_table_name = re.search(r'gff\.vs\.(.+)', get_file_name(input.hits)).group(1)
         # should be, eg, SilvaSSU.lastn or SilvaSSU.bwa.sam
         words = hit_table_name.split('.')
         # first word is DB name
@@ -126,7 +129,7 @@ rule rrna_report:
         elif hit_format.startswith('blast'):
             hit_format = 'blastplus'
         hit_descriptions = parseMapFile(id_names_files[db])
-        for gene, hits in generate_hits(input.hits, format=hit_format):
+        for gene, hits in generate_hits(get_file_name(input.hits), format=hit_format):
             # take the first hit
             hit = list(hits)[0]
             contig, start, end = re.search(r'^(.+)_(\d+)_(\d+)$', gene)\
