@@ -7,6 +7,7 @@ dependencies:
  - biopython
  - bbmap
  - bfc
+ - hmmer
  - trimmomatic
  - bwa 
  - samtools
@@ -15,3 +16,6 @@ dependencies:
  - seqtk
  - sed
  - spades
+ - salmon
+ - samtools
+ - bzip2
