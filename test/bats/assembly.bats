@@ -25,8 +25,8 @@ setup() {
     run bash -c "snakemake -j 10 -s ../../../assembly.metagenomic.snake -p --configfile ../../data/configs/spades.yaml -n 2>&1 | grep -v '^Multiple include'"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" == "Nothing to be done." ]
-    head -1 fortyk.renamed.R1.tsv
-    [ "${lines[0]}" == "NS500472:37:HMMVTBGXX:1:11101:14387:1050	fortyk_1" ]
+    run bash -c "head -1 fortyk.renamed.R1.tsv | perl -pe 's/\s//'g"
+    [ "${lines[0]}" == "NS500472:37:HMMVTBGXX:1:11101:14387:1050fortyk_1" ]
 }
 
 @test "assemble single sample with megahit" {
