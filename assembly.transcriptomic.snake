@@ -23,7 +23,7 @@ see test/data/configs/spades.yaml for an example configuration
 """
 import os, re, sys, glob, yaml, pandas, subprocess, tempfile
 from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
-from python.common import get_version, parse_stats
+from python.common import get_version, parse_stats, get_file_name
 from python.qc import setup_qc_outputs
 
 # add pymg to path
@@ -172,20 +172,20 @@ rule final_report:
 
         # contigs
         contig_stats={}
-        stats = parse_stats(input.contig_stats)
+        stats = parse_stats(get_file_name(input.contig_stats))
         contig_stats['contigs']=stats['reads']
         contig_stats['contig bases']=stats['bases']
 
         # full length SSUs
         ssu_count=-1
-        with open(input.ssu_rrnas) as INF:
+        with open(get_file_name(input.ssu_rrnas)) as INF:
             for line in INF:
                 ssu_count+=1
         contig_stats['SSUs']=ssu_count
 
         # full length LSUs
         lsu_count=-1
-        with open(input.lsu_rrnas) as INF:
+        with open(get_file_name(input.lsu_rrnas)) as INF:
             for line in INF:
                 lsu_count+=1
         contig_stats['LSUs']=lsu_count

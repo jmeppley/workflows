@@ -12,6 +12,8 @@ the assembly
 
 include: "../common/mapping_bwa.snake"
 
+from python.common import get_file_name
+
 """
 # Some extra hoops to jump through because the contigs stats aren't a proper 
 #  script yet
@@ -95,12 +97,12 @@ rule annotation_coverage:
         table="contigs.annotations.coverage.{sample}.tsv"
     run:
         # Read stats table, but just keep median coverage
-        cov_dict = pandas.read_table(input.stats,
+        cov_dict = pandas.read_table(get_file_name(input.stats),
                                      index_col=0,
                                      usecols=['contig', config['cov_col']])\
                                                              [config['cov_col']]
-        with open(output.table,'w') as OUT:
-            with open(input.gff) as GFF:
+        with open(get_file_name(output.table),'w') as OUT:
+            with open(get_file_name(input.gff)) as GFF:
                 feature_count = 0
                 current_contig = 0
                 for line in GFF:
