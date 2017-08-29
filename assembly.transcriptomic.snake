@@ -63,7 +63,14 @@ for seqtype in ['non-rRNA', 'rRNA-only']:
         outputs.add('stats/contigs.{}.fasta.{}'.format(seqtype, extension))
 #
 # contig annotation (RNA, genes, coverage, stats)
-include: "annotation/salmon.snake"
+transcript_mapper = config.setdefault('transcript_mapper','salmon')
+if transcript_mapper == 'salmon':
+    include: "annotation/salmon.snake"
+elif transcript_mapper == 'bwa':
+    include: "common/mapping_bwa.snake"
+else:
+    raise Exception("Unknown transcript mapping tool: {}! Please check your configuration.".format(transcript_mapper))
+
 include: "assembly/rrna.annotation.snake"
 #
 # rule to create links

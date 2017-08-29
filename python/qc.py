@@ -31,34 +31,37 @@ QC_PROTOCOLS = {
                           'trimmed',
                           'dropse',
                          ]),
+     "assembly_no_ec": '.'.join(['renamed',
+                                 'interleaved',
+                                 'noadapt',
+                                 'nophix',
+                                 'trimmed',
+                                 'dropse',
+                         ]),
     "joining": '.'.join(['trim_adapt', 'joined', 'nophix']),
 }
+
+# list of protocols with no error correction
+non_ec_protocols = ['joining', 'assembly_no_ec']
 
 READ_DIRECTIONS = ['R1', 'R2']
 
 def get_sample_from_reads_prefix(prefix, config):
     """
+    check for two specific cases, then fall back to the prefix:
     If there is path info, assume sample is top folder name
       EG  reads/sample/reads.R1.fastq
-    If there is no path info, look for _ in prefix
+    If there is no path info, look for reads_ in prefix
       EG  reads_sample.R1.fastq
-    If config[sample_name] is defined, use that
-    If config[assembly_name] is defined, use that
     Fall back to the prefix
     """
-    match = re.search(r'([^/])+/[^/]+$', prefix)
+    match = re.search(r'([^/])+/reads$', prefix)
     if match:
         return match.group(1)
 
     match = re.search(r'^reads_(.+)$', prefix)
     if match:
         return match.group(1)
-
-    if 'sample_name' in config:
-        return config['sample_name']
-
-    if 'assembly_name' in config:
-        return config['assembly_name']
 
     return prefix
 

@@ -24,7 +24,6 @@ from edl import __version__ as PYMG_VERSION
 """
 include: "rrna.annotation.snake"
 include: "../annotation/lastal.snake"
-include: "../annotation/bwa.snake"
 
 config.setdefault('outputs', set()).add("contigs.annotations.gff")
 for sample in config['sample_data']:
