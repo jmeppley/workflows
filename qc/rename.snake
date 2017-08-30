@@ -20,7 +20,8 @@ rule rename_raw_reads:
     run:
         from Bio import SeqIO
         name_root = params.sample
-        print("Renaming root is %r from %r" % (name_root, params.sample))
+        with open(get_file_name(log), 'w') as LOG:
+            LOG.write("Renaming root is %r from %r\n" % (name_root, wildcards.prefix))
         with open(get_file_name(output.reads),'w') as OUTR:
             with open(get_file_name(output.name_map), 'w') as OUTM:
                 for i, record in enumerate(
