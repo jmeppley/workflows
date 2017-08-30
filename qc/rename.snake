@@ -1,6 +1,6 @@
 from python.common import get_file_name
 from python.qc import get_sample_from_reads_prefix
-
+#
 include: "common.snake"
 
 rule rename_raw_reads:
@@ -9,6 +9,7 @@ rule rename_raw_reads:
         "{prefix}.{dir}.fastq"
     output:
         reads=temp("{prefix}.renamed.{dir,R[12]}.fastq"),
+        #reads"{prefix}.=renamed.{dir,R[12]}.fastq",
         name_map="{prefix}.renamed.{dir}.tsv"
     log:
         "logs/{prefix}.renamed.{dir}.log"

@@ -1,5 +1,6 @@
 channels:
  - bioconda
+ - conda-forge
 dependencies:
  - python=3.5
  - snakemake<4
@@ -17,5 +18,4 @@ dependencies:
  - sed
  - spades
  - salmon
- - samtools
- - bzip2
+ 

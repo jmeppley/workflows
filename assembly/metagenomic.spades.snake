@@ -17,6 +17,8 @@ defaults = {
 apply_defaults(config, defaults)
 
 # get all the cleaned reads from config[sample_data]
+#builds a list of all cleaned read filenames from all samples
+
 cleaned_reads = [data['clean'] \
                          for sample,data in config['sample_data'].items() \
                          if 'clean' in data]
@@ -26,6 +28,8 @@ config.setdefault('outputs', set()).update(
         'stats/all_cleaned_reads.fastq.stats',
         'stats/all_cleaned_reads.fastq.hist',
     ])
+
+print(cleaned_reads)
 
 rule merge_reads_for_spades:
     """
@@ -54,9 +58,11 @@ rule run_spades_metagenomic:
     """
     #input: cleaned_reads
     input: rules.merge_reads_for_spades.output
+    
+    #snakemake 'looks' at all its rules and figures out which rule makes an output file that matches below.
     output: "spades/{product}.fasta"
     wildcard_constraints:
-        product=r'(contigs|transcripts)',
+        product=r'(contigs|transcripts)' #,
     log: "logs/spades.log"
     benchmark: "benchmarks/spades.time"
     version: get_version('spades.py')
