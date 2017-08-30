@@ -45,6 +45,8 @@ rule merge_reads_for_spades:
         count=len(cleaned_reads),
     shell: 
         """
+        echo {params.count}
+        echo cleaned_reads
         if [ "{params.count}" == "1" ]; then
             # just link if it's one file
             ln -s {input} {output}
