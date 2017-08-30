@@ -78,8 +78,8 @@ rule run_spades_metagenomic:
         tmp_dir=tempfile.TemporaryDirectory( \
                                 suffix='tmp', \
                                 prefix='spades', \
-                                dir=config['spades']['tmp_dir']),
-        continue_flags="--continue" if os.path.isdir('spades') else "",
+                                dir=config['spades']['tmp_dir']), 
+        continue_flags="",
         skip_ec='' if run_ec else '--only-assembler',
     shell:
         """
