@@ -23,9 +23,13 @@ see test/data/configs/spades.yaml for an example configuration
 """
 import os, re, sys, glob, yaml, pandas, subprocess, tempfile
 from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
+<<<<<<< HEAD
 
 #python modules that are part of the workflow package (John's modules) in python folder
 from python.common import get_version, parse_stats
+=======
+from python.common import get_version, parse_stats, get_file_name
+>>>>>>> 3b8240c5cce221e0b82ef3d02fde1fad6a02d508
 from python.qc import setup_qc_outputs
 
 # add pymg to path
@@ -74,9 +78,20 @@ for seqtype in ['non-rRNA', 'rRNA-only']:
         outputs.add('stats/contigs.{}.fasta.{}'.format(seqtype, extension))
 #
 # contig annotation (RNA, genes, coverage, stats)
+<<<<<<< HEAD
 #include: "annotation/salmon.snake"]
 include: "annotation/bwa.snake"
 #count SSU and LSU contigs and give coverage
+=======
+transcript_mapper = config.setdefault('transcript_mapper','salmon')
+if transcript_mapper == 'salmon':
+    include: "annotation/salmon.snake"
+elif transcript_mapper == 'bwa':
+    include: "common/mapping_bwa.snake"
+else:
+    raise Exception("Unknown transcript mapping tool: {}! Please check your configuration.".format(transcript_mapper))
+
+>>>>>>> 3b8240c5cce221e0b82ef3d02fde1fad6a02d508
 include: "assembly/rrna.annotation.snake"
 
 # rule to create links
@@ -192,20 +207,20 @@ rule final_report:
 
         # contigs
         contig_stats={}
-        stats = parse_stats(input.contig_stats)
+        stats = parse_stats(get_file_name(input.contig_stats))
         contig_stats['contigs']=stats['reads']
         contig_stats['contig bases']=stats['bases']
 
         # full length SSUs
         ssu_count=-1
-        with open(input.ssu_rrnas) as INF:
+        with open(get_file_name(input.ssu_rrnas)) as INF:
             for line in INF:
                 ssu_count+=1
         contig_stats['SSUs']=ssu_count
 
         # full length LSUs
         lsu_count=-1
-        with open(input.lsu_rrnas) as INF:
+        with open(get_file_name(input.lsu_rrnas)) as INF:
             for line in INF:
                 lsu_count+=1
         contig_stats['LSUs']=lsu_count
