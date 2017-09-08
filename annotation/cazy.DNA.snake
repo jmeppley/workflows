@@ -1,0 +1,64 @@
+"""
+This workflow identifies Cazy enzymes in contigs:
+
+environment: source activate cDNA
+
+usage: snakemake -s ~/johns_workflows/workflows/common/cazy.snake --configfile config.yml
+"""
+
+python_scripts = "/home/jbryant/johns_workflows/workflows/tools/pymg/"
+
+rule all:
+    input: ["annotation/contigs.non-rRNA.tr.CAZy.hmmsearch.m8",\
+            "annotation/contigs.non-rRNA.tr.CAZy.hmmsearch.e-5.m8"]
+
+
+rule translate_frames:
+    """
+    translate all six coding frames
+    """
+    input:
+        "contigs.non-rRNA.fasta"
+    output:
+        "annotation/contigs.non-rRNA.tr.allframes.fasta"
+    log:
+        "logs/transeq.log"
+    benchmark:
+        "benchmarks/transeq.txt"
+    shell:
+        "/home/jbryant/programs/EMBOSS-6.6.0/emboss/transeq -sequence {input} -outseq {output} -table 11 -frame all -clean"
+
+
+
+rule hmmsearch:
+    """
+    run hmmsearch against Cazy database
+    """
+    input:
+        "annotation/contigs.non-rRNA.tr.allframes.fasta"
+    output:
+        "annotation/contigs.non-rRNA.tr.CAZy.hmmsearch.m8"
+    log:
+        "logs/cazy.log"
+    benchmark:
+        "benchmarks/cazy.txt"
+    shell:
+        "hmmsearch --domtblout {output} -o {log}  /home/jbryant/programs/cazy_hmms/dbCAN-fam-HMMs.txt.v5 {input}"
+
+rule hmm_filter:
+    """
+    filters hmm output, assumed to be in m8 format
+    python scripts located here: /home/jbryant/johns_workflows/workflows/tools/pymg
+    """
+    
+    input:
+        "annotation/contigs.non-rRNA.tr.CAZy.hmmsearch.m8"
+    output:
+        "annotation/contigs.non-rRNA.tr.CAZy.hmmsearch.e-5.m8"
+    log:
+        "logs/cazy.log"
+    benchmark:
+        "benchmarks/cazy.txt"
+    shell:
+        "head -n2 {input} | tail -n1 > {output}; \
+        python {python_scripts}filter_blast_m8.py  -E 1e-5 -f hmmsearchdom {input}  >> {output}"
