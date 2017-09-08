@@ -49,6 +49,8 @@ rule merge_reads_for_spades:
         count=len(cleaned_reads),
     shell: 
         """
+        echo {params.count}
+        echo cleaned_reads
         if [ "{params.count}" == "1" ]; then
             # just link if it's one file
             ln -s {input} {output}
@@ -82,8 +84,8 @@ rule run_spades_metagenomic:
         tmp_dir=tempfile.TemporaryDirectory( \
                                 suffix='tmp', \
                                 prefix='spades', \
-                                dir=config['spades']['tmp_dir']),
-        continue_flags="--continue" if os.path.isdir('spades') else "",
+                                dir=config['spades']['tmp_dir']), 
+        continue_flags="",
         skip_ec='' if run_ec else '--only-assembler',
     shell:
         """
