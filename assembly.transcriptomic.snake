@@ -23,14 +23,9 @@ see test/data/configs/spades.yaml for an example configuration
 """
 import os, re, sys, glob, yaml, pandas, subprocess, tempfile
 from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
-<<<<<<< HEAD
-
-#python modules that are part of the workflow package (John's modules) in python folder
-from python.common import get_version, parse_stats
-=======
 from python.common import get_version, parse_stats, get_file_name
->>>>>>> 3b8240c5cce221e0b82ef3d02fde1fad6a02d508
 from python.qc import setup_qc_outputs
+
 
 # add pymg to path
 #puts stuff in tools into execution path
