@@ -85,7 +85,7 @@ rule run_spades_metagenomic:
                                 suffix='tmp', \
                                 prefix='spades', \
                                 dir=config['spades']['tmp_dir']), 
-        continue_flags="",
+        continue_flags="--continue" if os.path.isdir('spades') else "",
         skip_ec='' if run_ec else '--only-assembler',
     shell:
         """
