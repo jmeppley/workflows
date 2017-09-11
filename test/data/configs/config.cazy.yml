@@ -1,0 +1,5 @@
+annotation_name: contigs
+sample_data:
+          - "/mnt/lysine/jbryant/vibrio_transcriptomics/cDNA_assembly/annotation/contigs_short.fasta"
+path_formats:
+    paths=['/slipstream/home/jbryant/workflows/tools/pymg/']
