@@ -18,6 +18,7 @@ try:
 except:
     enable_hist = False
 
+print('I am printing pymg_dir:')
 print(config['pymg_dir'])
 
 if enable_hist:
