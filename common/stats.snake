@@ -77,8 +77,8 @@ rule prinseq_any:
     version:
         get_version('prinseq-lite.pl','-version')
     shell:
-        "
         echo 'running primseq_any'
+        "
         {params.cat} {input} | \
         prinseq-lite.pl {params.input_flag} stdin \
          -stats_len -stats_info {params.aa} > {output}"
