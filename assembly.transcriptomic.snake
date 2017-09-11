@@ -40,7 +40,7 @@ config.setdefault('transitions', {})
 ##
 # Bring in components
 include: "common/stats.snake"
-print(pymg_dir)
+
 #
 ## set up any QC
 # don't separate rRNA in reads
