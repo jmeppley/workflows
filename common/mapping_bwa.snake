@@ -8,6 +8,7 @@ BWA_VERSION = \
 from snakemake.utils import update_config
 update_config(config, {'bwa': {'threads': 15}})
 config['cov_col'] = 'md cov'
+from python.samples import get_sample_reads_for_mapping
 
 #######
 # map reads to contigs with BWA:
@@ -27,44 +28,6 @@ rule index_contigs:
     shell:
         "bwa index -p mapping/contigs.index.bwa {input} > {log} 2>&1 "
 
-def get_sample_reads(wildcards):
-    """
-    reads for mapping can come from different places
-    """
-    sample = wildcards.sample
-    # look in configuration first
-    if sample in config['sample_data'] and (
-        'raw' in config['sample_data'][wildcards.sample] or \
-        'for_mapping' in config['sample_data'][wildcards.sample] or \
-        'clean' in config['sample_data'][wildcards.sample]
-    ):
-
-        if 'for_mapping' in config['sample_data'][wildcards.sample]:
-            # use explicit decalration first
-            return config['sample_data'][wildcards.sample]['for_mapping']
-
-        try:
-            # can we find the renamed and interleaved reads?
-            renamed_root = re.search(r'^.+\.renamed(?:\.interleaved)?',
-                                     config['sample_data']\
-                                                    [wildcards.sample]\
-                                                    ['clean']
-                                    ).group()
-            return renamed_root + ".fastq"
-        except:
-            # OK, that didn't work
-            pass
-        # let's try simply using raw or clean reads
-        if 'raw' in config['sample_data'][wildcards.sample]:
-            # just use the raw reads
-            return config['sample_data'][wildcards.sample]['raw']
-        else:
-            # return clean reads if that's all we have
-            return config['sample_data'][wildcards.sample]['clean']
-    else:
-        # otherwise, look for fastq file with sample name
-        return "{}.fastq".format(wildcards.sample)
-
 rule map_sample_reads:
     """
     map cleaned reads onto contigs
@@ -72,7 +35,7 @@ rule map_sample_reads:
     input:
         "mapping/contigs.index.bwa.bwt",
         # prefer the raw reads, but cleaned are OK
-        get_sample_reads
+        lambda w: get_sample_reads_for_mapping(w, config)
     output:
         temp("mapping/{sample}.reads.vs.contigs.sam")
     log:
