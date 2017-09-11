@@ -24,6 +24,8 @@ run_ec = config.setdefault("run_spades_error_correction",
                            config['cleaning_protocol'] in non_ec_protocols)
 
 # get all the cleaned reads from config[sample_data]
+#builds a list of all cleaned read filenames from all samples
+
 cleaned_reads = [data['clean'] \
                          for sample,data in config['sample_data'].items() \
                          if 'clean' in data]
@@ -33,6 +35,8 @@ config.setdefault('outputs', set()).update(
         'stats/all_cleaned_reads.fastq.stats',
         'stats/all_cleaned_reads.fastq.hist',
     ])
+
+print(cleaned_reads)
 
 rule merge_reads_for_spades:
     """
@@ -45,6 +49,8 @@ rule merge_reads_for_spades:
         count=len(cleaned_reads),
     shell: 
         """
+        echo {params.count}
+        echo cleaned_reads
         if [ "{params.count}" == "1" ]; then
             # just link if it's one file
             ln -s {input} {output}
@@ -61,9 +67,11 @@ rule run_spades_metagenomic:
     """
     #input: cleaned_reads
     input: rules.merge_reads_for_spades.output
+    
+    #snakemake 'looks' at all its rules and figures out which rule makes an output file that matches below.
     output: "spades/{product}.fasta"
     wildcard_constraints:
-        product=r'(contigs|transcripts)',
+        product=r'(contigs|transcripts)' #,
     log: "logs/spades.log"
     benchmark: "benchmarks/spades.time"
     version: get_version('spades.py')
@@ -76,7 +84,7 @@ rule run_spades_metagenomic:
         tmp_dir=tempfile.TemporaryDirectory( \
                                 suffix='tmp', \
                                 prefix='spades', \
-                                dir=config['spades']['tmp_dir']),
+                                dir=config['spades']['tmp_dir']), 
         continue_flags="--continue" if os.path.isdir('spades') else "",
         skip_ec='' if run_ec else '--only-assembler',
     shell:

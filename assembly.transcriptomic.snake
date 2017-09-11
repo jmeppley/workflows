@@ -26,31 +26,41 @@ from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
 from python.common import get_version, parse_stats, get_file_name
 from python.qc import setup_qc_outputs
 
+
 # add pymg to path
+#puts stuff in tools into execution path
 include: "common/tool.path.snake"
 
 # Initialize transitions
+#creating empty dictionary for updating paths/ names
+# creates a symbolic link from one location to another
+# if raw read files are somewhere else, this updates file path
 config.setdefault('transitions', {})
 
 ##
 # Bring in components
 include: "common/stats.snake"
+
 #
 ## set up any QC
 # don't separate rRNA in reads
 config.setdefault('remove_rna', False)
+
 # use the assembly cleaning protocol
 config.setdefault('cleaning_protocol', 'assembly')
 outputs = config.setdefault('outputs',set())
 cleaned_reads = setup_qc_outputs(config)
+
 #outputs.update(cleaned_reads)
+# use assembly cleanup defaults
 include: "qc/setup.snake"
+
 #
 # the assembler (add link from assembled contigs to ./contigs.raw.fasta)
 assembler = config.get('assembler', 'spades')
 if assembler == 'spades':
     include: "assembly/metagenomic.spades.snake"
-    config['transitions']['contigs.raw.fasta'] = 'spades/transcripts.fasta'
+    config['transitions']['contigs.raw.fasta'] = 'spades/transcripts.fasta' #directory name
 elif assembler == 'megahit':
     raise Excption("Unsupported RNA assembler: " + config['assembler'])
 else:
@@ -72,17 +82,20 @@ else:
     raise Exception("Unknown transcript mapping tool: {}! Please check your configuration.".format(transcript_mapper))
 
 include: "assembly/rrna.annotation.snake"
-#
+
 # rule to create links
+# makes all the transition that we defined into actual rules
 include: "common/transitions.snake"
 
 # make sure tanstion source files don't get deleted
+# stops temps() from deleting
 from snakemake.io import flag
 for file_name in list(config['outputs']) + list(config['transitions'].values()):
     flag(file_name, "temp", False)
 
 # 
 # Make sure assembly has name
+# define naming root for contigs, may raise exception , need to define assembly name in config.yml
 if 'assembly_name' not in config:
     # if there is only one sample, use that
     sample_names = [sample \
@@ -93,6 +106,8 @@ if 'assembly_name' not in config:
     else:
         raise Exception("Please supply a naming string for this assembly "
                         "in config[assembly_name].")
+
+# rule to create rrna assembly data in the annotation makefile. Triggers SSU coverage to be run.
 config['outputs'].add("assembly.{assembly_name}.report".format(**config))
 
 logger.debug("Snakefile config:\n" + yaml.dump(config))
@@ -103,11 +118,12 @@ logger.debug("Snakefile config:\n" + yaml.dump(config))
 # Start with the final product(s):
 rule all:
     input:
+    	# sets all outputs as target
         config['outputs'],
 
 rule contigs_fasta:
     """
-    Rename contigs
+    Rename contigs to include assembly name that was specified
     """
     input:
         "contigs.raw.fasta"
@@ -141,6 +157,7 @@ def get_read_files(reads_type, config):
                     yield reads_file
 
 rule final_report:
+#counts reads and contigs
     input:
         raw_stats=['stats/{}.stats'.format(reads_file) \
                    for reads_file in get_read_files('raw', config)],

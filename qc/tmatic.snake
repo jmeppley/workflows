@@ -22,7 +22,7 @@ rule trimmomatic_trim:
     input:
         "{file_root}.fastq"
     output:
-        temp("{file_root}.trimmed.fastq")
+        "{file_root}.trimmed.fastq"
     log:
         "logs/{file_root}_trimmomatic_trim.log"
     benchmark:

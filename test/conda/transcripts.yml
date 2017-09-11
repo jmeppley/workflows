@@ -8,6 +8,7 @@ dependencies:
  - biopython
  - bbmap
  - bfc
+ - hmmer
  - trimmomatic
  - bwa 
  - samtools
@@ -17,3 +18,7 @@ dependencies:
  - sed
  - spades
  - salmon
+<<<<<<< HEAD
+ 
+=======
+>>>>>>> 3b8240c5cce221e0b82ef3d02fde1fad6a02d508
