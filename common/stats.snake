@@ -39,6 +39,7 @@ if enable_hist:
              if re.search(r'\.gz$',wildcards.ext) else "cat"
         shell:
             """
+            echo 'running histogram simple'
             which histograms.py
             {params.cat} {input} | \
             seqtk comp | \
@@ -76,7 +77,9 @@ rule prinseq_any:
     version:
         get_version('prinseq-lite.pl','-version')
     shell:
-        "{params.cat} {input} | \
+        "
+        echo 'running primseq_any'
+        {params.cat} {input} | \
         prinseq-lite.pl {params.input_flag} stdin \
          -stats_len -stats_info {params.aa} > {output}"
 
