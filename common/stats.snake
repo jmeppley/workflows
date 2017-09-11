@@ -18,6 +18,8 @@ try:
 except:
     enable_hist = False
 
+print(config['pymg_dir'])
+
 if enable_hist:
     rule histogram_simple:
         """ produce a histogram of sequence lengths """
