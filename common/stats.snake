@@ -38,8 +38,8 @@ if enable_hist:
             cat=lambda wildcards:"gunzip -c" \
              if re.search(r'\.gz$',wildcards.ext) else "cat"
         shell:
-            """
             echo 'running histogram simple'
+            """
             which histograms.py
             {params.cat} {input} | \
             seqtk comp | \
