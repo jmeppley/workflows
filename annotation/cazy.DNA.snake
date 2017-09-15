@@ -32,25 +32,27 @@ sys.path.append(pymg_dir)
 print(sys.path)
 print(config)
 
+config['sample_names']=[os.path.basename(x) for x in config['sample_data']]
+
 rule target:
     input: 
-    	expand("annotation/{sample}.tr.CAZy.hmmsearch.e-5.m8", sample=config['sample_data'])
+    	expand("annotation/{sample}.tr.CAZy.hmmsearch.e-5.m8", sample=config['sample_names'])
 
 rule translate_frames:
     """
     translate all six coding frames
     """
     input:
-        config['sample_data']
+       config['sample_data']
     output:
-        "annotation/{contigs}.tr.allframes.fasta"
+        "annotation/{contig}.tr.allframes.fasta"
     log:
         "logs/transeq.log"
     benchmark:
         "benchmarks/transeq.txt"
     shell:
         """
-        transeq -sequence {input} -outseq annotation/{wildcards.contigs}.tr.allframes.fasta -table 11 -frame all -clean
+        transeq -sequence {input} -outseq annotation/{wildcards.contig}.tr.allframes.fasta -table 11 -frame all -clean
         """
 
 
