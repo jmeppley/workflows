@@ -47,9 +47,9 @@ RUN git clone --recursive https://github.com/jmeppley/workflows /opt/workflows &
   rm -rf /opt/workflows/tools/pymg/test
 
 # reduce image size after conda run
-#RUN conda env update -n root -f /opt/workflows/docker/annotation.reads/minimal.conda.yml && \
 #RUN conda install -c bioconda -c conda-forge "python=3.5" "snakemake<4" samtools last hmmer prinseq prodigal seqtk && \
-RUN conda env update -n root -f /opt/workflows/test/conda/annotate.yml && \
+#RUN conda env update -n root -f /opt/workflows/test/conda/annotate.yml && \
+RUN conda env update -n root -f /opt/workflows/docker/annotation.reads/minimal.conda.yml && \
   conda clean --all -y
 
 # copy in default config (can be ignored if new --configfile= argument passed in)
