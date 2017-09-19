@@ -1,41 +1,56 @@
-FROM debian:8.5
+FROM alpine:latest
 
-# 
-# This image based on the miniconda3 image in 
-#  https://github.com/ContinuumIO/docker-images
-#MAINTAINER Kamil Kwiek <kamil.kwiek@continuum.io>
+#MAINTAINER CognitiveScale <devops@cognitivescale.com>
+MAINTAINER Marmaduke <jmeppley@gmail.com>
 
-MAINTAINER Kamil Kwiek <kamil.kwiek@continuum.io>
+RUN apk --update  --repository http://dl-4.alpinelinux.org/alpine/edge/community add \
+	bash \
+	git \
+	curl \
+	ca-certificates \
+	bzip2 \
+	unzip \
+	sudo \
+	libstdc++ \
+	glib \
+	libxext \
+	libxrender \
+	tini \ 
+	&& curl -L "https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.25-r0/glibc-2.25-r0.apk" -o /tmp/glibc.apk \
+	&& curl -L "https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.25-r0/glibc-bin-2.25-r0.apk" -o /tmp/glibc-bin.apk \
+	&& curl -L "https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.25-r0/glibc-i18n-2.25-r0.apk" -o /tmp/glibc-i18n.apk \
+	&& apk add --allow-untrusted /tmp/glibc*.apk \
+	&& /usr/glibc-compat/sbin/ldconfig /lib /usr/glibc-compat/lib \
+	&& /usr/glibc-compat/bin/localedef -i en_US -f UTF-8 en_US.UTF-8 \
+	&& rm -rf /tmp/glibc*apk /var/cache/apk/*
 
-ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+# Configure environment
+ENV CONDA_DIR=/opt/conda CONDA_VER=4.3.14
+ENV PATH=$CONDA_DIR/bin:$PATH SHELL=/bin/bash LANG=C.UTF-8
+ENV PYTHON_VER=3.5
 
-RUN apt-get update --fix-missing && apt-get install -y wget bzip2 ca-certificates \
-    libglib2.0-0 libxext6 libsm6 libxrender1 \
-    git mercurial subversion
-
-RUN echo 'export PATH=/opt/conda/bin:$PATH' > /etc/profile.d/conda.sh && \
-    wget --quiet https://repo.continuum.io/miniconda/Miniconda3-4.2.12-Linux-x86_64.sh -O ~/miniconda.sh && \
-    /bin/bash ~/miniconda.sh -b -p /opt/conda && \
-    rm ~/miniconda.sh
-
-RUN apt-get install -y curl grep sed dpkg && \
-    TINI_VERSION=`curl https://github.com/krallin/tini/releases/latest | grep -o "/v.*\"" | sed 's:^..\(.*\).$:\1:'` && \
-    curl -L "https://github.com/krallin/tini/releases/download/v${TINI_VERSION}/tini_${TINI_VERSION}.deb" > tini.deb && \
-    dpkg -i tini.deb && \
-    rm tini.deb && \
-    apt-get clean
+# Install conda
+RUN mkdir -p $CONDA_DIR && \
+	echo export PATH=$CONDA_DIR/bin:'$PATH' > /etc/profile.d/conda.sh && \
+	curl https://repo.continuum.io/miniconda/Miniconda3-${CONDA_VER}-Linux-x86_64.sh -o mconda.sh && \
+	/bin/bash mconda.sh -f -b -p $CONDA_DIR && \
+	rm mconda.sh && \
+	$CONDA_DIR/bin/conda install --yes conda==${CONDA_VER} && \
+	$CONDA_DIR/bin/conda install --yes python==${PYTHON_VER} && \
+	$CONDA_DIR/bin/conda clean --all -y
 
 ENV PATH /opt/conda/bin:$PATH
 
-RUN git clone --recursive https://github.com/jmeppley/workflows /opt/workflows
+# reduce image size by removing test data after clone
+RUN git clone --recursive https://github.com/jmeppley/workflows /opt/workflows && \
+  rm -rf /opt/workflows/test/data && \
+  rm -rf /opt/workflows/tools/pymg/test
 
-RUN conda env update -n root -f /opt/workflows/test/conda/annotate.yml
-
-# reduce image size
-RUN conda clean --all -y
-
-# reduce image size
-RUN rm -rf /opt/workflows/test/data
+# reduce image size after conda run
+#RUN conda env update -n root -f /opt/workflows/docker/annotation.reads/minimal.conda.yml && \
+#RUN conda install -c bioconda -c conda-forge "python=3.5" "snakemake<4" samtools last hmmer prinseq prodigal seqtk && \
+RUN conda env update -n root -f /opt/workflows/test/conda/annotate.yml && \
+  conda clean --all -y
 
 # copy in default config (can be ignored if new --configfile= argument passed in)
 #  This lets us get locally modified config, not config from github
@@ -43,5 +58,5 @@ ADD ./config.yaml /default.config.yaml
 
 WORKDIR /workdir
 
-ENTRYPOINT [ "/usr/bin/tini", "--", "snakemake", "-s", "/opt/workflows/annotation.reads.snake", "--configfile", "/default.config.yaml", "-j", "20", "-p" ]
+ENTRYPOINT [ "/sbin/tini", "--", "snakemake", "-s", "/opt/workflows/annotation.reads.snake", "--configfile", "/default.config.yaml", "-j", "20", "-p" ]
 

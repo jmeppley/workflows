@@ -1,0 +1,12 @@
+channels:
+ - bioconda
+ - conda-forge
+dependencies:
+ - python=3.5
+ - snakemake<4
+ - samtools
+ - last
+ - hmmer
+ - prinseq
+ - prodigal
+ - seqtk
