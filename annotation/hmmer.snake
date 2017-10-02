@@ -27,7 +27,7 @@ rule hmmer:
     version:
         get_version('hmmsearch','-h',lines=[1,])
     threads:
-        lambda wildcards: config['threads'].get('hmmer',default_threads)
+        lambda wildcards: config['hmmer'].get('threads',default_threads)
     params:
         db_path=lambda wildcards: config['dbs'][wildcards.db]['path']
     shell:
@@ -51,7 +51,7 @@ rule hmmer_dbfrag:
     version:
         get_version('hmmsearch','-h',lines=[1,])
     threads:
-        config['threads'].get('hmmer',default_threads)
+        config['hmmer'].get('threads',default_threads)
     params:
         db_path=lambda w: config['dbs'][w.db]['path'].format(N=int(w.N))
     shell:

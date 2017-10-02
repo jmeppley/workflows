@@ -203,6 +203,7 @@ def normalize_coverages(input):
     coverages = None
     for cov_file in sorted(input.contig_covs):
         assembly = os.path.dirname(cov_file)
+        assembly = re.sub(r'^renamed_dir', '', assembly)
         if assembly != last_assembly:
             if coverages is not None:
                 for item in coverages.items():
