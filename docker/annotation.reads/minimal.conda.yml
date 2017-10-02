@@ -4,16 +4,9 @@ channels:
 dependencies:
  - python=3.5
  - snakemake<4
- - pandas
- - biopython
- - bbmap
- - bfc
- - trimmomatic
- - bwa 
  - samtools
- - infernal
+ - last
+ - hmmer
  - prinseq
+ - prodigal
  - seqtk
- - sed
- - spades
- - salmon

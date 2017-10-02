@@ -45,7 +45,7 @@ config.setdefault('remove_rna', False)
 config.setdefault('cleaning_protocol', 'assembly')
 outputs = config.setdefault('outputs',set())
 cleaned_reads = setup_qc_outputs(config)
-outputs.update(cleaned_reads)
+#outputs.update(cleaned_reads)
 include: "qc/setup.snake"
 include: "common/gunzip.snake"
 #

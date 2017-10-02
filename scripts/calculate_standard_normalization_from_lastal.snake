@@ -1,0 +1,102 @@
+import pandas
+import numpy
+import glob
+import re
+
+## where to find the data
+# You can set these to something differnt on the command line by adding, EG:
+#   --config spike_amounts_table=spikes.txt last_table_dir=lastouts
+spike_amounts_table = config.get('spike_amounts_table', "spike_amounts.tsv")
+last_table_dir = config.get('last_table_dir', "ERCC_RNA_controls")
+last_table_glob = config.get('last_table_glob', "*ERCC*.lastout")
+
+## get the list of factor file names to be produced
+# this looks for all the lastout files in the give dir
+# and replaces the suffix with "factor"
+final_factor_files = \
+    [re.sub(r'\.lastout$', '.factor', f) \
+     for f in glob.glob(os.path.join(last_table_dir, last_table_glob))]
+
+## The first rule is run by default
+rule collate_factors:
+    """
+    Collect all the factors into one table
+    """
+    input: final_factor_files
+    output: last_table_dir + ".normalization_factors.txt"
+    shell: "cat {input} > {output}"
+
+rule filter_hits:
+    """
+    Only keep hits over 98% identical and only the best scoring hit(s) for each read
+    """
+    input: "{prefix}.lastout"
+    output: "{prefix}.I98.L50.lastout"
+    shell: "filter_blast_m8.py -f blast -F 0 -I 98 -L 50 {input} > {output}"
+
+rule count_hits:
+    """
+    Count hits for each sample
+    """
+    input: "{prefix}.I98.L50.lastout"
+    output: "{prefix}.counts"
+    shell: "count_taxa.py -c 0 -f blast {input} > {output}"
+
+rule calculate_factors:
+    """
+    generate a normalization factor for each sample
+    """
+    input: 
+        counts="{path}/{sample}.vs.{db}.counts",
+        spiked=spike_amounts_table
+    output: "{path}/{sample}.vs.{db}.factor"
+    wildcard_constraints:
+        sample=r'[^/]+'
+    run:
+        # load counts of recovered standards from this sample
+        count_table = pandas.read_table(input.counts, header=0, index_col=0)
+        count_table.columns = ['Counts']
+
+        # load spiked in amounts
+        spike_table = pandas.read_table(input.spiked, header=None, index_col=0)
+        spike_table.columns = ['Spiked']
+        
+        # get data as lists in same order
+        standard_list = sorted(list(count_table.index))
+        counts = [count_table.Counts[s] for s in standard_list]
+        spikes = [spike_table.Spiked[s] for s in standard_list]
+        
+        # calculate the scale factor and save
+        scale_factor = get_best_fit(counts, spikes, force_intercept=True)[0]
+        with open(output[0], 'w') as OUT:
+            OUT.write("{0}\t{1:0.2f}\n".format(wildcards.sample, scale_factor))
+
+def get_best_fit(xd, yd, force_intercept=False, force_slope=False):
+    """Return coeefs for a line of best fit"""
+    #Calculate trendline
+    if force_intercept:
+        # intercept of 0
+        x = numpy.array(xd)[:,numpy.newaxis]
+        slope, _, _, _ = numpy.linalg.lstsq(x, yd)
+        coeffs = [slope[0], 0]
+        if force_slope:
+            # We shouldn't get here, but let's just return the fixed values
+            coeffs = (1, 0)
+    elif force_slope:
+        # slope of 1: intercept is average of difference
+        intercept = numpy.mean(yd-xd)
+        coeffs = [1,intercept]
+    else:
+        coeffs = numpy.polyfit(xd, yd, 1)
+
+    return coeffs
+
+"""
+rule assign_top_hit:
+    Resolve cases where one read matches equally well to two standards
+    input: all_filtered_hits
+    output: all_top_hits
+    shell: "assign_top_hit.py ..."
+"""
+
+

@@ -21,7 +21,7 @@ rule drop_singles:
     drop unpaired reads from interleaved fastq
     """
     input: "{prefix}.fastq"
-    output: temp("{prefix}.dropse.fastq")
+    output: "{prefix}.dropse.fastq"
     benchmark: "benchmarks/{prefix}.dropse.time"
     version: SEQTK_VERSION
     shell: "seqtk dropse {input} > {output}"

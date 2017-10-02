@@ -14,8 +14,8 @@ def get_bbduk_resource_path(config):
 
     # infer path from binary location (using which and subprocess)
     try:
-        cmd='find `which bbduk.sh | sed -r s/bbduk\.sh/../` ' + \
-             '-name "adapters.fa" | sed -r s#/adapters.fa##'
+        cmd='find `which bbduk.sh | sed s/bbduk\.sh/../` ' + \
+             '-name "adapters.fa" | sed s#/adapters.fa##'
         resource_path = \
             subprocess.check_output(cmd, shell=True).decode().strip()
     except:

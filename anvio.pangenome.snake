@@ -86,7 +86,8 @@ rule pangenome_files:
             --project-name {wildcards.pangenome_name} \
             > {log} 2>&1
            mv {wildcards.pangenome_name} anvio/
-           touch {output}"""
+           touch {output}
+           """
 
 rule pangenome_db:
     input: genomes_tables
