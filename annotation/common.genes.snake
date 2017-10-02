@@ -4,12 +4,14 @@
 # rank to collect taxa on (defaults to order)
 config.setdefault('clade_ranks', ['order'])
 #
-# threads per search are set in the threads: parameter
-# Either use the db name or "default". EG:
+# threads per search are set in the threads: parameter for each tool:
 # threads:
 #   default: 5
-#   lastal: 20
-# Defaults to 8 for eveerything
+# lastal:
+#   threads: 20
+# hmmer:
+#   threads: 2
+#Defaults to 8 for eveerything
 default_threads=config.setdefault('threads',{}).get('default', 3)
 #
 # End configuration
