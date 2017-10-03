@@ -23,22 +23,24 @@ threads:
     hmmer:    2
     lastal:   10
     prodigal: 50
+aa_conversion: prodigal
 dbs:
     RefSeq:
-        path: "/projectb/scratch/jmeppley/seqdbs/RefSeq/78/RefSeq-78.           AllProteins.faa.ldb/lastdb"
-        type: lastdb
-        istaxdb: True
+        path: "/seqdbs/RefSeq/78/RefSeq-78.AllProteins.faa.ldb/lastdb"
+        format: lastp
+        type: tax
     KEGG:
-        path: "/projectb/scratch/jmeppley/seqdbs/KEGG/KeggGene.pep.20160919/    lastdb"
-        type: lastdb
+        path: "/seqdbs/KEGG/KeggGene.pep.20160919/lastdb"
+        format: lastp
+        assign_type: kegg
     PFAM:
-        path: "/projectb/scratch/jmeppley/seqdbs/PFAM/30.0/frag-20/Pfam-A.{N:   02d}.hmm"
+        path: "/seqdbs/PFAM/30.0/frag-20/Pfam-A.{N:02d}.hmm"
         frags: 20
     COG:
-        path: "/projectb/scratch/jmeppley/seqdbs/cdd/16_January_2015/COG/frag-  10/COG.hmm.{N:02d}.ascii"
+        path: "/seqdbs/cdd/16_January_2015/COG/frag-10/COG.hmm.{N:02d}.ascii"
         frags: 10
     TIGR:
-        path: "/projectb/scratch/jmeppley/seqdbs/TIGRFAM/15.0/frag-10/TIGRFAMS. {N:02d}.hmm"
+        path: "/seqdbs/TIGRFAM/15.0/frag-10/TIGRFAMS.{N:02d}.hmm"
         frags: 10
 
 The reads can be embedded in a bam file or given as fasta or fastq.
