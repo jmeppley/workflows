@@ -65,7 +65,7 @@ rule long_rrna_gff:
           | sort \
           | filter_blast_m8.py -s score -L {wildcards.length} -f gff \
             --nonoverlapping \
-          > {output}"
+          > {output} || true"
 
 rule rrna_fasta:
     """ extract rRNA fasta """
