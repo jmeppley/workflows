@@ -16,6 +16,9 @@ Workflow:
 
 The middle part of the workflow should be the same as the annotation.genes.snake workflow.
 """
+# add my tools to the path (Somewhat of a hack, maybe I'll get my stuff in
+# conda eventually)
+include: "common/tool.path.snake"
 
 import os
 import glob
@@ -23,6 +26,7 @@ import re
 import yaml
 import pandas
 from Bio import SeqIO
+from python import gene_catalog
 from python.common import get_version, apply_defaults, get_file_name, parse_stats
 from python.annotate import get_db_dot_fmt_strings
 
@@ -61,6 +65,10 @@ defaults = {
 }
 apply_defaults(config, defaults)
 
+# rules for gene annmotation workflow
+include: "common/stats.snake"
+include: "annotation/common.genes.snake"
+
 # Define some trasitions to break the workflow up into segments
 transitions = config.setdefault('transitions',{})
 # the first part creates the clustered faa
@@ -71,14 +79,15 @@ transitions['all_genes.ffn.{}.ffn'.format(config['cdhit']['output_str'])] = \
             'all_genes.ffn.{}'.format(config['cdhit']['output_str'])
 # the second part will work from there (using the annotation.genes workflow)
 prefix = 'all_genes.clustered'
+# the last part will merge all the annotation files
+gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs, config, 'faa')
+for dbdotfmt in gene_family_db_dot_fmts:
+    db = dbdotfmt.split(".",1)[0]
+    transitions['all_genes.clustered.annotations.{}'.format(db)] = \
+            'all_genes.clustered.annot.gene_family.{}.tsv'.format(dbdotfmt)
 
-# add my tools to the path (Somewhat of a hack, maybe I'll get my stuff in
-# conda eventually)
-include: "common/tool.path.snake"
-# rules for gene annmotation workflow
-include: "common/stats.snake"
+# include transitions makefile only after all transitions defined
 include: "common/transitions.snake"
-include: "annotation/common.genes.snake"
 
 # how to search against taxdb
 config['taxdbfmt'] = config['dbs'][config['taxdb']].get('format','lastx')
@@ -91,7 +100,6 @@ config['taxdbfmt'] = config['dbs'][config['taxdb']].get('format','lastx')
 #  - The final tabulations
 #  - Stats and histrogram files for fasta files
 #  - The final annotation table
-gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs, config, 'faa')
 annotation_file_list = \
                 expand("{prefix}.annot.{taxdb}.{taxdbfmt}.{clade_rank}.vs.{db_dot_fmt}.tsv",
                        prefix=prefix,
@@ -106,8 +114,8 @@ annotation_file_list = \
                 expand("stats/{prefix}.{suffix}.{ext}", 
                        ext=['stats','hist'],
                        suffix=['faa'],
-                       prefix=prefix)
-                #[prefix + ".annotation.tab"]
+                       prefix=prefix) + \
+                [prefix + ".annotations.tab"]
 
 logger.debug("Snakefile config:\n" + yaml.dump(config))
 
@@ -120,34 +128,8 @@ rule gene_annotation_all:
 
 #########
 # Helper functions
+                                                   
 def get_all_annotation_files(wildcards):
-    """
-    Find the contig.annotations.{wildcards.ext} for each assembly
-    """
-    for assembly_path in config['assembly_list']:
-        file_name = os.path.join(assembly_path, 
-                                 'contigs.annotations.{}'.format(wildcards.ext))
-        yield file_name
-
-def get_all_annotation_files_renamed(wildcards):
-    """
-    Find the contig.annotations.{wildcards.ext} for each assembly
-
-    Replace file name
-    """
-    for assembly_path in config['assembly_list']:
-        file_name = os.path.join(assembly_path, 
-                                 'contigs.annotations.{}'.format(wildcards.ext))
-
-        if assembly_path in assembly_renaming_map:
-            regex_str = assembly_renaming_map(assembly_path)
-            # bash injection
-            file_name = "<(perl -pe '{}' {})".format(regex_str,
-                                                    file_name)
-
-        yield file_name
-                                                    
-def get_all_annotation_files_renaming(wildcards):
     """
     Find the contig.annotations.{wildcards.ext} for each assembly
 
@@ -184,44 +166,6 @@ def get_assembly_read_stats(wildcards):
                                 'all_cleaned_reads.fastq.stats')):
             yield file_name
 
-def normalize_coverages(input):
-    """
-    Loop over read stats files and create a normalization factor for each assembly (number of reads/10M)
-
-    Loop over coverage files, 
-    group by assembly (some assemblies have 2), 
-    normalize by adjusted number of reads,
-    yield (contig, coverage) tuples
-    """
-    read_counts = {}
-    for stats_file in input.read_stats:
-        assembly = re.sub(r'/stats/.+$', '', stats_file)
-        reads = parse_stats(stats_file)['reads'] / 10000000
-        read_counts[assembly] = read_counts.get(assembly, 0) + reads
-
-    last_assembly = None
-    coverages = None
-    for cov_file in sorted(input.contig_covs):
-        assembly = os.path.dirname(cov_file)
-        assembly = re.sub(r'^renamed_dir', '', assembly)
-        if assembly != last_assembly:
-            if coverages is not None:
-                for item in coverages.items():
-                    yield item
-            coverages = None
-            last_assembly = assembly
-        _coverages = pandas.read_table(cov_file,
-                                       index_col=0,
-                                       header=0,
-                                       usecols=['contig', 'md cov'],
-                                       )['md cov'] / read_counts[assembly]
-        if coverages is None:
-            coverages = _coverages
-        else:
-            coverages = coverages + _coverages
-    for item in coverages.items():
-        yield item
-
 ##########
 # RULES:
 #  This lays out the dependencies and logic of the workflow
@@ -239,7 +183,7 @@ rule rename_annotations:
             > {output}"
 
 rule collect_annotations:
-    input: get_all_annotation_files_renaming
+    input: get_all_annotation_files
     output: "all_genes.{ext}"
     wildcard_constraints:
         ext=r'(fna|faa)'
@@ -308,3 +252,32 @@ rule get_gene_coverages:
             for contig, coverage in normalize_coverages(input):
                 for gene in contig_genes.get(contig, []):
                     OUT.write('{}\t{}\n'.format(gene, coverage))
+
+rule refseq_annotations:
+    input:
+        hits='all_genes.clustered.vs.RefSeq.lastp',
+        db=config['dbs'][config['taxdb']]['path'] + ".prj"
+    output: 'all_genes.clustered.annotations.RefSeq'
+    params:
+        db=config['dbs'][config['taxdb']]['path']
+    run:
+        a = gene_catalog.RefSeqGeneAnnotator(get_file_name(params.db))
+        a.annotate_genes_rs_prot(get_file_name(input.hits), 
+                                 get_file_name(output))
+
+rule kegg_annotations:
+    input:
+        hits='all_genes.clustered.vs.KEGG.lastp',
+        db=config['dbs']['KEGG']['path'] + '.prj'
+    output: 'all_genes.clustered.annotations.KEGG'
+    params:
+        db=config['dbs']['KEGG']['path']
+    run:
+        a = gene_catalog.KeggGeneAnnotator(get_file_name(params.db))
+        a.annotate_genes_kg(get_file_name(input.hits), get_file_name(output))
+
+rule final_table:
+    input: expand('all_genes.clustered.annotations.{db}', \
+                  db=config['dbs'])
+    output: 'all_genes.clustered.annotations.tab'
+    shell: 'table_merger.py {input} > {output}'
