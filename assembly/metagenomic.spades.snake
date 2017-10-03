@@ -5,6 +5,8 @@ Rules and config for using spades to run an assembly
 # set some reasonable defaults
 import os
 from python.common import apply_defaults
+from python.qc import non_ec_protocols
+
 # kmers only applies to metagenomic
 # use rnakmer for transcript assembly
 defaults = {
@@ -15,6 +17,11 @@ defaults = {
                   'rnakmer':'55'},
             }
 apply_defaults(config, defaults)
+
+# figure out if we're going to run error correction
+#  (can be explicitly set, or we'll try to guess based on cleaning)
+run_ec = config.setdefault("run_spades_error_correction",
+                           config['cleaning_protocol'] in non_ec_protocols)
 
 # get all the cleaned reads from config[sample_data]
 cleaned_reads = [data['clean'] \
@@ -71,7 +78,7 @@ rule run_spades_metagenomic:
                                 prefix='spades', \
                                 dir=config['spades']['tmp_dir']),
         continue_flags="--continue" if os.path.isdir('spades') else "",
-        skip_ec='--only-assembler',
+        skip_ec='' if run_ec else '--only-assembler',
     shell:
         """
         spades.py {params.mode} -m {params.ram_limit} -t {threads} \

@@ -8,13 +8,14 @@ To run:
 
 snakemake -s /path/to/workflows/annotate.reads.snake --configfile annotate.reads.yaml [OPTIONS]
 
-The following conda packages are necessary:
-conda create -n snakemake -c bioconda python=3 snakemake samtools last hmmer
-emboss prodigal
+See test/conda/annotate.yml for a list of rquired packages. You can create a conda environment with the command:
+conda env create -n annotate -f test/conda/annotate.yml
 
-You will need to run the makefiles in tools/pymg/databases or provide your own sequence dbs.
+You will need to run the makefiles in tools/pymg/databases two download and format the 
+reference databases if your lab doesn't already have them.
 
-With a config file that looks like this:
+With a config file that looks like test/data/configs/reads.annot.prod/yml or reads.annot.six.yml.
+Or like this:
 reads_file: /path/to/file.bam
 annot_prefix: reads
 clade_rank: order

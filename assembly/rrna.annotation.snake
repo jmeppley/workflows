@@ -1,5 +1,8 @@
 include: "../annotation/cmsearch.snake"
 include: "../annotation/bwa.snake"
+
+from python.common import get_file_name
+
 # available rRNA DBs
 from python.annotate import get_last_alg
 
@@ -62,7 +65,7 @@ rule long_rrna_gff:
           | sort \
           | filter_blast_m8.py -s score -L {wildcards.length} -f gff \
             --nonoverlapping \
-          > {output}"
+          > {output} || true"
 
 rule rrna_fasta:
     """ extract rRNA fasta """
@@ -107,7 +110,7 @@ rule rrna_report:
             coverages[sample] = cov_table[config['cov_col']]
 
         # table of rRNA model hits from filtered GFF
-        features = pandas.read_table(input.gff,
+        features = pandas.read_table(get_file_name(input.gff),
                                      header=None,
                                      names=['contig',
                                             'tool',
@@ -136,7 +139,7 @@ rule rrna_report:
         from edl.blastm8 import generate_hits
         from edl.util import parseMapFile
         
-        m = re.search(r'gff\.vs\.(.+)', input.hits)
+        m = re.search(r'gff\.vs\.(.+)', get_file_name(input.hits))
         if m is not None:
             hit_table_name = re.search(r'gff\.vs\.(.+)', input.hits).group(1)
             # should be, eg, SilvaSSU.lastn or SilvaSSU.bwa.sam
@@ -150,7 +153,8 @@ rule rrna_report:
             elif hit_format.startswith('blast'):
                 hit_format = 'blastplus'
             hit_descriptions = parseMapFile(input.id_names)
-            for gene, hits in generate_hits(input.hits, format=hit_format):
+            for gene, hits in generate_hits(get_file_name(input.hits),
+                                            format=hit_format):
                 # take the first hit
                 hit = list(hits)[0]
                 contig, start, end = re.search(r'^(.+)_(\d+)_(\d+)$', gene)\

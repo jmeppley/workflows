@@ -1,4 +1,5 @@
 setup() {
+    mkdir -p test/conda/envs
     ENV=assembly
     ENV_DIR=`pwd`/test/conda/envs/$ENV
     ENV_FILE=test/conda/${ENV}.yml
@@ -21,6 +22,11 @@ setup() {
 
     run bash -c "snakemake -j 10 -s ../../../assembly.metagenomic.snake -p --configfile ../../data/configs/spades.yaml --verbose > assembly.log 2>&1"
     [ "$status" -eq 0 ]
+    run bash -c "snakemake -j 10 -s ../../../assembly.metagenomic.snake -p --configfile ../../data/configs/spades.yaml -n 2>&1 | grep -v '^Multiple include'"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" == "Nothing to be done." ]
+    run bash -c "head -1 fortyk.renamed.R1.tsv | perl -pe 's/\s//'g"
+    [ "${lines[0]}" == "NS500472:37:HMMVTBGXX:1:11101:14387:1050fortyk_1" ]
 }
 
 @test "assemble single sample with megahit" {
@@ -30,6 +36,9 @@ setup() {
 
     run bash -c "snakemake -j 10 -s ../../../assembly.metagenomic.snake -p --configfile ../../data/configs/megahit.yaml --verbose > assembly.log 2>&1"
     [ "$status" -eq 0 ]
+    run bash -c "snakemake -j 10 -s ../../../assembly.metagenomic.snake -p --configfile ../../data/configs/megahit.yaml -n 2>&1 | grep -v '^Multiple include'"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" == "Nothing to be done." ]
 }
 
 @test "Prep two pair of files for assembly" {
@@ -39,5 +48,8 @@ setup() {
 
     run bash -c "snakemake -j 10 -s ../../../clean.illumina.snake -p --configfile ../../data/configs/illumina.yaml --verbose --config cleaning_protocol=assembly remove_rna=False discover_fastx_for_stats=True > assembly.clean.log 2>&1"
     [ "$status" -eq 0 ]
+    run bash -c "snakemake -j 10 -s ../../../clean.illumina.snake -p --configfile ../../data/configs/illumina.yaml --config cleaning_protocol=assembly remove_rna=False discover_fastx_for_stats=True -n 2>&1 | grep -v '^Multiple include'"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" == "Nothing to be done." ]
 }
 

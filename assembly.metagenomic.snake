@@ -45,7 +45,7 @@ config.setdefault('remove_rna', False)
 config.setdefault('cleaning_protocol', 'assembly')
 outputs = config.setdefault('outputs',set())
 cleaned_reads = setup_qc_outputs(config)
-outputs.update(cleaned_reads)
+#outputs.update(cleaned_reads)
 include: "qc/setup.snake"
 include: "common/gunzip.snake"
 #
@@ -109,6 +109,7 @@ rule contigs_fasta:
         "biopython-{}".format(BIOPYTHON_VERSION)
     run:
         root_name = config['assembly_name']
+        logger.debug("root name: {}".format(root_name))
         with open(input[0]) as INPUT:
             with open(output[0], 'w') as OUTPUT:
                 for i, (title, sequence) \
@@ -117,6 +118,7 @@ rule contigs_fasta:
                         OUTPUT.write(">%s %s\n%s\n" % (contig_name,
                                                        title,
                                                        sequence))
+                logger.debug("renamed {} contigs".format(i))
 
 def get_read_files(reads_types, config):
     """

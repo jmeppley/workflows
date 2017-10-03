@@ -1,0 +1,310 @@
+"""
+Python Makefile to create an anntotated gene catalog
+
+Starting point:
+   multiple assembled metagenomes (configured in configfile) 
+
+Workflow:
+
+ * collect all faa and fna annotations
+ * pull out just coding sequences from fna files
+ * cluster all nucl CDS at 95%
+ * pull out faa version of cluster reps
+ * query genes in configured databases: usu RefSeq, KEGG, COG, PFAM, and EGGnog
+ * tabulate tax v gene_families counts
+ * generate db specific annotations and merge into final table
+
+The middle part of the workflow should be the same as the annotation.genes.snake workflow.
+"""
+
+import os
+import glob
+import re
+import yaml
+import pandas
+from Bio import SeqIO
+from python.common import get_version, apply_defaults, get_file_name, parse_stats
+from python.annotate import get_db_dot_fmt_strings
+
+#########
+# CONFIGURATION
+#
+# defaults for basic operation
+# ranks to collect taxa on (defaults to order)
+config.setdefault('clade_ranks', ['order'])
+
+# assemblies located in paths
+# listed in config[assembly_list] or file config[assembly_list_file]
+if "assembly_list" not in config:
+    with open(config['assembly_list_file']) as LIST:
+        config['assembly_list'] = [l.strip() for l in LIST.readlines()]
+
+# soma assemblies need to be renamed to fit in the big catalog
+# listed in config as list of 2-entry dicts:
+# assembly_renaming:
+#   - assembly: /full/path/to/assembly
+#     regex: "s/old_prefix/new_prefix/"
+#   - assembly: . . .
+# Change to a simple dict for use in makefile
+assembly_renaming_map = {x['assembly']:x['regex'] \
+                         for x in config.get('assembly_renaming', [])}
+
+# software parameters
+defaults = {
+    'cdhit': {
+        'threads': 20,
+        'options': '-c 0.95 -M 1000000 -G 0 -aS 0.9 -g 1 -r 1 -d 0',
+        'output_str': 'c.95.aS.9.g1.r1.G0',
+    },
+    'hmmer': {'threads': 2},
+    'lastal': {'threads': 10},
+}
+apply_defaults(config, defaults)
+
+# Define some trasitions to break the workflow up into segments
+transitions = config.setdefault('transitions',{})
+# the first part creates the clustered faa
+transitions['all_genes.clustered.faa'] = \
+            'all_genes.ffn.{}.faa'.format(config['cdhit']['output_str'])
+# the clustered ffn is ambiguously named, so lets add ffn to the end
+transitions['all_genes.ffn.{}.ffn'.format(config['cdhit']['output_str'])] = \
+            'all_genes.ffn.{}'.format(config['cdhit']['output_str'])
+# the second part will work from there (using the annotation.genes workflow)
+prefix = 'all_genes.clustered'
+
+# add my tools to the path (Somewhat of a hack, maybe I'll get my stuff in
+# conda eventually)
+include: "common/tool.path.snake"
+# rules for gene annmotation workflow
+include: "common/stats.snake"
+include: "common/transitions.snake"
+include: "annotation/common.genes.snake"
+
+# how to search against taxdb
+config['taxdbfmt'] = config['dbs'][config['taxdb']].get('format','lastx')
+
+# End configuration
+##########
+
+##########
+# set up list of files to create
+#  - The final tabulations
+#  - Stats and histrogram files for fasta files
+#  - The final annotation table
+gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs, config, 'faa')
+annotation_file_list = \
+                expand("{prefix}.annot.{taxdb}.{taxdbfmt}.{clade_rank}.vs.{db_dot_fmt}.tsv",
+                       prefix=prefix,
+                       taxdbfmt=config['taxdbfmt'],
+                       taxdb=config['taxdb'],
+                       clade_rank=config['clade_ranks'],
+                       db_dot_fmt=gene_family_db_dot_fmts,) + \
+                expand("stats/{prefix}.{suffix}.{ext}", 
+                       ext=['stats','hist'],
+                       suffix=['faa','fna'],
+                       prefix="all_genes") + \
+                expand("stats/{prefix}.{suffix}.{ext}", 
+                       ext=['stats','hist'],
+                       suffix=['faa'],
+                       prefix=prefix)
+                #[prefix + ".annotation.tab"]
+
+logger.debug("Snakefile config:\n" + yaml.dump(config))
+
+# The first target defines the files to be created 
+#  (Counterintuitively, these are listed as the "input" of the rule
+rule gene_annotation_all:
+    input:
+        annotation_file_list
+#########
+
+#########
+# Helper functions
+def get_all_annotation_files(wildcards):
+    """
+    Find the contig.annotations.{wildcards.ext} for each assembly
+    """
+    for assembly_path in config['assembly_list']:
+        file_name = os.path.join(assembly_path, 
+                                 'contigs.annotations.{}'.format(wildcards.ext))
+        yield file_name
+
+def get_all_annotation_files_renamed(wildcards):
+    """
+    Find the contig.annotations.{wildcards.ext} for each assembly
+
+    Replace file name
+    """
+    for assembly_path in config['assembly_list']:
+        file_name = os.path.join(assembly_path, 
+                                 'contigs.annotations.{}'.format(wildcards.ext))
+
+        if assembly_path in assembly_renaming_map:
+            regex_str = assembly_renaming_map(assembly_path)
+            # bash injection
+            file_name = "<(perl -pe '{}' {})".format(regex_str,
+                                                    file_name)
+
+        yield file_name
+                                                    
+def get_all_annotation_files_renaming(wildcards):
+    """
+    Find the contig.annotations.{wildcards.ext} for each assembly
+
+    Replace file name with renamed file name if assembly needs 
+    renaming
+    """
+    for assembly_path in config['assembly_list']:
+        file_name = os.path.join(assembly_path, 
+                                 'contigs.annotations.{}'.format(wildcards.ext))
+
+        if assembly_path in assembly_renaming_map:
+            file_name = "renamed_dir" + file_name
+
+        yield file_name
+
+def get_assembly_coverage_files(wildcards):
+    """
+    Find all the contig.coverages.{sample}.txt for each assembly
+    """
+    for assembly_path in config['assembly_list']:
+        for file_name in glob.glob(os.path.join(assembly_path,
+                                'contigs.coverages.*.txt')):
+            if assembly_path in assembly_renaming_map:
+                file_name = "renamed_dir" + file_name
+            yield file_name
+
+def get_assembly_read_stats(wildcards):
+    """
+    Find all the cleaned reads stats files for each assembly
+    """
+    for assembly_path in config['assembly_list']:
+        for file_name in glob.glob(os.path.join(assembly_path,
+                                'stats',
+                                'all_cleaned_reads.fastq.stats')):
+            yield file_name
+
+def normalize_coverages(input):
+    """
+    Loop over read stats files and create a normalization factor for each assembly (number of reads/10M)
+
+    Loop over coverage files, 
+    group by assembly (some assemblies have 2), 
+    normalize by adjusted number of reads,
+    yield (contig, coverage) tuples
+    """
+    read_counts = {}
+    for stats_file in input.read_stats:
+        assembly = re.sub(r'/stats/.+$', '', stats_file)
+        reads = parse_stats(stats_file)['reads'] / 10000000
+        read_counts[assembly] = read_counts.get(assembly, 0) + reads
+
+    last_assembly = None
+    coverages = None
+    for cov_file in sorted(input.contig_covs):
+        assembly = os.path.dirname(cov_file)
+        assembly = re.sub(r'^renamed_dir', '', assembly)
+        if assembly != last_assembly:
+            if coverages is not None:
+                for item in coverages.items():
+                    yield item
+            coverages = None
+            last_assembly = assembly
+        _coverages = pandas.read_table(cov_file,
+                                       index_col=0,
+                                       header=0,
+                                       usecols=['contig', 'md cov'],
+                                       )['md cov'] / read_counts[assembly]
+        if coverages is None:
+            coverages = _coverages
+        else:
+            coverages = coverages + _coverages
+    for item in coverages.items():
+        yield item
+
+##########
+# RULES:
+#  This lays out the dependencies and logic of the workflow
+
+## First we collect the genes and cluster them
+
+rule rename_annotations:
+    """ Renames contigs and genes in any annotation file that needs it """
+    input: "{assembly}/contigs.{annotation_file}"
+    output: temp("renamed_dir{assembly}/contigs.{annotation_file}")
+    params:
+        regex=lambda w: assembly_renaming_map[w.assembly]
+    shell: "perl -pe '{params.regex}' \
+            < {input} \
+            > {output}"
+
+rule collect_annotations:
+    input: get_all_annotation_files_renaming
+    output: "all_genes.{ext}"
+    wildcard_constraints:
+        ext=r'(fna|faa)'
+    shell:
+        """
+        cat {input} > {output}
+        """
+
+rule get_fasta_id_list:
+    input: "{file_root}.{ext}"
+    output: "{file_root}.{ext}.ids"
+    wildcard_constraints:
+        ext=r'(fna|ffn|faa|fasta|fa)'
+    shell:
+        r"""
+        grep "^>" {input} \
+         | perl -pe 's/>(\S+)\s.+/\1/' \
+         | sort \
+         | uniq \
+         > {output}
+        """
+
+rule filter_fna:
+    input:
+        "all_genes.faa.ids",
+        "all_genes.fna"
+    output: 
+        "all_genes.ffn"
+    shell: "screen_list.py -l {input[0]} -k {input[1]} > {output}"
+
+rule cluster_ffn:
+    input: "all_genes.ffn"
+    output: "all_genes.ffn.{}".format(config['cdhit']['output_str'])
+    threads: config['cdhit']['threads']
+    params:
+        cd_hit_options=config['cdhit']['options']
+    shell:
+        "cd-hit-est -T {threads} {params.cd_hit_options} \
+         -i {input} -o {output}"
+
+rule get_cluster_rep_faa:
+    input:
+        "all_genes.ffn.{cd_hit_output_str}.ffn.ids",
+        "all_genes.ffn.{cd_hit_output_str}.ffn",
+    output:
+        "all_genes.ffn.{cd_hit_output_str}.faa"
+    shell: "screen_list.py -l {input[0]} -k {input[1]} > {output}"
+
+## We also need to collect the contig coverages
+rule get_gene_coverages:
+    input: 
+        contig_covs=get_assembly_coverage_files,
+        read_stats=get_assembly_read_stats,
+        faa="all_genes.clustered.faa"
+    output: 'all_genes.clustered.coverage.tsv'
+    run:
+        # get map from contig name to genes
+        contig_genes = {}
+        contig_rexp = re.compile(r'_\d+$')
+        for record in SeqIO.parse(get_file_name(input.faa), 'fasta'):
+            gene = record.id
+            contig = contig_rexp.sub('', gene)
+            contig_genes.setdefault(contig, []).append(gene)
+
+        with open(get_file_name(output), 'wt') as OUT:
+            for contig, coverage in normalize_coverages(input):
+                for gene in contig_genes.get(contig, []):
+                    OUT.write('{}\t{}\n'.format(gene, coverage))

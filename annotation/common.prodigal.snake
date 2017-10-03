@@ -36,7 +36,7 @@ rule predict_genes_prodigal:
         get_version('batch_launcher.py') + '::' + \
             get_version('prodigal', '-v', lines=[1,])
     threads:
-        config['threads'].get('prodigal',default_threads)
+        config['prodigal'].get('threads',default_threads)
     shell:
         # Use batch launcher to run prodigal multithreaded
         "batch_launcher.py -N {threads} -i -i -o -a -T fasta -X local -v -- \

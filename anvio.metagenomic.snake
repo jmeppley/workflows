@@ -83,7 +83,7 @@ config.setdefault('cleaning_protocol', 'assembly')
 config.setdefault('remove_rna', False)
 # process the config
 cleaned_reads = setup_qc_outputs(config)
-outputs.update(cleaned_reads)
+#outputs.update(cleaned_reads)
 # import needed QC rules
 include: "qc/setup.snake"
 

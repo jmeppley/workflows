@@ -21,6 +21,10 @@ if sum(1 for s in config['sample_data'] \
         include: 'bbduk.snake'
         include: 'bfc.snake'
         include: 'tmatic.snake'
+    elif protocol == 'assembly_no_ec':
+        include: 'rename.snake'
+        include: 'bbduk.snake'
+        include: 'tmatic.snake'
     elif protocol == 'rename':
         include: 'rename.snake'
     elif protocol not in ['None', None]:

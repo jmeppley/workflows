@@ -103,3 +103,55 @@ def collect_sample_reads(samples_pattern_data):
         reads.setdefault(sample, []).append(read_file)
 
     return reads
+
+def get_sample_reads_for_mapping(wildcards, config):
+    """
+    reads for mapping can come from different places
+    
+    if a for_mapping file is specified for this sample, use it
+    if map_clean_reads is set to True, use the clean reads
+
+    if nothing explicit is specified:
+    use raw reads preferentially
+     (using the renamed.interleaved.fastq version if we can)
+    fall back to clean reads
+    """
+    sample = wildcards.sample
+    # look in configuration first
+    if sample in config['sample_data'] and (
+        'raw' in config['sample_data'][wildcards.sample] or \
+        'for_mapping' in config['sample_data'][wildcards.sample] or \
+        'clean' in config['sample_data'][wildcards.sample]
+    ):
+
+        if 'for_mapping' in config['sample_data'][wildcards.sample]:
+            # use explicit decalration first
+            return config['sample_data'][wildcards.sample]['for_mapping']
+
+        if config.get('map_clean_reads', False):
+            # return clean reads if explicitly requested
+            return config['sample_data'][wildcards.sample]['clean']
+
+        try:
+            # can we find the renamed and interleaved reads?
+            renamed_root = re.search(r'^.+\.renamed(?:\.interleaved)?',
+                                     config['sample_data']\
+                                                    [wildcards.sample]\
+                                                    ['clean']
+                                    ).group()
+            return renamed_root + ".fastq"
+        except:
+            # OK, that didn't work
+            pass
+        # let's try simply using raw or clean reads
+        if 'raw' in config['sample_data'][wildcards.sample]:
+            # just use the raw reads
+            return config['sample_data'][wildcards.sample]['raw']
+        else:
+            # return clean reads if that's all we have
+            return config['sample_data'][wildcards.sample]['clean']
+    else:
+        # otherwise, look for fastq file with sample name
+        return "{}.fastq".format(wildcards.sample)
+
+
