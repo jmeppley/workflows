@@ -68,14 +68,14 @@ rule mg_read_list_for_sag:
 
 rule mg_reads_for_sag:
     input:
-        bams=lambda w: mg_genomes[w.mg],
+        bams=lambda w: mg_bams[w.mg],
         reads='{sag}/matching_reads_from_mg.{mg}.list'
     output: '{sag}/matching_reads_from_mg.{mg}.fastq'
     shell:
         """
         rm -f {output}
         for BAM in {input.bams}; do
-            samtools fastq $BAM | seqtk subseq - {input.reads} >> {output}
+            samtools sort -n $BAM | samtools fastq - | seqtk subseq - {input.reads} >> {output}
         done
         """
 
