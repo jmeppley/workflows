@@ -75,7 +75,7 @@ rule mg_reads_for_sag:
         """
         rm -f {output}
         for BAM in {input.bams}; do
-            samtools fastq $BAM | seqtk subseq - {input.reads} >> {output}
+            samtools sort -n $BAM | samtools fastq - | seqtk subseq - {input.reads} >> {output}
         done
         """
 
