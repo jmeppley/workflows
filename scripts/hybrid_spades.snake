@@ -62,7 +62,7 @@ rule mg_read_list_for_sag:
         """
         rm -f {output}
         for BAM in {input.bams}; do
-            samtools view -L {input.bed} $BAM | cut -f 0 >> {output}
+            samtools view -L {input.bed} $BAM | cut -f 1 >> {output}
         done
         """
 
