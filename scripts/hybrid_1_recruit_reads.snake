@@ -20,8 +20,9 @@ sag_genomes = {re.search(r'\[([^\]]+)\]/', f).group(1):f for f in sag_genome_fas
 
 rule output:
     input:
-        expand('{sag}/matching_reads_from_all_mgs.fastq', \
-               sag=sag_genomes)
+        reads=expand('{sag}/matching_reads_from_all_mgs.fastq', \
+                     sag=sag_genomes),
+        contigs=expand('{sag}/matching_contigs_from_all_mgs.fna', sag=sag_genomes)
 
 rule list_matching_contigs:
     input: '{sag}/matching_contigs_from_mg.{mg}.lastal'
@@ -53,6 +54,24 @@ rule matching_contigs_bed:
     output: '{sag}/matching_contigs_from_mg.{mg}.bed'
     shell: "grep '^>' {input.fasta} | perl -pe 's/^>(\\S+)\\s.+length_(\\d+)_.+/\\1\\t1\\t\\2/' | screen_table.py -l {input.list} -k  > {output}"
 
+rule matching_contigs_fna:
+    input:
+        list='{sag}/matching_contigs_from_mg.{mg}.list',
+        fna=lambda w: mg_genomes[w.mg]
+    output: '{sag}/matching_contigs_from_mg.{mg}.fna'
+    shell: 'screen_list.py {input.fna} -l {input.list} -k -o {output}'
+
+rule all_mg_contigs_for_sag:
+    input:
+        expand('{{sag}}/matching_contigs_from_mg.{mg}.fna', mg=mg_genomes)
+    output: '{sag}/matching_contigs_from_all_mgs.fna'
+    shell: 'cat {input} > {output}'
+
+rule sam_header_only:
+    input: '{some_file}.bam'
+    output: '{some_file}.bam.header'
+    shell: 'samtools view -H {input} > {output}'
+
 rule mg_read_list_for_sag:
     input:
         bams=lambda w: mg_bams[w.mg],
@@ -72,10 +91,10 @@ rule mg_reads_for_sag:
         reads='{sag}/matching_reads_from_mg.{mg}.list'
     output: '{sag}/matching_reads_from_mg.{mg}.fastq'
     shell:
-        """
+        r"""
         rm -f {output}
         for BAM in {input.bams}; do
-            samtools sort -n $BAM | samtools fastq - | seqtk subseq - {input.reads} >> {output}
+            samtools view $BAM | screen_table.py -l {input.reads} | sort | perl -lane 'print "\@$F[0]\n$F[9]\n+\n$F[10]";' >> {output}
         done
         """
 
