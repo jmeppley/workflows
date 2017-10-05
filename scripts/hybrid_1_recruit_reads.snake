@@ -86,6 +86,13 @@ rule mg_read_list_for_sag:
         """
 
 rule mg_reads_for_sag:
+    """
+    USes screen table (will match multiple reads with same name) to pull out
+    SAM lines.
+
+    Takes advantage of BWA output using only the 4 and 16 flags in the second column
+    so that the sourted output will alwaus put fwd before rev reads.
+    """
     input:
         bams=lambda w: mg_bams[w.mg],
         reads='{sag}/matching_reads_from_mg.{mg}.list'
