@@ -8,9 +8,10 @@
 ## 
 ###
 from Bio import SeqIO
-import re, os, logging
+import re, os, logging, pandas
 from edl import taxon as edltaxon, util, hits as edlhits, blastm8, kegg
 from snakemake import logger
+from python.common import parse_stats
 
 
 ####
@@ -53,8 +54,8 @@ def get_lca(hits, translate=lambda x: [x]):
     return lca
 
 # Simplify the list of ranks 
-printed_ranks=[edltaxon.ranks[i] for i in [3,7,11,16,20,23]] + ['domain']
-major_ranks=[edltaxon.ranks[i] for i in [2,3,7,11,16,20,23,26,27]]
+printed_ranks=[edltaxon.ranks[i] for i in [3,7,12,17,21,24]] + ['domain']
+major_ranks=[edltaxon.ranks[i] for i in [2,3,7,12,17,21,24,27,28]]
 def get_major_rank(rank):
     " return the highest major rank below or equal to the given rank "
     rank_index = edltaxon.ranks.index(rank)
@@ -140,10 +141,16 @@ class RefSeqGeneAnnotator():
         self.desc_map = util.parseMapFile(rsdb_desc_map)
 
     def annotate_genes_rs_prot(self, hit_table, annotation_table):
-        with open(annotation_table, 'w') as csv_out:
+        with open(annotation_table, 'w') as tsv_out:
+            tsv_out.write('Gene\t' \
+                           + '\t'.join(printed_ranks) \
+                           + '\tfunction\tmin pct ID\thit count' \
+                           + '\ttop hit\ttop pct ID\ttop score\ttop desc\n')
             for info in self.generate_gene_annotations_rs_prot(hit_table):
-                (gene, lca_ranked, function, min_pctid, hit_count, top_hit, top_pctid, top_score, top_desc) = info
-                csv_out.write("%s\t%s\t%s\t%0.1f\t%d\t%s\t%0.1f\t%0.1f\t%s\n" % (gene,
+                (gene, lca_ranked, function, min_pctid, hit_count, \
+                       top_hit, top_pctid, top_score, top_desc) = info
+                tsv_out.write("%s\t%s\t%s\t%0.1f\t%d\t%s\t%0.1f\t%0.1f\t%s\n" \
+                 % (gene,
                     '\t'.join([lca_ranked.get(r,"") for r in printed_ranks]),
                     function,
                     min_pctid,
@@ -228,8 +235,9 @@ class KeggGeneAnnotator():
         self.desc_map = util.parseMapFile(kegg_ids)
 
     def annotate_genes_kg(self, hit_table, annotation_table):
+        header='Gene\tKO(s)'
         annot_tuples=self.generate_gene_annotations_kg(hit_table)
-        write_tsv(annotation_table, annot_tuples)
+        write_tsv(annotation_table, annot_tuples, header=header)
 
     def generate_gene_annotations_kg(self, hit_table):
         blast_m8 = blastm8.M8Stream(hit_table)
@@ -251,8 +259,12 @@ class KeggGeneAnnotator():
             uniq_kos=set([k for k in kos_so_far if k not in [None,"None",""]])
             yield (read, ';'.join(uniq_kos))
 
-def write_tsv(out_file, data_tuples, sep='\t'):
+def write_tsv(out_file, data_tuples, sep='\t', header=None):
     with open(out_file,'w') as out_handle:
+        if header is not None:
+            out_handle.write(header)
+            if not header.endswith('\n'):
+                out_handle.write('\n')
         for data_tuple in data_tuples:
             out_handle.write(sep.join(data_tuple)+'\n')
 
