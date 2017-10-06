@@ -33,7 +33,7 @@ sortmerna_database_dir = "/slipstream/home/jbryant/databases/sortmerna/"
 config['sample_names']=[os.path.basename(x) for x in config['sample_data']]
 config['sample_strip']=[os.path.splitext(x)[0] for x in config['sample_names']]
 
-print(expand("ssu_rRNA/{sample}.rna.fastq", sample=config['sample_strip']))
+print(config['sample_strip'])
 
 rule target:
     input: 
@@ -44,7 +44,7 @@ rule sortmerna:
     run sortmerna interleaved sequences
     """
     input:
-       config['sample_data']
+       config['sample_names'].fastq
     output:
         "ssu_rRNA/{sample}.rna.fastq"
     log:
