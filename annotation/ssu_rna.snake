@@ -5,7 +5,7 @@ Structure:
 +-.gitignore
 +--README.md
 +--LICENSE.md
-+--config.yaml workflows/test/data/configs/ssu_rna.yml
++--config.yaml ssu_rna.snake
 +--environment: workflows/test/conda/cDNA.yml
 +--workflows: workflows/annotation/ssu_rna.snake 
 +--scripts
@@ -17,7 +17,7 @@ Structure:
 environment: source activate cDNA
 example config file: config.cazy.yml (located /workflows/test/data/configs/config.cazy.yml
 
-usage: snakemake -s ~/workflows/annotation/cazy.DNA.snake --configfile config.cazy.yml
+usage: snakemake -s ~/workflows/annotation/ssu_rna.snake --configfile ~/workflows/annotation/ssu_rna.snake 
 """
 
 import os
@@ -28,6 +28,7 @@ pymg_dir = os.path.sep.join([snakefile_path, 'tools', 'pymg'])
 
 sys.path.append(snakefile_path)
 sys.path.append(pymg_dir)
+sortmerna_database_dir = "/slipstream/home/jbryant/databases/sortmerna/"
 
 print(sys.path)
 print(config)
@@ -38,56 +39,21 @@ rule target:
     input: 
     	expand("ssu_rRNA/{sample}.tr.CAZy.hmmsearch.e-5.m8", sample=config['sample_names'])
 
-rule translate_frames:
+rule sortmerna:
     """
-    translate all six coding frames
+    run sortmerna interleaved sequences
     """
     input:
        config['sample_data']
     output:
-        "annotation/{contig}.tr.allframes.fasta"
+        "SSU/{sample}.rna.fastq"
     log:
-        "logs/transeq.log"
+        "logs/sortmerna.log"
     benchmark:
-        "benchmarks/transeq.txt"
+        "benchmarks/sortmerna.txt"
     shell:
         """
-        transeq -sequence {input} -outseq annotation/{wildcards.contig}.tr.allframes.fasta -table 11 -frame all -clean
+        sortmerna --ref {sortmerna_database_dir}silva-euk-18s-id95.fasta,{sortmerna_database_dir}silva-euk-18s-id95.db --reads {input} --aligned SSU/{sample}.rna --fastx
         """
 
 
-rule hmmsearch:
-    """
-    run hmmsearch against Cazy database
-    """
-    input:
-        "annotation/{contigss}.tr.allframes.fasta"
-    output:
-        "annotation/{contigss}.tr.CAZy.hmmsearch.m8"
-    log:
-        "logs/cazy.log"
-    benchmark:
-        "benchmarks/cazy.txt"
-    shell:
-        "hmmsearch --domtblout annotation/{wildcards.contigss}.tr.CAZy.hmmsearch.m8 -o {log}  /slipstream/home/jbryant/databases/cazy_hmms/dbCAN-fam-HMMs.txt.v6 {input}"
-
-
-rule hmm_filter:
-    """
-    filters hmm output, assumed to be in m8 format
-    python scripts located here: /home/jbryant/johns_workflows/workflows/tools/pymg
-    """
-    
-    input:
-        "annotation/{contigsss}.tr.CAZy.hmmsearch.m8"
-    output:
-        "annotation/{contigsss}.tr.CAZy.hmmsearch.e-5.m8"
-    log:
-        "logs/cazy.log"
-    benchmark:
-        "benchmarks/cazy.txt"
-    shell:
-        """
-        head -n2 {input} | tail -n1 > {output}; \
-        filter_blast_m8.py  -E 1e-5 -f hmmsearchdom {input}  >> {output}
-        """
