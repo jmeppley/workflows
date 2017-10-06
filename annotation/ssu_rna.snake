@@ -35,7 +35,7 @@ print(config)
 
 config['sample_names']=[os.path.basename(x) for x in config['sample_data']]
 
-print config
+print(config)
 
 rule target:
     input: 
