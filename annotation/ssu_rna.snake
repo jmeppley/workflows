@@ -31,8 +31,11 @@ sys.path.append(pymg_dir)
 sortmerna_database_dir = "/slipstream/home/jbryant/databases/sortmerna/"
 
 
+SAMPLES, = glob_wildcards("/mnt/arginine/assemblies/Aloha_2_0/HSD00-20a/HSD00-20a-283-S2C012-0500-170428/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.fastq")
+
+
 rule all:
-    input: "ssu_rRNA/HSD00-20a-283-S2C012-0500.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.fastq"
+     input: expand("ssu_rRNA/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.fastq", sample_name=SAMPLES)
 
 rule sortmerna:
     """
@@ -40,9 +43,9 @@ rule sortmerna:
     """
     
     input:
-        "/mnt/arginine/assemblies/Aloha_2_0/HSD00-20a/HSD00-20a-283-S2C012-0500-170428/HSD00-20a-283-S2C012-0500.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.fastq"
+        "/mnt/arginine/assemblies/Aloha_2_0/HSD00-20a/HSD00-20a-283-S2C012-0500-170428/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.fastq"
     output:
-        "ssu_rRNA/HSD00-20a-283-S2C012-0500.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.fastq"
+        "ssu_rRNA/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.fastq"
     log:
         "logs/sortmerna.log"
     benchmark:
