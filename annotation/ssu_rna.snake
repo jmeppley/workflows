@@ -53,8 +53,8 @@ rule sortmerna:
         "benchmarks/sortmerna.txt"
     shell:
         """
-        sortmerna --ref {sortmerna_database_dir}silva-euk-18s-id95.fasta,{sortmerna_database_dir}silva-euk-18s-id95.db\
-        {sortmerna_database_dir}silva-bac-16s-id90.fasta,{sortmerna_database_dir}silva-bac-16s-id90.db\
-        {sortmerna_database_dir}silva-arc-16s-id95.fasta,{sortmerna_database_dir}silva-arc-16s-id95.db \
+        sortmerna --ref {sortmerna_database_dir}silva-euk-18s-id95.fasta,{sortmerna_database_dir}silva-euk-18s-id95.db:\
+        {sortmerna_database_dir}silva-bac-16s-id90.fasta,{sortmerna_database_dir}silva-bac-16s-id90.db:\
+        {sortmerna_database_dir}silva-arc-16s-id95.fasta,{sortmerna_database_dir}silva-arc-16s-id95.db:\
         --reads {input} --aligned ssu_rRNA/{wildcards.sample}.rna --fastx --paired_in
         """
