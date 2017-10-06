@@ -44,7 +44,7 @@ rule sortmerna:
     run sortmerna interleaved sequences
     """
     input:
-        expand({pathsample}.fastq",sample=config['sample_data'])
+        expand({pathsample}.fastq",pathsample=config['sample_data'])
     output:
         "ssu_rRNA/{sample}.rna.fastq"
     log:
