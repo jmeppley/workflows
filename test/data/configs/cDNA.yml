@@ -20,6 +20,7 @@ dependencies:
 - pysftp=0.2.9=py35_0
 - python-dateutil=2.3=py35_0
 - salmon=0.8.1=0
+- sortmerna=2.1b
 - samtools=1.5=2
 - sed=4.2.3.dev0=0
 - seqtk=1.2=0
