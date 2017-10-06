@@ -30,28 +30,25 @@ sys.path.append(snakefile_path)
 sys.path.append(pymg_dir)
 sortmerna_database_dir = "/slipstream/home/jbryant/databases/sortmerna/"
 
-config['sample_names']=[os.path.basename(x) for x in config['sample_data']]
-config['sample_strip']=[os.path.splitext(x)[0] for x in config['sample_names']]
 
-print(config['sample_strip'])
-
-rule target:
-    input: 
-    	expand("ssu_rRNA/{sample}.rna.fastq", sample=config['sample_strip'])
+rule all:
+    input: "ssu_rRNA/HSD00-20a-283-S2C012-0500.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.fastq"
 
 rule sortmerna:
     """
     run sortmerna interleaved sequences
     """
+    
     input:
-        expand({pathsample}.fastq",pathsample=config['sample_data'])
+        "/mnt/arginine/assemblies/Aloha_2_0/HSD00-20a/HSD00-20a-283-S2C012-0500-170428/HSD00-20a-283-S2C012-0500.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.fastq"
     output:
-        "ssu_rRNA/{sample}.rna.fastq"
+        "ssu_rRNA/HSD00-20a-283-S2C012-0500.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.fastq"
     log:
         "logs/sortmerna.log"
     benchmark:
         "benchmarks/sortmerna.txt"
     shell:
         """
-        sortmerna --ref {sortmerna_database_dir}silva-euk-18s-id95.fasta,{sortmerna_database_dir}silva-euk-18s-id95.db:{sortmerna_database_dir}silva-bac-16s-id90.fasta,{sortmerna_database_dir}silva-bac-16s-id90.db:{sortmerna_database_dir}silva-arc-16s-id95.fasta,{sortmerna_database_dir}silva-arc-16s-id95.db --reads {input}.fastq --aligned ssu_rRNA/{wildcards.sample}.rna --fastx --paired_in
+        echo 'made it here'
+        sortmerna --ref {sortmerna_database_dir}silva-euk-18s-id95.fasta,{sortmerna_database_dir}silva-euk-18s-id95.db:{sortmerna_database_dir}silva-bac-16s-id90.fasta,{sortmerna_database_dir}silva-bac-16s-id90.db:{sortmerna_database_dir}silva-arc-16s-id95.fasta,{sortmerna_database_dir}silva-arc-16s-id95.db --reads {input} --aligned {output} --fastx --paired_in
         """
