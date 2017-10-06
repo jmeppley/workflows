@@ -30,7 +30,6 @@ sys.path.append(snakefile_path)
 sys.path.append(pymg_dir)
 sortmerna_database_dir = "/slipstream/home/jbryant/databases/sortmerna/"
 
-print(sys.path)
 print(config)
 
 config['sample_names']=[os.path.basename(x) for x in config['sample_data']]
@@ -46,7 +45,7 @@ rule sortmerna:
     run sortmerna interleaved sequences
     """
     input:
-       config['sample_names']
+       config['sample_data']
     output:
         "SSU/{sample}.rna.fastq"
     log:
