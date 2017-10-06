@@ -45,7 +45,8 @@ rule sortmerna:
     """
     input:
        #config['sample_names']
-       lambda wildcards: config['sample_names'][wildcards.sample]
+       #input: lambda wild: config['sample_names'][wild.sample]
+        "{sample}.{ext}"
     output:
         "ssu_rRNA/{sample}.rna.fastq"
     log:
