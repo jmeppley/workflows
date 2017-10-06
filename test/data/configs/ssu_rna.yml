@@ -1,4 +1,5 @@
 sample_data:
+          #- "/mnt/arginine/assemblies/Aloha_2_0/HSD00-20a/HSD00-20a-267-S2C010-0005-161208/HSD00-20a-267-S2C010-0005.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.fastq"
           - "/mnt/arginine/assemblies/Aloha_2_0/HSD00-20a/HSD00-20a-267-S2C010-0005-161208/HSD00-20a-267-S2C010-0005.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.fastq"
 path_formats:
     paths=['/slipstream/home/jbryant/workflows/tools/pymg/']
