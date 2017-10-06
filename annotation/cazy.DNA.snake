@@ -69,7 +69,7 @@ rule hmmsearch:
     benchmark:
         "benchmarks/cazy.txt"
     shell:
-        "hmmsearch --domtblout annotation/{wildcards.contigss}.tr.CAZy.hmmsearch.m8 -o {log}  /slipstream/home/jbryant/databases/cazy_hmms/dbCAN-fam-HMMs.txt.v5 {input}"
+        "hmmsearch --domtblout annotation/{wildcards.contigss}.tr.CAZy.hmmsearch.m8 -o {log}  /slipstream/home/jbryant/databases/cazy_hmms/dbCAN-fam-HMMs.txt.v6 {input}"
 
 
 rule hmm_filter:

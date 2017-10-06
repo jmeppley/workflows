@@ -38,9 +38,9 @@ rule index_contigs_salmon:
     version: config['salmon_version']
     shell:
         """
-        {config[salmon_prefix]}
+#        {config[salmon_prefix]}
         rm -rf {params.outdir}
-        salmon index -t {input} --gcBias --seqBias -i {params.outdir} -p {threads} > {log} 2>&1
+        salmon index -t {input} -i {params.outdir} -p {threads} > {log} 2>&1
         """
 
 rule quant_reads_salmon:
@@ -62,7 +62,7 @@ rule quant_reads_salmon:
         """
         {config[salmon_prefix]}
         rm -rf {params.outdir}
-        salmon quant -i {params.indir} -p {threads} \
+        salmon quant  --gcBias --seqBias -i {params.indir} -p {threads} \
          -l {config[salmon][lib_type]} \
          {params.reads} -o {params.outdir} \
          > {log} 2>&1
