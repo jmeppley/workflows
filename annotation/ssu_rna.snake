@@ -47,7 +47,7 @@ rule sortmerna:
     input:
        config['sample_data']
     output:
-        "SSU/{sample}.rna.fastq"
+        "ssu_rRNA/{sample}.rna.fastq"
     log:
         "logs/sortmerna.log"
     benchmark:
