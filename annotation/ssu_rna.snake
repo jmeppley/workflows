@@ -44,7 +44,8 @@ rule sortmerna:
     run sortmerna interleaved sequences
     """
     input:
-       config['sample_names'].fastq
+       #config['sample_names']
+       lambda wildcards: config['sample_names'][wildcards.sample]
     output:
         "ssu_rRNA/{sample}.rna.fastq"
     log:
@@ -53,5 +54,5 @@ rule sortmerna:
         "benchmarks/sortmerna.txt"
     shell:
         """
-        sortmerna --ref {sortmerna_database_dir}silva-euk-18s-id95.fasta,{sortmerna_database_dir}silva-euk-18s-id95.db:{sortmerna_database_dir}silva-bac-16s-id90.fasta,{sortmerna_database_dir}silva-bac-16s-id90.db:{sortmerna_database_dir}silva-arc-16s-id95.fasta,{sortmerna_database_dir}silva-arc-16s-id95.db --reads {input} --aligned ssu_rRNA/{wildcards.sample}.rna --fastx --paired_in
+        sortmerna --ref {sortmerna_database_dir}silva-euk-18s-id95.fasta,{sortmerna_database_dir}silva-euk-18s-id95.db:{sortmerna_database_dir}silva-bac-16s-id90.fasta,{sortmerna_database_dir}silva-bac-16s-id90.db:{sortmerna_database_dir}silva-arc-16s-id95.fasta,{sortmerna_database_dir}silva-arc-16s-id95.db --reads {input}.fastq --aligned ssu_rRNA/{wildcards.sample}.rna --fastx --paired_in
         """
