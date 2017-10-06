@@ -30,10 +30,9 @@ sys.path.append(snakefile_path)
 sys.path.append(pymg_dir)
 sortmerna_database_dir = "/slipstream/home/jbryant/databases/sortmerna/"
 
-print(config)
-
 config['sample_names']=[os.path.basename(x) for x in config['sample_data']]
 config['sample_strip']=[os.path.splitext(x)[0] for x in config['sample_names']]
+
 print(config)
 
 rule target:
@@ -57,7 +56,7 @@ rule sortmerna:
         sortmerna --ref {sortmerna_database_dir}silva-euk-18s-id95.fasta,{sortmerna_database_dir}silva-euk-18s-id95.db\
         {sortmerna_database_dir}silva-bac-16s-id90.fasta,{sortmerna_database_dir}silva-bac-16s-id90.db\
         {sortmerna_database_dir}silva-arc-16s-id95.fasta,{sortmerna_database_dir}silva-arc-16s-id95.db \
-        --reads {input} --aligned ssu_rRNA/{sample}.rna --fastx --paired_in
+        --reads {input} --aligned ssu_rRNA/{config['sample_strip']}.rna --fastx --paired_in
         """
 
 
