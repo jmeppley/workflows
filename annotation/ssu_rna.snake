@@ -33,12 +33,12 @@ sortmerna_database_dir = "/slipstream/home/jbryant/databases/sortmerna/"
 print(config)
 
 config['sample_names']=[os.path.basename(x) for x in config['sample_data']]
-
+config['sample_strip']=[os.path.splitext(x) for x in config['sample_names']]
 print(config)
 
 rule target:
     input: 
-    	expand("ssu_rRNA/{sample}.rna.fastq", sample=config['sample_names'])
+    	expand("ssu_rRNA/{sample}.rna.fastq", sample=config['sample_strip'])
 
 rule sortmerna:
     """
