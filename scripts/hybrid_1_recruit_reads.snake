@@ -1,4 +1,5 @@
-import os, sys, re, glob, pandas, itertools
+import os, sys, re, glob, pandas, itertools,  yaml
+from snakemake import logger
 
 data_dir = config.setdefault('data_dir', '..')
 
@@ -6,6 +7,7 @@ data_dir = config.setdefault('data_dir', '..')
 mg_genome_fasta_files = glob.glob(data_dir + "/*/*/*/contigs.fasta")
 mg_genomes = {}
 mg_bams = {}
+mg_cleaned_reads = {}
 for fasta_file in mg_genome_fasta_files:
     rundate, sample = \
         re.search(r'/(\d\d\d\d\d\d)[_-]NS500.+/([^/]+)/contigs.fasta', \
@@ -13,15 +15,26 @@ for fasta_file in mg_genome_fasta_files:
     sample_name = sample + "-" + rundate
     mg_genomes[sample_name] = fasta_file
     mg_bams[sample_name] = glob.glob(re.sub(r'contigs.fasta','mapping/*.reads.vs.contigs.bam',fasta_file))
+    cleaned_reads = glob.glob(re.sub(r'contigs.fasta', "*.dropse.fastq", fasta_file))
+    if len(cleaned_reads)==1:
+        mg_cleaned_reads[sample_name] = cleaned_reads[0]
+    else:
+        mg_cleaned_reads[sample_name] = 'no_such_file'
 
 # find all the SAG genomes
 sag_genome_fasta_files = glob.glob(data_dir + "/*/IMG*/*assembled.fna")
 sag_genomes = {re.search(r'\[([^\]]+)\]/', f).group(1):f for f in sag_genome_fasta_files}
+sag_fastq_tarballs = glob.glob(data_dir + "/*/QC_and*/*fastq.gz")
+sag_reads = {re.search(r'\[([^\]]+)\]/', t).group(1):t for t in sag_fastq_tarballs}
+
+logger.debug(yaml.dump(config))
+logger.debug("MG READS: " + yaml.dump(mg_cleaned_reads))
 
 rule output:
     input:
-        reads=expand('{sag}/matching_reads_from_all_mgs.fastq', \
-                     sag=sag_genomes),
+        sag_reads=expand('{sag}/reads.fastq', sag=sag_reads),
+        mg_reads=expand('{sag}/matching_reads_from_mg.{mg}.fastq', \
+                     sag=sag_genomes, mg=mg_bams),
         contigs=expand('{sag}/matching_contigs_from_all_mgs.fna', sag=sag_genomes)
 
 rule list_matching_contigs:
@@ -43,15 +56,16 @@ rule find_matching_contigs:
     params:
         db=lambda w: mg_genomes[w.mg]
     threads:
-        config.get('lastal_threads', 20)
+        config.get('lastal_threads', 10)
     shell:
-        'lastal -F BlastTab {params.db} {input.fasta} > {output}'
+        'lastal -P {threads} -F BlastTab {params.db} {input.fasta} > {output}'
 
 rule matching_contigs_bed:
     input: 
         list='{sag}/matching_contigs_from_mg.{mg}.list',
         fasta=lambda w: mg_genomes[w.mg]
     output: '{sag}/matching_contigs_from_mg.{mg}.bed'
+    threads: 2
     shell: "grep '^>' {input.fasta} | perl -pe 's/^>(\\S+)\\s.+length_(\\d+)_.+/\\1\\t1\\t\\2/' | screen_table.py -l {input.list} -k  > {output}"
 
 rule matching_contigs_fna:
@@ -85,7 +99,7 @@ rule mg_read_list_for_sag:
         done
         """
 
-rule mg_reads_for_sag:
+rule mg_reads_for_sag_17:
     """
     USes screen table (will match multiple reads with same name) to pull out
     SAM lines.
@@ -94,16 +108,55 @@ rule mg_reads_for_sag:
     so that the sourted output will alwaus put fwd before rev reads.
     """
     input:
-        bams=lambda w: mg_bams[w.mg],
-        reads='{sag}/matching_reads_from_mg.{mg}.list'
-    output: '{sag}/matching_reads_from_mg.{mg}.fastq'
+        bams=lambda w: mg_bams[w.mg17],
+        reads='{sag}/matching_reads_from_mg.{mg17}.list'
+    output: '{sag}/matching_reads_from_mg.{mg17}.fastq'
+    wildcard_constraints:
+        mg17='S.+170703'
+    params:
+        stmp=config.get('stmp', '/mnt/stmp' if os.path.exists('/mnt/stmp') else '/tmp')
+    threads: 4
     shell:
         r"""
         rm -f {output}
         for BAM in {input.bams}; do
-            samtools view $BAM | screen_table.py -l {input.reads} | sort | perl -lane 'print "\@$F[0]\n$F[9]\n+\n$F[10]";' >> {output}
+            samtools view $BAM | screen_table.py -l {input.reads} | cut -f 1,8,9 | sort -T {params.stmp} | perl -lane 'print "\@$F[0]\n$F[9]\n+\n$F[10]";' >> {output}
         done
         """
+
+rule mg_reads_for_sag_16:
+    """
+    Goes back to raw reads using read list.
+    
+    I can't use screen_list, because it won't get pairs
+    """
+    input:
+        fastq=lambda w: mg_cleaned_reads[w.mg16],
+        read_list='{sag}/matching_reads_from_mg.{mg16}.list'
+    output: '{sag}/matching_reads_from_mg.{mg16}.fastq'
+    wildcard_constraints:
+        mg16=r'H.+16\d+'
+    run:
+        with open(input.read_list) as R:
+            read_list = set(r.strip() for r in R)
+        read_rexp = re.compile(r'^@(\S+)\s')
+        with open(output[0], 'wt') as OUT:
+            with open(input.fastq) as F:
+                try:
+                    while True:
+                        # reads are paired, so process in groups of 8 lines
+                        lines = [next(F) for i in range(8)]
+                        read_name = read_rexp.match(lines[0]).group(1)
+                        if read_name in read_list:
+                            for line in lines:
+                                OUT.write(line)
+                except StopIteration:
+                    pass
+
+rule sag_reads:
+    input: lambda w: sag_reads[w.sag]
+    output: '{sag}/reads.fastq'
+    shell: 'gunzip -c {input} > {output}'
 
 rule all_mg_reads_for_sag:
     input:
