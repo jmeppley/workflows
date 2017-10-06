@@ -17,7 +17,7 @@ Structure:
 environment: source activate cDNA
 example config file: config.cazy.yml (located /workflows/test/data/configs/config.cazy.yml
 
-usage: snakemake -s ~/workflows/annotation/ssu_rna.snake --configfile ~/workflows/annotation/ssu_rna.snake 
+usage: snakemake -s ~/workflows/annotation/ssu_rna.snake --configfile ~/workflows/test/data/configs/ssu_rna.yml
 """
 
 import os
@@ -35,6 +35,8 @@ print(config)
 
 config['sample_names']=[os.path.basename(x) for x in config['sample_data']]
 
+print config
+
 rule target:
     input: 
     	expand("ssu_rRNA/{sample}.rna.fastq", sample=config['sample_names'])
@@ -44,7 +46,7 @@ rule sortmerna:
     run sortmerna interleaved sequences
     """
     input:
-       config['sample_data']
+       config['sample_names']
     output:
         "SSU/{sample}.rna.fastq"
     log:
