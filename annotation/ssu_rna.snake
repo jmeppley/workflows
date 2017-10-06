@@ -1,0 +1,93 @@
+"""
+This workflow pulls out SSU rRNA genes using sortmeRNA, quality trims and joins pairs, then runs riboframe.
+
+Structure:
++-.gitignore
++--README.md
++--LICENSE.md
++--config.yaml workflows/test/data/configs/ssu_rna.yml
++--environment: workflows/test/conda/cDNA.yml
++--workflows: workflows/annotation/ssu_rna.snake 
++--scripts
+|   +- python scripts: /tools/pymg/
+|   +-
++- sortmeRNA hmms: /slipstream/home/jbryant/databases/
++--Snakefile
+
+environment: source activate cDNA
+example config file: config.cazy.yml (located /workflows/test/data/configs/config.cazy.yml
+
+usage: snakemake -s ~/workflows/annotation/cazy.DNA.snake --configfile config.cazy.yml
+"""
+
+import os
+import sys
+
+snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))[0:-11]
+pymg_dir = os.path.sep.join([snakefile_path, 'tools', 'pymg'])
+
+sys.path.append(snakefile_path)
+sys.path.append(pymg_dir)
+
+print(sys.path)
+print(config)
+
+config['sample_names']=[os.path.basename(x) for x in config['sample_data']]
+
+rule target:
+    input: 
+    	expand("ssu_rRNA/{sample}.tr.CAZy.hmmsearch.e-5.m8", sample=config['sample_names'])
+
+rule translate_frames:
+    """
+    translate all six coding frames
+    """
+    input:
+       config['sample_data']
+    output:
+        "annotation/{contig}.tr.allframes.fasta"
+    log:
+        "logs/transeq.log"
+    benchmark:
+        "benchmarks/transeq.txt"
+    shell:
+        """
+        transeq -sequence {input} -outseq annotation/{wildcards.contig}.tr.allframes.fasta -table 11 -frame all -clean
+        """
+
+
+rule hmmsearch:
+    """
+    run hmmsearch against Cazy database
+    """
+    input:
+        "annotation/{contigss}.tr.allframes.fasta"
+    output:
+        "annotation/{contigss}.tr.CAZy.hmmsearch.m8"
+    log:
+        "logs/cazy.log"
+    benchmark:
+        "benchmarks/cazy.txt"
+    shell:
+        "hmmsearch --domtblout annotation/{wildcards.contigss}.tr.CAZy.hmmsearch.m8 -o {log}  /slipstream/home/jbryant/databases/cazy_hmms/dbCAN-fam-HMMs.txt.v6 {input}"
+
+
+rule hmm_filter:
+    """
+    filters hmm output, assumed to be in m8 format
+    python scripts located here: /home/jbryant/johns_workflows/workflows/tools/pymg
+    """
+    
+    input:
+        "annotation/{contigsss}.tr.CAZy.hmmsearch.m8"
+    output:
+        "annotation/{contigsss}.tr.CAZy.hmmsearch.e-5.m8"
+    log:
+        "logs/cazy.log"
+    benchmark:
+        "benchmarks/cazy.txt"
+    shell:
+        """
+        head -n2 {input} | tail -n1 > {output}; \
+        filter_blast_m8.py  -E 1e-5 -f hmmsearchdom {input}  >> {output}
+        """
