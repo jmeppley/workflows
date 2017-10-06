@@ -37,7 +37,7 @@ config['sample_names']=[os.path.basename(x) for x in config['sample_data']]
 
 rule target:
     input: 
-    	expand("ssu_rRNA/{sample}.tr.CAZy.hmmsearch.e-5.m8", sample=config['sample_names'])
+    	expand("ssu_rRNA/{sample}.rna.fastq", sample=config['sample_names'])
 
 rule sortmerna:
     """
@@ -56,7 +56,7 @@ rule sortmerna:
         sortmerna --ref {sortmerna_database_dir}silva-euk-18s-id95.fasta,{sortmerna_database_dir}silva-euk-18s-id95.db\
         {sortmerna_database_dir}silva-bac-16s-id90.fasta,{sortmerna_database_dir}silva-bac-16s-id90.db\
         {sortmerna_database_dir}silva-arc-16s-id95.fasta,{sortmerna_database_dir}silva-arc-16s-id95.db \
-        --reads {input} --aligned SSU/{sample}.rna --fastx --paired_in
+        --reads {input} --aligned ssu_rRNA/{sample}.rna --fastx --paired_in
         """
 
 
