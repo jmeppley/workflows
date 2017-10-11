@@ -29,6 +29,9 @@ pymg_dir = os.path.sep.join([snakefile_path, 'tools', 'pymg'])
 sys.path.append(snakefile_path)
 sys.path.append(pymg_dir)
 sortmerna_database_dir = "/slipstream/home/jbryant/databases/sortmerna/"
+#
+RIBOFRAME_DIR="/slipstream/home/jbryant/workflows/scripts/riboframe/hmms/"
+CLASSIFIER_JAR="/home/jbryant/programs/riboFrame/rdp_classifier_2.12/dist/classifier.jar"
 
 config['sample_names']=[os.path.basename(x) for x in config['sample_data']]
 config['sample_strip']=[os.path.splitext(x)[0] for x in config['sample_names']]
@@ -37,8 +40,8 @@ rule all:
      input: 
           expand("ssu_rRNA/{sample_nameS}.rna.fastq", sample_nameS=config['sample_strip']),
           expand("ssu_rRNA/{sample_name_23}.rna.2.fastq", sample_name_23=config['sample_strip']),
-          expand("ssu_rRNA/{sample_name_assembled}.rna.2.assembled.fastq", sample_name_assembled=config['sample_strip'])
-
+          expand("ssu_rRNA/{sample_name_assembled}.rna.2.assembled.fastq", sample_name_assembled=config['sample_strip']),
+          expand("ssu_rRNA/{sample_name_assembled}.rna.2.assembled.hmms.archR", sample_name_assembled=config['sample_strip'])
 
 rule sortmerna:
     """
@@ -136,3 +139,48 @@ rule assemble:
         """
         pear -f {input.forward} -r {input.reverse} -o {params.prefix} >> logs/pear.log
         """
+        
+
+rule fastq_to_fasta:
+    """
+    Fastq to Fasta
+    """
+    
+    input:
+        "ssu_rRNA/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.fastq"
+    output:
+        "ssu_rRNA/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.fasta"
+        
+    benchmark:
+        "benchmarks/seqtk.txt"
+    shell:
+        """
+        seqtk seq -A {input} > {output}
+        """
+
+
+rule riboframe_hmms:
+    """
+    Hmm search
+    """
+    
+    input:
+        "ssu_rRNA/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.fasta"
+    output:
+        bact_for="ssu_rRNA/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.hmms.bactF",
+        bact_rev="ssu_rRNA/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.hmms.bactR",
+        arch_for="ssu_rRNA/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.hmms.archF",
+        arch_rev="ssu_rRNA/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.hmms.archR"
+
+    benchmark:
+        "benchmarks/riboframe.txt"
+
+    shell:
+        """
+        hmmsearch -E 0.00001 --domtblout {output.bact_for} --noali --cpu 2 -o {RIBOFRAME_DIR}16S_bact_for3.hmm
+        hmmsearch -E 0.00001 --domtblout {output.bact_rev} --noali --cpu 2 -o {RIBOFRAME_DIR}16S_bact_rev3.hmm
+        hmmsearch -E 0.00001 --domtblout {output.arch_for} --noali --cpu 2 -o {RIBOFRAME_DIR}16S_arch_for3.hmm
+        hmmsearch -E 0.00001 --domtblout {output.arch_rev} --noali --cpu 2 -o {RIBOFRAME_DIR}16S_bact_rev3.hmm
+        """
+
+#        perl /slipstream/home/jbryant/workflows/scripts/riboframe/riboTrap.pl {input} nopair
