@@ -1,0 +1,222 @@
+"""
+Rules that predict genes on a set of contigs using prodigal
+"""
+
+from Bio import SeqIO
+from python.common import get_file_name
+# get gff parsing from py-metagenomics
+from edl.blastm8 import GFF, generate_hits
+from snakemake import logger
+
+# need rRNA hits to filter on
+include: "../annotation/cmsearch.snake"
+
+rule prodigal:
+    """ get gene predictions form prodigal """
+    input:
+        "contigs.fasta"
+    output:
+        gff="contigs.prodigal.genes.gff",
+        faa="contigs.prodigal.genes.faa",
+        ffn="contigs.prodigal.genes.ffn"
+    benchmark:
+        "benchmarks/contigs.prodigal.genes.time"
+    version:
+        get_version('prodigal','-v')
+    shell:
+        "prodigal -i {input} -f gff -p meta -q -c \
+         -o {output.gff} -a {output.faa} -d {output.ffn}"
+
+rule rna_annotation:
+    input:
+        'contigs.vs.{mol}.cmsearch.gff',
+        'contigs.fasta'
+    output:
+        fna='contigs.annotations.{mol}.fna',
+        gff='contigs.annotations.{mol}.gff' 
+    benchmark: 'benchmarks/contigs.annotations.{mol}.time'
+    run:
+        filter_args = {'sort': 'score',
+                       'nonoverlapping': True}
+        gff_file = input[0]
+        gff_hits = {c: list(h) for c, h in generate_hits(gff_file,
+                                                         format=GFF,
+                                                         **filter_args)}
+        with open(get_file_name(output.fna), 'wt') as FNA_OUT:
+            with open(get_file_name(output.gff), 'wt') as GFF_OUT:
+                # loop over contigs
+                for contig in SeqIO.parse(input[1], 'fasta'):
+                    # get naming informatoion from gff line and contig 
+                    # from spades:
+                    m = re.search(r'length_(\d+)_cov_([0-9.]+)',
+                                  contig.description)
+                    if m:
+                        length, coverage = m.groups()
+                        contig_info_string = \
+                                "contig_length={};contig_cov={}" \
+                                            .format(length, coverage)
+                    else:
+                        # megahit
+                        m = re.search(r'\blen=(\d+)\b', contig.description)
+                        if m:
+                            contig_info_string = "contig_length=" + m.group(1)
+                        else:
+                            contig_info_string = ""
+
+                    # loop over hits
+                    for i, hit in enumerate(gff_hits.get(contig.id, [])):
+                        source, feature_type, start, end, score, strand = \
+                            hit.line.split('\t')[1:7]
+
+                        # name gene with contig name and index
+                        gene_name = contig.id + "_{mol}_{n}" \
+                                                    .format(n=i+1,
+                                                            mol=wildcards.mol)
+                        # put everything else in the description
+                        gene_desc =\
+                            ("source={source};type={feature_type};"
+                             "score={score};"
+                             "strand={strand};start={start};end={end};") \
+                            .format(source=source, start=start, end=end,
+                                    feature_type=feature_type, score=score,
+                                    strand=strand) + \
+                            hit.hitDesc + \
+                            contig_info_string
+
+                        # reverse comp seq if on other strand
+                        if hit.qstart <= hit.qend:
+                            subsequence = contig.seq[hit.qstart - 1:hit.qend]
+                        else:
+                            subsequence = contig.seq[
+                                hit.qend - 1:hit.qstart].reverse_complement()
+                        if strand == '-':
+                            subsequence = subsequence.reverse_complement()
+
+                        FNA_OUT.write(">{seqid}\t{desc}\n{seq}\n"
+                                                .format(seqid=gene_name,
+                                                        desc=gene_desc,
+                                                        seq=str(subsequence)
+                                                        ))
+                        GFF_OUT.write(hit.line)
+
+rule filter_annotations:
+    """ 
+    merge all GFFs and drop genes that overlap rRNA
+    """
+    input:
+        genes=expand("contigs.prodigal.genes.{ext}", \
+                     ext=['faa', 'ffn', 'gff']),
+        rna=expand('contigs.annotations.{mol}.gff', \
+                    mol=['rRNA', 'tRNA'])
+    output:
+        "contigs.annotations.CDS.gff",
+        "contigs.annotations.ffn",
+        "contigs.annotations.faa"
+    benchmark:
+        "benchmarks/contigs.annotations.merge.time"
+    run:
+        def intersects(pair1, pair2):
+            return (pair1[0] < pair2[1]) and (pair1[1] > pair2[0])
+        # parse start/end from prodigal fasta header
+        gene_rexp = re.compile(r'^>?(\S+)_\d+\s+#\s+(\d+)\s+#\s+(\d+)\s+#')
+
+        def gff_line_parser(hit):
+            return (hit.read, hit.qstart, hit.qend)
+
+        def gff_hit_iterator(gff_file, nonoverlapping=False):
+            for c, h in generate_hits(gff_file,
+                                      format=GFF,
+                                      sort='score',
+                                      nonoverlapping=nonoverlapping):
+                for hit in h:
+                    yield hit
+
+        # build dict of RNA locations
+        rna_locations = {}
+        for g in input.rna:
+            for gene in gff_hit_iterator(g, nonoverlapping=True):
+                contig, start, end = gff_line_parser(gene)
+                new_rna_pos = sorted([int(p) for p in (start, end)])
+                for old_rna_pos in rna_locations.setdefault(contig, []):
+                    if intersects(old_rna_pos, new_rna_pos):
+                        break
+                else:
+                    rna_locations[contig].append(new_rna_pos)
+
+        #print(rna_locations)
+
+        # run through prodigal fasta and GFF dropping overlapping genes
+        for input_file in input.genes:
+            print("Filtering {}".format(input_file))
+            # Is this a GFF or FASTA file?}
+            file_type = input_file[-3:]
+            output_file = [f for f in output if f.endswith(file_type)][0]
+            if file_type.startswith('f'):
+                iterator = lambda f: SeqIO.parse(f, 'fasta')
+                record_parser = lambda r: \
+                        gene_rexp.search(r.description).groups()
+                formatter = lambda g: g.format('fasta')
+            else:
+                iterator = gff_hit_iterator
+                record_parser = gff_line_parser
+                formatter = lambda l: l.line
+
+            # Only keep genes that don't overlap
+            in_genes = 0
+            out_genes = 0
+            with open(output_file, 'wt') as OUT:
+                for gene in iterator(input_file):
+                    in_genes += 1
+                    contig, start, end = record_parser(gene)
+                    gene_pos = sorted([int(p) for p in (start, end)])
+                    for rna_pos in rna_locations.get(contig, []):
+                        if intersects(gene_pos, rna_pos):
+                            #print("in contig {}, {} intersects {}".format(contig, gene_pos, rna_pos))
+                            break
+                    else:
+                        out_genes += 1
+                        OUT.write(formatter(gene))
+            print("Kept {} of {} genes from {}".format(out_genes, in_genes, input_file))
+
+rule merge_annotations:
+    input:
+        genes='contigs.annotations.ffn',
+        rna=expand('contigs.annotations.{mol}.fna', mol=['rRNA', 'tRNA'])
+    output:
+        faa='contigs.annotations.fna',
+    benchmark: 'benchmarks/contigs.merged.fna.time'
+    run:
+        rna_genes = {}
+        for gf in input.rna:
+            for rna in SeqIO.parse(gf, 'fasta'):
+                contig = re.sub(r'_.RNA_\d+$', '', rna.id)
+                if contig==rna.id:
+                    raise Exception("Cound not get contig from " + contig)
+                rna_genes.setdefault(contig, []).append(rna)
+
+        with open(get_file_name(output), 'wt') as OUT:
+            last_contig = None
+            for gene in SeqIO.parse(get_file_name(input.genes), 'fasta'):
+                contig = re.sub(r'_\d+$', '', gene.id)
+                if contig==gene.id:
+                    raise Exception("Cound not get contig from " + contig)
+                if contig != last_contig:
+                    for rna in rna_genes.pop(contig, []):
+                        OUT.write(rna.format('fasta'))
+                    last_contig = contig
+                OUT.write(gene.format('fasta'))
+            
+            for leftover_rna in rna_genes.values():
+                for rna in leftover_rna:
+                    OUT.write(rna.format('fasta'))
+
+
+rule merge_annotation_gff:
+    input:
+        genes='contigs.annotations.CDS.gff',
+        rna=expand('contigs.annotations.{mol}.gff', mol=['rRNA', 'tRNA'])
+    output:
+        faa='contigs.annotations.gff',
+    benchmark: 'benchmarks/contigs.merged.gff.time'
+    shell:
+        "cat {input.rna} {input.genes} | grep -v '^#' | sort > {output}"

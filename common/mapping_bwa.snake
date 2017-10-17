@@ -7,7 +7,7 @@ BWA_VERSION = \
                     regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
 from snakemake.utils import update_config
 update_config(config, {'bwa': {'threads': 15}})
-config['cov_col'] = 'md cov'
+config['cov_col'] = 'MeanCov'
 from python.samples import get_sample_reads_for_mapping
 
 #######

@@ -24,6 +24,7 @@ config['pymg_dir'] = os.path.join(snakefile_path, 'tools', 'pymg')
 sys.path.append(config['pymg_dir'])
 from edl import __version__ as PYMG_VERSION
 """
+include: "contig.genes.snake"
 include: "rrna.annotation.snake"
 include: "../annotation/lastal.snake"
 
@@ -138,54 +139,12 @@ rule contigs_filtered:
     Get fasta of contigs with config[mapped_read_cutoff] mapped reads
     """
     input: 
-        fasta="contigs.fasta",
+        fasta="contigs.all.fasta",
         list="contigs.filter.list"
     output: "contigs.fasta"
     benchmark: "benchmarks/contigs.fitered.fasta.time"
     shell:
         "screen_list.py -k {input.fasta} -l {input.list} -o {output}"
-
-rule prodigal:
-    """ get gene predictions form prodigal """
-    input:
-        "contigs.fasta"
-    output:
-        "contigs.prodigal.genes.gff"
-    benchmark:
-        "benchmarks/contigs.prodigal.genes.time"
-    version:
-        get_version('prodigal','-v')
-    shell:
-        "prodigal -i {input} -f gff -o {output} -p meta -q"
-
-rule prodigal_complete:
-    """ filter for just the complete genes """
-    input: "contigs.prodigal.genes.gff"
-    output: "contigs.prodigal.complete.genes.gff"
-    benchmark: "benchmarks/contigs.prodigal.complete.genes.gff"
-    shell: "grep 'partial=00' {input} > {output} || true"
-
-rule merge_annotations:
-    """ 
-    merge all GFFs and drop genes that overlap rRNA
-    """
-    input:
-        contigs="contigs.fasta",
-        rrnas="contigs.vs.rRNA.cmsearch.gff",
-        trnas="contigs.vs.tRNA.cmsearch.gff",
-        genes="contigs.prodigal.complete.genes.gff"
-    output:
-        "contigs.annotations.gff",
-        "contigs.annotations.fna",
-        "contigs.annotations.faa"
-    params:
-        output_root="contigs.annotations"
-    benchmark:
-        "benchmarks/contigs.annotations.merge.time"
-    version:
-        get_version('merge_gffs.py')
-    shell:
-        "merge_gffs.py -r {input.rrnas} -r {input.trnas} -c {input.genes} {input.contigs} {params.output_root}"
 
 rule annotation_coverage:
     """
@@ -194,14 +153,14 @@ rule annotation_coverage:
     """
     input:
         gff="contigs.annotations.gff",
-        stats="contigs.coverages.{sample}.txt"
+        stats="contigs.final.stats.txt"
     output:
         table="contigs.annotations.coverage.{sample}.tsv"
     run:
         # Read stats table, but just keep median coverage
         cov_dict = pandas.read_table(get_file_name(input.stats),
                                      index_col=0,
-                                     usecols=['contig', config['cov_col']])\
+                                     usecols=['Contig', config['cov_col']])\
                                                              [config['cov_col']]
         with open(get_file_name(output.table),'w') as OUT:
             with open(get_file_name(input.gff)) as GFF:
