@@ -13,7 +13,7 @@ the assembly
 include: "../common/mapping_bwa.snake"
 
 from python.common import get_file_name
-from python.assembly import get_contig_stats, get_coverage_stats, \
+from python.assembly import get_contig_stats, \
                             generate_histogram
 
 """
@@ -47,20 +47,6 @@ rule contig_stats_table:
         "benchmarks/contig.sequence.stats.time"
     run:
         get_contig_stats(get_file_name(input), get_file_name(output))
-
-rule contig_coverage_table:
-    """
-    Use depths and read counts to build table of coverage stats per contig
-    """
-    input:
-        "mapping/{sample}.reads.vs.contigs.all.depths",
-        "mapping/{sample}.reads.vs.contigs.all.read_counts",
-    output:
-        temp("contigs.all.coverages.{sample}.txt"),
-    benchmark:
-        "benchmarks/contig.stats.{sample}.time"
-    run:
-        get_coverage_stats(*input, get_file_name(output))
 
 rule contig_master_stats_table:
     """

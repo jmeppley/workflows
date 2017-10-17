@@ -8,6 +8,7 @@ BWA_VERSION = \
 from snakemake.utils import update_config
 update_config(config, {'bwa': {'threads': 15}})
 config['cov_col'] = 'MeanCov'
+from python.assembly import get_coverage_stats
 from python.samples import get_sample_reads_for_mapping
 
 #######
@@ -109,4 +110,18 @@ rule mapped_read_depths:
         input="mapping/{sample}.vs.{contigs}.bam"
     shell:
         "samtools depth {params.input} > {output}"
+
+rule contig_coverage_table:
+    """
+    Use depths and read counts to build table of coverage stats per contig
+    """
+    input:
+        "mapping/{sample}.reads.vs.{contigs}.depths",
+        "mapping/{sample}.reads.vs.{contigs}.read_counts",
+    output:
+        temp("{contigs}.coverages.{sample}.txt"),
+    benchmark:
+        "benchmarks/contig.stats.{sample}.time"
+    run:
+        get_coverage_stats(*input, get_file_name(output))
 

@@ -38,8 +38,10 @@ def get_rna_id_names_file(w):
     logger.debug ("returing blank file")
     return blank_file_name
 
+# for transcriptomes, there is no contig filter step
+all_str = '' if config.get('is_transcriptomic', False) else 'all.'
 sample_coverages = \
-        {s:"contigs.all.coverages.{sample}.txt".format(sample=s) \
+        {s:"contigs.{all}coverages.{sample}.txt".format(all=all_str, sample=s) \
                      for s in config['sample_data'] \
                      if 'clean' in config['sample_data'][s]}
 

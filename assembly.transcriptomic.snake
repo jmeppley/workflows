@@ -71,6 +71,7 @@ elif transcript_mapper == 'bwa':
 else:
     raise Exception("Unknown transcript mapping tool: {}! Please check your configuration.".format(transcript_mapper))
 
+config['is_transcriptomic'] = True
 include: "assembly/rrna.annotation.snake"
 #
 # rule to create links
