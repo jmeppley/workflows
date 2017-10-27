@@ -3,10 +3,12 @@ Rules that predict genes on a set of contigs using prodigal
 """
 
 from Bio import SeqIO
-from python.common import get_file_name
+from python.common import get_file_name, apply_defaults
 # get gff parsing from py-metagenomics
 from edl.blastm8 import GFF, generate_hits
 from snakemake import logger
+
+apply_defaults(config, {'prodigal': {'options': '-p meta -c'}})
 
 # need rRNA hits to filter on
 include: "../annotation/cmsearch.snake"
@@ -23,8 +25,10 @@ rule prodigal:
         "benchmarks/contigs.prodigal.genes.time"
     version:
         get_version('prodigal','-v')
+    params:
+        opts=config['prodigal']['options']
     shell:
-        "prodigal -i {input} -f gff -p meta -q -c \
+        "prodigal -i {input} -f gff -q {params.opts} \
          -o {output.gff} -a {output.faa} -d {output.ffn}"
 
 rule rna_annotation:
