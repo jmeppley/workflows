@@ -5,7 +5,7 @@ Structure:
 +-.gitignore
 +--README.md
 +--LICENSE.md
-+--config.yaml ssu_rna.snake
++--config.yaml (none required!)
 +--environment: workflows/test/conda/cDNA.yml
 +--workflows: workflows/annotation/ssu_rna.snake 
 +--scripts
@@ -21,6 +21,7 @@ usage: snakemake -s ~/workflows/annotation/ssu_rna.snake --configfile ~/workflow
 """
 
 import os
+import re
 import sys
 
 snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))[0:-11]
@@ -29,19 +30,35 @@ pymg_dir = os.path.sep.join([snakefile_path, 'tools', 'pymg'])
 sys.path.append(snakefile_path)
 sys.path.append(pymg_dir)
 sortmerna_database_dir = "/slipstream/home/jbryant/databases/sortmerna/"
-#
-RIBOFRAME_DIR="/slipstream/home/jbryant/workflows/scripts/riboframe/hmms/"
-CLASSIFIER_JAR="/home/jbryant/programs/riboFrame/rdp_classifier_2.12/dist/classifier.jar"
+
+RIBOFRAME_DIR = "/slipstream/home/jbryant/workflows/scripts/riboframe/hmms/"
+CLASSIFIER_JAR = "/home/jbryant/programs/riboFrame/rdp_classifier_2.12/dist/classifier.jar"
+
+# collect files
+config={'sample_data':[]}
+sample_path = "/mnt/lysine/jbryant/ALOHA_2.0/symlinks"
+
+for file in os.listdir(sample_path):
+    if file.endswith(".renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.fastq"):
+        config['sample_data'].append(file) 
+
 
 config['sample_names']=[os.path.basename(x) for x in config['sample_data']]
+config['sample_path']=[os.path.dirname(x).split("/")[-1] for x in config['sample_data']]
 config['sample_strip']=[os.path.splitext(x)[0] for x in config['sample_names']]
+config['sample_clean']=[x.split('.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse')[0] for x in config['sample_strip']]
+
+print(config)
 
 rule all:
      input: 
           expand("ssu_rRNA/{sample_nameS}.rna.fastq", sample_nameS=config['sample_strip']),
           expand("ssu_rRNA/{sample_name_23}.rna.2.fastq", sample_name_23=config['sample_strip']),
           expand("ssu_rRNA/{sample_name_assembled}.rna.2.assembled.fastq", sample_name_assembled=config['sample_strip']),
-          expand("ssu_rRNA/{sample_name_assembled}.rna.2.assembled.hmms.archR", sample_name_assembled=config['sample_strip'])
+          expand("ssu_rRNA/{sample_name_clean}/{sample_name_clean}.rev.arch.ribosomal.table", sample_name_clean=config['sample_clean']),
+          expand("ssu_rRNA/{sample_name_clean}/{sample_name_clean}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.16S.fasta", sample_name_clean=config['sample_clean']),
+          expand("ssu_rRNA/{sample_name_clean}/{sample_name_clean}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.16S.V4.fasta", sample_name_clean=config['sample_clean']),
+          expand("ssu_rRNA/{sample_name_clean}/{sample_name_clean}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.16S.rdp.count.genus.cnt", sample_name_clean=config['sample_clean'])
 
 rule sortmerna:
     """
@@ -69,6 +86,7 @@ rule sortmerna:
 rule remove_23S:
     """
     Re-run sortmerna but this time exclude 23S
+    #consider running another step to pull out the euk 18S from the 16S!
     """
     
     input:
@@ -149,7 +167,7 @@ rule fastq_to_fasta:
     input:
         "ssu_rRNA/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.fastq"
     output:
-        "ssu_rRNA/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.fasta"
+        "ssu_rRNA/{sample_name}/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.fasta"
         
     benchmark:
         "benchmarks/seqtk.txt"
@@ -165,22 +183,102 @@ rule riboframe_hmms:
     """
     
     input:
-        "ssu_rRNA/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.fasta"
+        "ssu_rRNA/{sample_name}/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.fasta"
     output:
-        bact_for="ssu_rRNA/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.hmms.bactF",
-        bact_rev="ssu_rRNA/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.hmms.bactR",
-        arch_for="ssu_rRNA/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.hmms.archF",
-        arch_rev="ssu_rRNA/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.hmms.archR"
+        bact_for="ssu_rRNA/{sample_name}/{sample_name}.fwd.bact.ribosomal.table",
+        bact_rev="ssu_rRNA/{sample_name}/{sample_name}.rev.bact.ribosomal.table",
+        arch_for="ssu_rRNA/{sample_name}/{sample_name}.fwd.arch.ribosomal.table",
+        arch_rev="ssu_rRNA/{sample_name}/{sample_name}.rev.arch.ribosomal.table"
+
+    params:
+        folder_name="{sample_name}"
 
     benchmark:
         "benchmarks/riboframe.txt"
 
     shell:
         """
-        hmmsearch -E 0.00001 --domtblout {output.bact_for} --noali --cpu 2 -o {RIBOFRAME_DIR}16S_bact_for3.hmm
-        hmmsearch -E 0.00001 --domtblout {output.bact_rev} --noali --cpu 2 -o {RIBOFRAME_DIR}16S_bact_rev3.hmm
-        hmmsearch -E 0.00001 --domtblout {output.arch_for} --noali --cpu 2 -o {RIBOFRAME_DIR}16S_arch_for3.hmm
-        hmmsearch -E 0.00001 --domtblout {output.arch_rev} --noali --cpu 2 -o {RIBOFRAME_DIR}16S_bact_rev3.hmm
+        hmmsearch -E 0.00001 --domtblout {output.bact_for} --noali --cpu 2 -o /dev/null {RIBOFRAME_DIR}16S_bact_for3.hmm {input}
+        hmmsearch -E 0.00001 --domtblout {output.bact_rev} --noali --cpu 2 -o /dev/null {RIBOFRAME_DIR}16S_bact_rev3.hmm {input}
+        hmmsearch -E 0.00001 --domtblout {output.arch_for} --noali --cpu 2 -o /dev/null {RIBOFRAME_DIR}16S_arch_for3.hmm {input}
+        hmmsearch -E 0.00001 --domtblout {output.arch_rev} --noali --cpu 2 -o /dev/null {RIBOFRAME_DIR}16S_bact_rev3.hmm {input}
         """
 
-#        perl /slipstream/home/jbryant/workflows/scripts/riboframe/riboTrap.pl {input} nopair
+rule ribotrap:
+         """
+         ribotrap
+         """
+         
+         input:
+            "ssu_rRNA/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.fastq"
+           
+         output:
+             "ssu_rRNA/{sample_name}/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.16S.fasta"
+         params:
+             folder_name="ssu_rRNA/{sample_name}/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled"
+         benchmark:
+             "benchmarks/ribotrap.txt"
+         shell:
+             """
+             perl /slipstream/home/jbryant/workflows/scripts/riboframe/riboTrap.pl {params.folder_name} nopair
+             """
+
+rule extract_16S:
+	"""
+	using one of John's scripts, that is written in python2
+	"""
+	
+	input:
+	    "ssu_rRNA/{sample_name}/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.16S.fasta"
+
+	output:
+	    "ssu_rRNA/{sample_name}/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.16S.V4.fasta"
+	
+	params:
+	    python_path='/slipstream/home/jbryant/workflows/scripts/riboframe'
+	
+	shell:
+	    """
+	    cat {input} | python2 -c "import sys; sys.path[0]='/slipstream/home/jbryant/workflows/scripts/riboframe'; import riboframe; riboframe.pull_out_region_piped('V4', padding=1);" > {output}
+	    """
+
+rule classify:
+	"""
+	Using RDP classifier
+	"""
+	
+	input:
+	    "ssu_rRNA/{sample_name}/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.16S.fasta"
+
+	output:
+	    "ssu_rRNA/{sample_name}/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.16S.rdp"
+	
+	params:
+		classifier_jar='/slipstream/home/jbryant/workflows/scripts/riboframe/RDP/classifier.jar'
+	
+	shell:
+	    """
+	    java -Xmx1g -jar {params.classifier_jar} -q {input} -o {output}
+	    """
+
+rule count rdp:
+	"""
+    covplot=1 abuplot=0 produces SSU coverage plots
+    covplot=0 abuplot=0 produces count tables that accurately reflect read counts
+	"""
+	
+	input:
+	    "ssu_rRNA/{sample_name}/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.16S.rdp"
+	
+	output:
+	    "ssu_rRNA/{sample_name}/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.16S.rdp.count.genus.cnt"
+	
+	params:
+	    output="ssu_rRNA/{sample_name}/{sample_name}.renamed.interleaved.noadapt.nophix.corrected.trimmed.dropse.rna.2.assembled.16S.rdp.count"
+
+	shell:
+	    """
+	    perl  /slipstream/home/jbryant/workflows/scripts/riboframe/riboMap.pl file={input} var=full conf=0.8 cross=any percmin=.05  covplot=0 abuplot=1 out={params.output}.fig;
+	    rm ssu_rRNA/*/*.assembled.16S.rdp.count.fig.*.cnt;
+	    perl  /slipstream/home/jbryant/workflows/scripts/riboframe/riboMap.pl file={input} var=full conf=0.8 cross=any percmin=.05  covplot=0 abuplot=0 out={params.output};
+	    """
