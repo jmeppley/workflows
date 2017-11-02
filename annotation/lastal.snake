@@ -1,12 +1,16 @@
-rule lastdb:
+rule compile_lastdb:
     """
     Compile fasta file into lastb
     This currenlty only works for protein dbs. Would a second rule for nucl
     work?
     """
-    input: "{db_path}.faa"
+    input: '{db_path}.faa'
     output: "{db_path}.prj"
-    shell: "lastdb -v -p {wildcards.db_path} {input}"
+    params:
+        lastdb=lambda w: 'lastdb8' \
+                    if os.path.dirname(w.db_path)[-1]=='8' \
+                    else 'lastdb'
+    shell: "{params.lastdb} -v -p {wildcards.db_path} {input}"
 
 rule lastal:
     """
@@ -30,10 +34,13 @@ rule lastal:
         db_path=lambda w: config['dbs'][w.db]['path'],
         fshift=lambda w: "-F 15" if w.alg=='x' else "",
         opts=lambda w: "" if w.alg=='n' else "-b 1 -x 15 -y 7 -z 25",
-        keep=config.get('last_filter','-F 5')
+        keep=config.get('last_filter','-F 5'),
+        lastal=lambda w: 'lastal8' \
+                if os.path.dirname(config['dbs'][w.db]['path'])[-1]=='8' \
+                else 'lastal'
     shell:
-        "lastal -P {threads} {params.fshift} -f BlastTab {params.opts} \
-         {params.db_path} {input[0]} \
+        "{params.lastal} -P {threads} {params.fshift} -f BlastTab \
+         {params.opts} {params.db_path} {input[0]} \
          | grep -v '^#'  \
          | filter_blast_m8.py -f blast {params.keep} \
          > {output}"
