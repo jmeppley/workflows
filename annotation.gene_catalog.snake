@@ -136,9 +136,16 @@ def get_all_annotation_files(wildcards):
     Replace file name with renamed file name if assembly needs 
     renaming
     """
+    ext = wildcards.ext
+    # hack for sliding in fixed gene calls
+    path_prefix = config.setdefault('gene_path_prefix', '')
+    gene_file_root = config.get('gene_file_root', 'contigs.annotations')
+    if 'gene_path_prefix' in config and ext=='fna':
+        ext='ffn'
+
     for assembly_path in config['assembly_list']:
-        file_name = os.path.join(assembly_path, 
-                                 'contigs.annotations.{}'.format(wildcards.ext))
+        file_name = os.path.join(path_prefix + assembly_path, 
+                                 '{}.{}'.format(gene_file_root, ext))
 
         if assembly_path in assembly_renaming_map:
             file_name = "renamed_dir" + file_name
@@ -174,11 +181,15 @@ def get_assembly_read_stats(wildcards):
 
 rule rename_annotations:
     """ Renames contigs and genes in any annotation file that needs it """
-    input: "{assembly}/contigs.{annotation_file}"
-    output: temp("renamed_dir{assembly}/contigs.{annotation_file}")
-    benchmark: 'benchmarks/rename_annotations{assembly}/{annotation_file}.time'
+    input: "{assembly}/{annotation_file}.{ext}"
+    output: temp("renamed_dir{assembly}/{annotation_file}.{ext}")
+    benchmark: 'benchmarks/rename_annotations{assembly}/{annotation_file}.{ext}.time'
+    wildcard_constraints:
+        ext='(faa|fna|ffn|txt)'
     params:
-        regex=lambda w: assembly_renaming_map[w.assembly]
+        regex=lambda w: assembly_renaming_map[re.sub('^' + \
+                            config['gene_path_prefix'], '', \
+                            w.assembly)]
     shell: "perl -pe '{params.regex}' \
             < {input} \
             > {output}"
