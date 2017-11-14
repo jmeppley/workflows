@@ -17,9 +17,11 @@ D3_level = defaultdict(lambda: 0, {})
 D6_level = defaultdict(lambda: 0, {})
 
 input_file = sys.argv[1] 
-output_file_name = input_file.strip(".txt") + ".counts.txt"
+output_file_name1 = input_file.strip(".txt") + ".D3.counts.txt"
+output_file_name2 = input_file.strip(".txt") + ".D6.counts.txt"
+
 f = open(input_file, 'r')
-g = open(output_file_name, 'r')
+#g = open(output_file_name, 'r')
 
 for input_line in f:
     line=input_line.split('\t')[1].split(';')
@@ -31,5 +33,5 @@ for input_line in f:
     D3_level[D3] = D3_level[D3]+1
     D6_level[D6] = D6_level[D6]+1
     
-pd.DataFrame(D3_level, index=[0]).transpose().to_csv()
-pd.DataFrame(D6_level, index=[0]).transpose().to_csv(output_file_name, sep='\t')
+pd.DataFrame(D3_level, index=[0]).transpose().to_csv(output_file_name1, sep='\t')
+pd.DataFrame(D6_level, index=[0]).transpose().to_csv(output_file_name2, sep='\t')
