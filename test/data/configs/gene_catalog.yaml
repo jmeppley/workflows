@@ -1,0 +1,29 @@
+assembly_list:
+ - ALOHA_04
+ - ALOHA_15
+ - ALOHA_21
+clade_ranks: 
+ - order
+ - genus
+output_style: long
+hmmer:
+    threads: 2
+lastal:
+    threads: 10
+prodigal:
+    threads: 20
+aa_conversion: prodigal
+dbs:
+    RefSeq: 
+        path: ../../data/seqdbs/RefSeq/lastdb
+        format: lastp
+        type: tax
+    KEGG: 
+        path: ../../data/seqdbs/KEGG/lastdb
+        format: lastp
+        assign_type: kegg
+    COG:
+        path: ../../data/seqdbs/COG/frag-8/COG.1.hmm
+    COGfrg:
+        path: ../../data/seqdbs/COG/frag-8/COG.{N}.hmm
+        frags: 8

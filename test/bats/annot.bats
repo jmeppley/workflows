@@ -21,7 +21,7 @@ setup() {
     [ "${lines[0]}" == "Nothing to be done." ]
 }
 
-@test "Annotate gene catalog" {
+@test "Annotate existing gene catalog" {
     rm -rf test/scratch/annot_cat
     mkdir -p test/scratch/annot_cat
     cd test/scratch/annot_cat

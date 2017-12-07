@@ -1,0 +1,19 @@
+assembly_name: ALOHA_15
+assembler: megahit
+sample_data:
+  ALOHA_XVII_1_15_DNA: 
+    clean: reads/ALOHA_XVII_1_15_DNA/reads.renamed.R12.fastq
+cmsearch:
+    threads: 10
+megahit:
+    preset: meta-sensitive
+    threads: 40
+dbs:
+    SilvaSSU:
+        path: ../../data/seqdbs/Silva/SSU/bwadb
+        format: bwadb
+        type: rrna
+    SilvaLSU:
+        path: ../../data/seqdbs/Silva/LSU/bwadb
+        format: bwadb
+        type: rrna
