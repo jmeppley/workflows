@@ -75,8 +75,7 @@ if 'coverage_file' in config or os.path.exists(local_coverage_file):
     if coverage_file != local_coverage_file:
         transitions[local_coverage_file] = coverage_file
 else:
-    dummy_coverage_file = prefix + ".coverage.dummy.tsv"
-    transitions[local_coverage_file] = dummy_coverage_file
+    include: 'annotation/dummy.coverage.snake'
 
 # add my tools to the path (Somewhat of a hack, maybe I'll get my stuff in
 # conda eventually)
@@ -118,13 +117,3 @@ logger.debug("Snakefile config:\n" + yaml.dump(config))
 rule gene_annotation_all:
     input:
         annotation_file_list
-
-rule dummy_gene_coverage:
-    """ generate a coverage table of all 1s """
-    input: "{prefix}.faa"
-    output: "{prefix}.coverage.dummy.tsv"
-    run:
-        from Bio import SeqIO
-        with open(output[0], 'w') as OUTF:
-            for record in SeqIO.parse(input[0], 'fasta'):
-                OUTF.write("{}\t1\n".format(record.id))
