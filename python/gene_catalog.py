@@ -301,8 +301,8 @@ def normalize_coverages(input):
         _coverages = pandas.read_table(cov_file,
                                        index_col=0,
                                        header=0,
-                                       usecols=['contig', 'md cov'],
-                                       )['md cov'] / read_counts[assembly]
+                                       usecols=['Contig', 'MeanCov'],
+                                       )['MeanCov'] / read_counts[assembly]
         if coverages is None:
             coverages = _coverages
         else:

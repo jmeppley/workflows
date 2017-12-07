@@ -98,7 +98,7 @@ def get_assembly_coverage_files(wildcards):
     """
     for assembly_path in config['assembly_list']:
         for file_name in glob.glob(os.path.join(assembly_path,
-                                'contigs.coverages.*.txt')):
+                                'contigs.final.stats.txt')):
             if assembly_path in assembly_renaming_map:
                 file_name = "renamed_dir" + file_name
             yield file_name
