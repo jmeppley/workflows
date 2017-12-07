@@ -20,3 +20,14 @@ setup() {
     [ "$status" -eq 0 ]
     [ "${lines[0]}" == "Nothing to be done." ]
 }
+
+@test "Annotate gene catalog" {
+    rm -rf test/scratch/annot_cat
+    mkdir -p test/scratch/annot_cat
+    cd test/scratch/annot_cat
+    run bash -c "snakemake -s ../../../annotation.gene_catalog.snake --configfile ../../data/configs/genes.annot.yaml -p -k -j 20 --notemp > genes.annot.prod.log 2>&1"
+    [ "$status" -eq 0 ]
+    run bash -c "snakemake -s ../../../annotation.gene_catalog.snake --configfile ../../data/configs/genes.annot.yaml -p -k -j 20 -n 2>&1"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" == "Nothing to be done." ]
+}
