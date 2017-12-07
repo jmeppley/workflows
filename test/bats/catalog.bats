@@ -16,26 +16,34 @@ setup() {
 }
 
 
-@test "build a gene catalog" {
+@test "catalog: create empty folders" {
     rm -rf test/scratch/catalog
 
     mkdir -p test/scratch/catalog/ALOHA_04
     mkdir -p test/scratch/catalog/ALOHA_15
     mkdir -p test/scratch/catalog/ALOHA_21
+}
 
+@test "assemble sample ALOHA_04" {
     cd test/scratch/catalog/ALOHA_04
-    run bash -c "snakemake -j 10 -s ../../../../assembly.metagenomic.snake -p --configfile ../../data/configs/megahit.A04.yaml --verbose > assembly.log 2>&1"
+    run bash -c "snakemake -j 10 -s ../../../../assembly.metagenomic.snake -p --configfile ../../../data/configs/megahit.A04.yaml > assembly.log 2>&1"
     [ "$status" -eq 0 ]
-    
-    cd ../ALOHA_15
-    run bash -c "snakemake -j 10 -s ../../../../assembly.metagenomic.snake -p --configfile ../../data/configs/megahit.A15.yaml --verbose > assembly.log 2>&1"
+}
+
+@test "assemble samples ALOHA_15" {
+    cd test/scratch/catalog/ALOHA_15
+    run bash -c "snakemake -j 10 -s ../../../../assembly.metagenomic.snake -p --configfile ../../../data/configs/megahit.A15.yaml > assembly.log 2>&1"
     [ "$status" -eq 0 ]
-    
-    cd ../ALOHA_21
-    run bash -c "snakemake -j 10 -s ../../../../assembly.metagenomic.snake -p --configfile ../../data/configs/megahit.A21.yaml --verbose > assembly.log 2>&1"
+}    
+
+@test "assemble samples ALOHA_21" {
+    cd test/scratch/catalog/ALOHA_21
+    run bash -c "snakemake -j 10 -s ../../../../assembly.metagenomic.snake -p --configfile ../../../data/configs/megahit.A21.yaml > assembly.log 2>&1"
     [ "$status" -eq 0 ]
-    
-    cd ..
+}
+
+@test "Compile gene catalog" {
+    cd test/scratch/catalog
     run bash -c "snakemake -s ../../../annotation.gene_catalog.snake --configfile ../../data/configs/gene_catalog.yaml -p -k -j 20 --notemp > gene_catalog.log 2>&1"
     [ "$status" -eq 0 ]
     run bash -c "snakemake -s ../../../annotation.gene_catalog.snake --configfile ../../data/configs/gene_catalog.yaml -p -k -j 20 -n 2>&1"
