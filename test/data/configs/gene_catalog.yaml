@@ -2,6 +2,7 @@ assembly_list:
  - ALOHA_04
  - ALOHA_15
  - ALOHA_21
+cross_tab: True
 clade_ranks: 
  - order
  - genus
