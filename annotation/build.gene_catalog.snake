@@ -110,7 +110,7 @@ def get_assembly_read_stats(wildcards):
     for assembly_path in config['assembly_list']:
         for file_name in glob.glob(os.path.join(assembly_path,
                                 'stats',
-                                'all_cleaned_reads.fastq.stats')):
+                                '*.trimmed.dropse.fastq.stats')):
             yield file_name
 
 ##########
