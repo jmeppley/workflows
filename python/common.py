@@ -9,13 +9,14 @@ Methods used across all or most workflows including:
 
 import os
 import re
+import logging
 import subprocess
 import tempfile
 import yaml
 import pandas
 from snakemake.logging import logger
-from snakemake.utils import update_config as apply_defaults
 
+TRUTH = ['True', True, 'true', 'TRUE', 'T']
 
 def get_version(command, version_flag='--version',
                 cmd_prefix='',
@@ -112,20 +113,41 @@ def add_stats_outputs(snakefile, config):
             'snakemake',
             '-s',
             snakefile,
+            '--nolock',
             '--configfile',
             config_file.name,
             '--summary',
+            '--rerun-incomplete',
             '-n',
         ]
 
+        if logger.logger.getEffectiveLevel() >= logging.DEBUG:
+        #if logger.logger.getEffectiveLevel() <= logging.DEBUG:
+            command += ['--verbose']
+
         logger.debug("Performing dry-run to get outputs")
         logger.debug(" ".join(command))
-        out = subprocess.check_output(command).decode()
+        try:
+            complete = subprocess.run(command,
+                                      stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE)
+        except:
+            logger.warning("Cannot get fastx files, there is something wrong "
+                            "with your workflow!")
+            raise
+            return
+
+        if complete.returncode != 0:
+            logger.warning("STDOUT:\n" + get_str(complete.stdout))
+            logger.warning("STDERR:\n" + get_str(complete.stderr))
+            raise Exception("Cannot get fastx files, there is something wrong "
+                            "with your workflow!")
+
         logger.debug("Dry run complete")
 
         new_outputs = config.setdefault('outputs', set())
         output_count = 0
-        for line in out.split('\n'):
+        for line in complete.stdout.decode().split('\n'):
             output = line.split('\t')[0]
             logger.debug(output)
             if re.search(r'f(aa|fn|na|a|asta|astq)(\.gz)?$', output):
@@ -135,3 +157,33 @@ def add_stats_outputs(snakefile, config):
 
         logger.debug("Added stats and hist files for {} fasta files"\
                      .format(output_count))
+
+def get_str(possibly_byte_array):
+    if isinstance(possibly_byte_array, str):
+        return possibly_byte_array
+    return possibly_byte_array.decode()
+
+def apply_defaults(config, defaults):
+    """ recursively appy defaults to nested dicts """
+    for param, pdefaults in defaults.items():
+        if isinstance(pdefaults, dict):
+            apply_defaults(config.setdefault(param, {}), pdefaults)
+        else:
+            config.setdefault(param, pdefaults)
+
+def get_file_name(list_or_string):
+    """
+    Different versions of snakemake seem to have different approaches to this syntax:
+
+    rule x:
+        input:
+            file1="some.file"
+            file2="other.file"
+
+    Sometimes input.file1 is a string and sometimes it is list containing a string.
+
+    So I'm inserting this method into all the python code that uses named files.
+    """
+    if isinstance(list_or_string, str):
+        return list_or_string
+    return next(iter(list_or_string))

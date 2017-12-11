@@ -1,5 +1,5 @@
 from python.cmsearch import get_cm_model_version
-from snakemake.utils import update_config
+from python.common import apply_defaults
 
 # models dir should contain pressed cm files named rRNA.cm and tRNA.cm
 defaults={'cmsearch': {
@@ -8,7 +8,7 @@ defaults={'cmsearch': {
                       os.path.join(snakefile_path,"annotation",'models'),
                    },
          }
-update_config(config, defaults)
+apply_defaults(config, defaults)
 
 rule cmsearch_default_all:
     input: 

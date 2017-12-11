@@ -6,8 +6,9 @@ import sys
 snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))
 pymg_dir = os.path.sep.join([snakefile_path, 'tools', 'pymg'])
 batch_dir = os.path.sep.join([snakefile_path, 'tools', 'batch'])
-os.environ['PATH'] += os.pathsep + os.pathsep.join([pymg_dir, batch_dir])
+os.environ['PATH'] = os.pathsep.join([pymg_dir, batch_dir, os.environ['PATH']])
 logger.debug(os.environ['PATH'])
 sys.path.append(pymg_dir)
+config['pymg_dir'] = pymg_dir
 #
 

@@ -83,7 +83,7 @@ config.setdefault('cleaning_protocol', 'assembly')
 config.setdefault('remove_rna', False)
 # process the config
 cleaned_reads = setup_qc_outputs(config)
-outputs.update(cleaned_reads)
+#outputs.update(cleaned_reads)
 # import needed QC rules
 include: "qc/setup.snake"
 
@@ -98,6 +98,8 @@ if run_assembly:
                                                 .get('preset','meta-sensitive'))
 else:
     # work from existing contigs
+    if config['contigs_fasta'] == 'contigs.fasta':
+        raise Exception("The file contigs.fasta will be created from the raw contigs you supply. Please rename your starting contigs to something else. We suggest 'contigs.raw.fasta'")
     if config['contigs_fasta'] != 'contigs.raw.fasta':
         transitions['contigs.raw.fasta'] = config['contigs_fasta']
 #

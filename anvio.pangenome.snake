@@ -82,10 +82,12 @@ rule pangenome_files:
     shell:
         """{config[anvio_prefix]}
            rm -rf anvio/{wildcards.pangenome_name} {wildcards.pangenome_name}
-           anvi-pan-genome -g {input} -J {wildcards.pangenome_name} \
+           anvi-pan-genome -g {input} \
+            --project-name {wildcards.pangenome_name} \
             > {log} 2>&1
            mv {wildcards.pangenome_name} anvio/
-           touch {output}"""
+           touch {output}
+           """
 
 rule pangenome_db:
     input: genomes_tables

@@ -1,13 +1,5 @@
 setup() {
-    ENV=salmon
-    ENV_DIR=`pwd`/test/conda/envs/$ENV
-    ENV_FILE=test/conda/${ENV}.yml
-    SALMONENV=$ENV_DIR
-    if [ "$ENV_FILE" -nt "$ENV_DIR" ]; then
-        rm -rf "$ENV_DIR"
-        conda env create -f $ENV_FILE -p $ENV_DIR --force --quiet > test/conda/envs/.create.$ENV 2>&1
-    fi
-
+    mkdir -p test/conda/envs
     ENV=transcripts
     ENV_DIR=`pwd`/test/conda/envs/$ENV
     ENV_FILE=test/conda/${ENV}.yml
@@ -23,10 +15,38 @@ setup() {
     fi
 }
 
-@test "assemble single transcriptome with spades" {
+@test "assemble single transcriptome with spades, map with salmon" {
     rm -rf test/scratch/transcripts
     mkdir -p test/scratch/transcripts
     cd test/scratch/transcripts
 
-    run bash -c "snakemake -j 10 -s ../../../assembly.transcriptomic.snake -p --configfile ../../data/configs/spades.cdna.yaml --config salmon_env=$SALMONENV --verbose > assembly.log 2>&1"
+    run bash -c "snakemake -j 10 -s ../../../assembly.transcriptomic.snake -p --configfile ../../data/configs/spades.cdna.yaml --config long_ssu_length=150 long_lsu_length=150 --verbose > assembly.log 2>&1"
+    [ "$status" -eq 0 ]
+    run bash -c "snakemake -j 10 -s ../../../assembly.transcriptomic.snake -p --configfile ../../data/configs/spades.cdna.yaml --config long_ssu_length=150 long_lsu_length=150 -n 2>&1 | grep -v '^Multiple include'"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" == "Nothing to be done." ]
+}
+
+@test "assemble single transcriptome with spades, map with bwa" {
+    rm -rf test/scratch/transcripts
+    mkdir -p test/scratch/transcripts
+    cd test/scratch/transcripts
+
+    run bash -c "snakemake -j 10 -s ../../../assembly.transcriptomic.snake -p --configfile ../../data/configs/spades.cdna.yaml --config long_ssu_length=150 long_lsu_length=150 transcript_mapper=bwa --verbose > assembly.log 2>&1"
+    [ "$status" -eq 0 ]
+    run bash -c "snakemake -j 10 -s ../../../assembly.transcriptomic.snake -p --configfile ../../data/configs/spades.cdna.yaml --config long_ssu_length=150 long_lsu_length=150 transcript_mapper=bwa -n 2>&1 | grep -v '^Multiple include'"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" == "Nothing to be done." ]
+}
+
+@test "assemble single transcriptome with spades, don't use bfc" {
+    rm -rf test/scratch/transcripts
+    mkdir -p test/scratch/transcripts
+    cd test/scratch/transcripts
+
+    run bash -c "snakemake -j 10 -s ../../../assembly.transcriptomic.snake -p --configfile ../../data/configs/spades.cdna.yaml --config long_ssu_length=150 long_lsu_length=150 cleaning_protocol=assembly_no_ec --verbose > assembly.log 2>&1"
+    [ "$status" -eq 0 ]
+    run bash -c "snakemake -j 10 -s ../../../assembly.transcriptomic.snake -p --configfile ../../data/configs/spades.cdna.yaml --config long_ssu_length=150 long_lsu_length=150 cleaning_protocol=assembly_no_ec -n 2>&1 | grep -v '^Multiple include'"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" == "Nothing to be done." ]
 }

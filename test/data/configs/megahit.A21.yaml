@@ -1,0 +1,12 @@
+assembly_name: ALOHA_21
+assembler: megahit
+sample_data:
+  ALOHA_XVII_1_21_DNA: 
+    raw:
+     - "../../../data/raw_reads/2014_ALOHA_XVII_1-21_DNA_S1_R1_001.fastq"
+     - "../../../data/raw_reads/2014_ALOHA_XVII_1-21_DNA_S1_R2_001.fastq"
+cmsearch:
+    threads: 10
+megahit:
+    preset: meta-sensitive
+    threads: 40

@@ -1,43 +1,72 @@
-include: "../annotation/cmsearch.snake"
-# available rRNA DBs
-rrna_db_dot_fmts=[]
-for db, db_data in config.get('dbs',{}).items():
-    if db_data.get('type') == 'rrna':
-        fmt = db_data.get('format', 'lastdb')
-        rrna_db_dot_fmts.append("{}.{}".format(db,fmt))
+include: "../annotation/bwa.snake"
 
+from python.common import get_file_name
+
+# available rRNA DBs
+from python.annotate import get_last_alg
+
+blank_file_name = ".empty.file"
+rna_search_hits_template = \
+    "contigs.vs.rRNA.cmsearch.{rmol}.gt{length}.gff.vs.{db_dot_fmt}"
+
+def get_rna_search_hits(w):
+    """ return search result that matches rmol (SSU or LSU) """
+    for db, db_data in config.get('dbs',{}).items():
+        if db_data.get('type') == 'rrna':
+            if re.search(w.rmol, db):
+                fmt = db_data.get('format', 'lastdb')
+                fmt = get_last_alg(fmt, 'fna')
+                db_dot_fmt = "{}.{}".format(db, fmt)
+                hits_file = rna_search_hits_template \
+                                            .format(db_dot_fmt=db_dot_fmt,
+                                                    length=w.length,
+                                                    rmol=w.rmol)
+                logger.debug ("returning " + hits_file)
+                return hits_file
+    logger.debug ("returing blank file")
+    return blank_file_name
+
+def get_rna_id_names_file(w):
+    """ get the .ids file from the Silva db 
+        # if rRNA DBs configured, this is a map to id/desc dict
+        # otherwise put blank place holder """
+    for db, db_data in config.get('dbs',{}).items():
+        if db_data.get('type') == 'rrna':
+            if re.search(w.rmol, db):
+                logger.debug ("returning " + db_data['path'] + ".ids")
+                return db_data['path'] + ".ids"
+    logger.debug ("returing blank file")
+    return blank_file_name
+
+# for transcriptomes, there is no contig filter step
+all_str = '' if config.get('is_transcriptomic', False) else 'all.'
 sample_coverages = \
-        {s:"contigs.coverages.{sample}.txt".format(sample=s) \
+        {s:"contigs.{all}coverages.{sample}.txt".format(all=all_str, sample=s) \
                      for s in config['sample_data'] \
                      if 'clean' in config['sample_data'][s]}
 
-def get_rna_search_hits(w):
-    """ return list of search results using wildcard info """
-    hits = []
-    for db_dot_fmt in rrna_db_dot_fmts:
-        hits.append(("contigs.vs.rRNA.cmsearch.{mol}.gt{length}"
-                     ".gff.fna.vs.{db_dot_fmt}"
-                    ).format(db_dot_fmt=db_dot_fmt,
-                             length=w.length,
-                             mol=w.mol))
-    return hits
+logger.debug("SAMPLE COVERAGES:\n" + repr(sample_coverages))
+
+wildcard_constraints:
+    rmol=r'[LS]SU',
+    length=r'\d+',
 
 rule long_rrna_gff:
     """ find long LSU or SSU annotations """
     input:
         "{prefix}.gff"
     output:
-        "{prefix}.{mol,[LS]SU}.gt{length,\d+}.gff"
+        "{prefix}.{rmol}.gt{length}.gff"
     benchmark:
-        "benchmarks/{prefix}.{mol}.gt{length}.time"
+        "benchmarks/{prefix}.{rmol}.gt{length}.time"
     version:
         get_version("filter_blast_m8.py")
     shell:
-        "grep {wildcards.mol} {input} \
+        "grep {wildcards.rmol} {input} \
           | sort \
           | filter_blast_m8.py -s score -L {wildcards.length} -f gff \
             --nonoverlapping \
-          > {output}"
+          > {output} || true"
 
 rule rrna_fasta:
     """ extract rRNA fasta """
@@ -45,29 +74,32 @@ rule rrna_fasta:
         fasta="{root}.fasta",
         gff="{root}.vs.{search}.gff"
     output:
-        "{root}.vs.{search}.gff.fna"
+        "{root}.vs.{search}.gff.fasta"
     benchmark:
-        "benchmarks/{root}.vs.{search}.gff.fna.time"
+        "benchmarks/{root}.vs.{search}.gff.fasta.time"
     version:
         get_version("get_sequences_from_m8.py")
     shell:
-        "cat {input.fastq} \
+        "cat {input.fasta} \
             | get_sequences_from_m8.py -f gff {input.gff} \
             > {output}"
+
+rule dummy_file:
+    """ blank file """
+    output: blank_file_name
+    shell: "touch {output}"
 
 rule rrna_report:
     """
     Look at the rRNA annotations and get table of nearly full length LSUs or SSUs
     """
     input:
-        gff="contigs.vs.rRNA.cmsearch.{mol}.gt{length}.gff",
-        hits=get_rna_search_hits,
+        gff="contigs.vs.rRNA.cmsearch.{rmol}.gt{length}.gff",
         stats=sample_coverages.values(),
+        hits=get_rna_search_hits,
+        id_names=get_rna_id_names_file,
     output:
-        "contigs.vs.rRNA.cmsearch.{mol}.gt{length}.tsv"
-    wildcard_constraints:
-        mol=r'[LS]SU',
-        length=r'\d+',
+        "contigs.vs.rRNA.cmsearch.{rmol}.gt{length}.tsv"
     run:
         # get map from contigs to coverage
         coverages = {}
@@ -79,7 +111,7 @@ rule rrna_report:
             coverages[sample] = cov_table[config['cov_col']]
 
         # table of rRNA model hits from filtered GFF
-        features = pandas.read_table(input.gff,
+        features = pandas.read_table(get_file_name(input.gff),
                                      header=None,
                                      names=['contig',
                                             'tool',
@@ -107,12 +139,23 @@ rule rrna_report:
         # get Silva annotation(s) for each feature
         from edl.blastm8 import generate_hits
         from edl.util import parseMapFile
-        for hit_table in input.hits:
-            hit_table_name = re.search(r'gff\.fna\.vs\.(.+)', hit_table).group(1)
-            db, format = hit_table_name.split('.',1)
-            id_name_file = config['dbs'][db]['path'] + ".ids"
-            hit_descriptions = parseMapFile(id_name_file)
-            for gene, hits in generate_hits(hit_table, format=format):
+        
+        m = re.search(r'gff\.vs\.(.+)', get_file_name(input.hits))
+        if m is not None:
+            hit_table_name = re.search(r'gff\.vs\.(.+)', input.hits).group(1)
+            # should be, eg, SilvaSSU.lastn or SilvaSSU.bwa.sam
+            words = hit_table_name.split('.')
+            # first word is DB name
+            db = words[0]
+            # last word is fmt for parsing
+            hit_format = words[-1]
+            if hit_format.startswith('last'):
+                hit_format = 'last'
+            elif hit_format.startswith('blast'):
+                hit_format = 'blastplus'
+            hit_descriptions = parseMapFile(input.id_names)
+            for gene, hits in generate_hits(get_file_name(input.hits),
+                                            format=hit_format):
                 # take the first hit
                 hit = list(hits)[0]
                 contig, start, end = re.search(r'^(.+)_(\d+)_(\d+)$', gene)\

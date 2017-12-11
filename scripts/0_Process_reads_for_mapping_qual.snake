@@ -1,0 +1,99 @@
+import argparse
+import os
+import sys
+import subprocess
+import re
+import pandas
+import random
+import shlex
+
+##
+# use --config input_folder=XXX to set the input folder. It defaults to "fastq"
+input_dir = config.get('input_folder', 'fastq')
+
+#####################################
+# Make directories to deposit results
+#####################################
+dirs = os.listdir(input_dir)
+samples = [re.sub('.fastq', '', f) \
+            for f in dirs if f.endswith("R1_001.fastq")]
+
+rule outputs:
+    input:
+        expand("{input_dir}/sorted_rna/{sample}.cut.sickle.non_rRNA.masked.fasta",
+                input_dir=input_dir,
+                sample=samples)
+
+#############################################################################################################
+# Use the IlluminaPrep script to join ends using PandaSeq and run a quick quality-filter using Trimmomatic
+#############################################################################################################
+rule illlumina_prep:
+    input:
+        fwd="{input_dir}/{file_root}_R1_001.fastq",
+        rev="{input_dir}/{file_root}_R2_001.fastq"
+    output: "{input_dir}/joined_reads/{file_root}_R1_001.fastq"
+    shell:
+        """
+        source activate illumina-prep
+        python /slipstream/opt/scripts/illuminaPrep.py -m 40 -g 6 -p primers -f {input.fwd} -r {input.rev} -o {output} > IlluminaPrep.log 2> IlluminaPrep.err
+        """
+
+#####################################################
+# Run Cutadapt to finish cutting of adapter sequences
+#####################################################
+rule cutadapt:
+    input: "{prefix}.fastq"
+    output: "{prefix}.cut.fastq"
+    shell:
+        'cutadapt -n 3 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -g AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC {input} > {output} 2> cutadapt.err'
+
+#####################################
+# Quality trim sequences with Sickle
+#####################################
+rule sickle:
+    input: "{prefix}.cut.fastq"
+    output: "{prefix}.cut.sickle.fastq"
+    shell:
+        '/slipstream/home/faylward/bin/sickle_11_25 se -t sanger -l 50 -f {input} -o {output} > {output}.log 2>&1'
+
+##############################################
+# Run sortMeRNA to separate rRNA from non-rRNA
+##############################################
+rule sortmerna:
+    input: "{input_dir}/joined_reads/{prefix}.cut.sickle.fastq"
+    output:
+        rrna="{input_dir}/sorted_rna/{prefix}.cut.sickle.rRNA.fastq",
+        nonrrna="{input_dir}/sorted_rna/{prefix}.cut.sickle.non_rRNA.fastq"
+    log: "{input_dir}/sorted_rna/{prefix}.cut.sickle.sort.rRNA.log",
+    params:
+        rrna="{input_dir}/sorted_rna/{prefix}.cut.sickle.rRNA",
+        nonrrna="{input_dir}/sorted_rna/{prefix}.cut.sickle.non_rRNA"
+    shell:
+        '/slipstream/home/faylward/bin/sortmerna --reads {input} -a 16 --fastx --aligned {params.rrna} --other {params.nonrrna} --ref /slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/rfam-5.8s-database-id98.fasta,/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/rfam-5.8s-database-id98.db:/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/rfam-5s-database-id98.fasta,/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/rfam-5s-database-id98.db:/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/silva-arc-23s-id98.fasta,/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/silva-arc-23s-id98.db:/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/silva-bac-16s-id90.fasta,/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/silva-bac-16s-id90.db:/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/silva-bac-23s-id98.fasta,/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/silva-bac-23s-id98.db:/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/silva-euk-18s-id95.fasta,/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/silva-euk-18s-id95.db:/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/silva-euk-28s-id98.fasta,/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/silva-euk-28s-id98.db:/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/silva-arc-16s-id95.fasta,/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/silva-arc-16s-id95.db > {log} 2>&1'
+
+#################################
+# Convert non-rRNA fastq to fasta 
+#################################
+rule prinseq:
+    input: "{prefix}.cut.sickle.non_rRNA.fastq"
+    output: "{prefix}.cut.sickle.non_rRNA.fasta"
+    params: 
+        fasta="{prefix}.cut.sickle.non_rRNA"
+    shell: "prinseq -out_format 1 -fastq {input} -out_good {params.fasta} > {output}.log 2>&1"
+
+###################################
+# Mask repeats in fasta with tantan
+###################################
+rule mask_with_tantan:
+    input: "{prefix}.non_rRNA.fasta"
+    output: "{prefix}.non_rRNA.masked.fasta"
+    shell: "tantan {input} > {output} 2>&1"
+
+# End
+
+
+
+
+
+
+

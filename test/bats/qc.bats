@@ -1,9 +1,10 @@
 setup() {
+    mkdir -p test/conda/envs
     ENV=illumina.qc
     ENV_DIR=`pwd`/test/conda/envs/$ENV
     ENV_FILE=test/conda/${ENV}.yml
     if [ "$ENV_FILE" -nt "$ENV_DIR" ]; then
-        conda env create -f $ENV_FILE -p $ENV_DIR --force --quiet
+        conda env create -f $ENV_FILE -p $ENV_DIR --force --quiet > test/conda/envs/.create.$ENV 2>&1
     fi
     source activate $ENV_DIR
 
@@ -27,6 +28,12 @@ setup() {
 @test "Prep two pair of scriptseq files with pandaseq" {
     which pandaseq || skip "Pandaseq is not installed"
     run bash -c "snakemake -j 10 -s ../../../clean.illumina.snake -p --configfile ../../data/configs/illumina.yaml --verbose --config joining_program=pandaseq > pandaseq.join.log 2>&1"
+    [ "$status" -eq 0 ]
+}
+
+@test "Split reads into rRNA or not" {
+    ln -s ../../data/raw_reads/2014_ALOHA_XVII_1-1B_S1_R2_001.head40k.fastq aloha1b.R2.fastq
+    run bash -c "snakemake -j 10 -s ../../../test.snake -p --config workflow=qc/sort.rna.snake file_root=aloha1b.R2 -k sort_rna_default_all > sort.rna.log 2>&1"
     [ "$status" -eq 0 ]
 }
 

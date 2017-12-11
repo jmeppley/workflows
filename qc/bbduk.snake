@@ -1,5 +1,5 @@
 from python import bbmap
-from snakemake.utils import update_config
+from python.common import apply_defaults
 defaults={'bbduk':{'ram':'1g',
                    'adapter_flags':
                         'ktrim=r k=23 mink=11 hdist=1 tbo tpe tbo tpe',
@@ -9,7 +9,7 @@ defaults={'bbduk':{'ram':'1g',
                    'threads': 20,
                    },
          }
-update_config(config, defaults)
+apply_defaults(config, defaults)
 
 # look in config[system_paths][bbmap] and relative to bbduk.sh script
 #  for adapter file folder (aka resources)

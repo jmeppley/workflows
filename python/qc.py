@@ -10,6 +10,7 @@ records jonied by a bunch of NNN's
 
 """
 
+import os
 import re
 from collections import defaultdict
 import yaml
@@ -17,6 +18,7 @@ from Bio import Seq, SeqIO, SeqRecord
 from snakemake.logging import logger
 from python.samples import process_sample_data
 from python.tmatic import get_chemistry_barcodes
+from python.common import get_file_name
 
 # interleaved will be automatically dropped if single file given per sample
 QC_PROTOCOLS = {
@@ -29,22 +31,31 @@ QC_PROTOCOLS = {
                           'trimmed',
                           'dropse',
                          ]),
+     "assembly_no_ec": '.'.join(['renamed',
+                                 'interleaved',
+                                 'noadapt',
+                                 'nophix',
+                                 'trimmed',
+                                 'dropse',
+                         ]),
     "joining": '.'.join(['trim_adapt', 'joined', 'nophix']),
 }
+
+# list of protocols with no error correction
+non_ec_protocols = ['joining', 'assembly_no_ec']
 
 READ_DIRECTIONS = ['R1', 'R2']
 
 def get_sample_from_reads_prefix(prefix, config):
     """
+    check for two specific cases, then fall back to the prefix:
     If there is path info, assume sample is top folder name
       EG  reads/sample/reads.R1.fastq
-    If there is no path info, look for _ in prefix
+    If there is no path info, look for reads_ in prefix
       EG  reads_sample.R1.fastq
-    If config[sample_name] is defined, use that
-    If config[assembly_name] is defined, use that
     Fall back to the prefix
     """
-    match = re.search(r'([^/])+/[^/]+$', prefix)
+    match = re.search(r'([^/])+/reads$', prefix)
     if match:
         return match.group(1)
 
@@ -52,13 +63,14 @@ def get_sample_from_reads_prefix(prefix, config):
     if match:
         return match.group(1)
 
-    if 'sample_name' in config:
-        return config['sample_name']
-
-    if 'assembly_name' in config:
-        return config['assembly_name']
-
     return prefix
+
+
+def is_in_working_dir(path):
+    """
+    Check if given path is in the working directory
+    """
+    return not os.path.relpath(path).startswith("..")
 
 
 def setup_qc_outputs(config):
@@ -99,8 +111,9 @@ def setup_qc_outputs(config):
 
     # Loop over samples that came with their own clean reads and:
     #  1) set up pairs to be interleaved
-    #  2) replace with locally named file and add transition
+    #  2) replace with locally named file and add transition if not in workdir 
     samples_with_clean_reads = [s for s in samples if 'clean' in sample_data[s]]
+    drop_clean_reads_for_these_samples = []
     for sample in samples_with_clean_reads:
         remote_cleaned_reads = sample_data[sample]['clean']
         if not isinstance(remote_cleaned_reads, str) and \
@@ -108,24 +121,33 @@ def setup_qc_outputs(config):
             # list or tuple or multiple files: send through QC to be
             # interleaved
             # transitions will be set up as part of QC below
+            # add raw and remove clean so QC will get setup below
             sample_data[sample].setdefault('raw', remote_cleaned_reads)
+            drop_clean_reads_for_these_samples.append(sample)
+            # set protocol to None, so the pair just gets interleaved
             sample_data[sample].setdefault('protocol', 'None')
         elif len(remote_cleaned_reads)==0:
             raise Exception("No clean reads for sample {}:\n{}".format(sample,
                                                 repr(sample_data[sample])))
-        elif not isinstance(remote_cleaned_reads, str) and \
-                len(remote_cleaned_reads)==1:
-            remote_cleaned_reads = remote_cleaned_reads[0]
         else:
-            local_cleaned_reads = '{sample}.clean.fastq'.format(**vars())
-            if re.search(r'\.gz$', remote_cleaned_reads) is not None:
-                local_cleaned_reads += ".gz"
-            if local_cleaned_reads != remote_cleaned_reads:
-                transitions[local_cleaned_reads] = remote_cleaned_reads
-                sample_data[sample]['clean'] = local_cleaned_reads
+            if not isinstance(remote_cleaned_reads, str):
+                remote_cleaned_reads = remote_cleaned_reads[0]
+            if not is_in_working_dir(remote_cleaned_reads):
+                logger.debug("{} is not in working dir".format(remote_cleaned_reads))
+                local_cleaned_reads = '{sample}.clean.fastq'.format(**vars())
+                if re.search(r'\.gz$', remote_cleaned_reads) is not None:
+                    local_cleaned_reads += ".gz"
+                if local_cleaned_reads != remote_cleaned_reads:
+                    transitions[local_cleaned_reads] = remote_cleaned_reads
+                    sample_data[sample]['clean'] = local_cleaned_reads
+
+    for sample in drop_clean_reads_for_these_samples:
+        del sample_data[sample]['clean']
 
     # find samples that need QC
-    samples_with_raw_reads = [s for s in samples if 'raw' in sample_data[s]]
+    samples_with_raw_reads = [s for s in samples \
+                                              if 'raw' in sample_data[s] \
+                                              and 'clean' not in sample_data[s]]
 
     # loop back over samples and set up cleaning or interleaving if needed
     outputs = []
@@ -200,7 +222,7 @@ def setup_qc_outputs(config):
         if config.get('remove_rna', True) in ['True', True]:
             # if rrna separation requested, add rRNA-only and non-rRNA to names
             logger.debug("adding separated rrna reads to output")
-            for rrna_split in ['non-rRNA', 'rRNA-only']:
+            for rrna_split in ['non-rRNA', 'SSU', 'LSU']:
                 outputs.append(re.sub(r'\.fastq$',
                                       '.{}.fastq'.format(rrna_split),
                                       cleaned_reads))
@@ -391,9 +413,9 @@ def dummy_join_fastq(inputs,
     }
     faked_joins = []
 
-    fwd_records = SeqIO.parse(inputs.fwd, 'fastq')
-    rev_records = SeqIO.parse(inputs.rev, 'fastq')
-    with open(outputs[0], 'w') as out_fastq_stream:
+    fwd_records = SeqIO.parse(get_file_name(inputs.fwd), 'fastq')
+    rev_records = SeqIO.parse(get_file_name(inputs.rev), 'fastq')
+    with open(get_file_name(outputs), 'w') as out_fastq_stream:
         for frec, rrec in merge_record_iters(fwd_records, rev_records,
                                              **kwargs):
             # join seqs

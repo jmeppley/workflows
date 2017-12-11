@@ -6,7 +6,7 @@ sample_data:
     clean: reads/ALOHA_XVII_1_15_DNA/reads.renamed.R12.fastq
   ALOHA_XVII_1_21_DNA: 
     clean: reads/ALOHA_XVII_1_21_DNA/reads.renamed.R12.fastq
-contigs_fasta: ../../data/contigs/contigs.aloha.fa
+contigs_fasta: contigs.raw.fasta
 min_contig_length: 500
 run_cogs: False
 skip_contig_clustering: True
@@ -29,5 +29,4 @@ bfc:
     threads: 8
 anvio-profile:
     threads: 1
-anvio_env: anvio
 

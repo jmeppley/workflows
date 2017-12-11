@@ -3,6 +3,7 @@ include: 'tmatic.snake'
 
 from python.qc import dummy_join_fastq
 from python.pandaseq import scan_pandaseq_log
+from python.common import get_file_name
 
 rule pandaseq:
     """ Joins paired illumina reads """
@@ -84,7 +85,8 @@ rule dummy_join:
     run:
         #dummy_join_fastq(input, output, log)
         with open(log[0], 'w') as LOG:
-            unpaired, counts = scan_pandaseq_log(input.pandaseq_log, LOG)
+            unpaired, counts = \
+                scan_pandaseq_log(get_file_name(input.pandaseq_log), LOG)
         dummy_join_fastq(input, output, log, 
                          record_id_filter = unpaired)
 

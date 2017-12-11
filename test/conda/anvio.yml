@@ -1,0 +1,25 @@
+channels:
+ - bioconda
+ - conda-forge
+ - brwnj
+dependencies:
+ - python=3.5
+ - snakemake<4
+ - gsl
+ - anvio
+ - pandas
+ - biopython
+ - bbmap
+ - bfc
+ - trimmomatic
+ - bwa 
+ - samtools
+ - infernal
+ - prodigal
+ - prinseq
+ - seqtk
+ - sed
+ - spades
+ - megahit
+ - last
+ - hmmer

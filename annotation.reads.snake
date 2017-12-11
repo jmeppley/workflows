@@ -8,13 +8,14 @@ To run:
 
 snakemake -s /path/to/workflows/annotate.reads.snake --configfile annotate.reads.yaml [OPTIONS]
 
-The following conda packages are necessary:
-conda create -n snakemake -c bioconda python=3 snakemake samtools last hmmer
-emboss prodigal
+See test/conda/annotate.yml for a list of rquired packages. You can create a conda environment with the command:
+conda env create -n annotate -f test/conda/annotate.yml
 
-You will need to run the makefiles in tools/pymg/databases or provide your own sequence dbs.
+You will need to run the makefiles in tools/pymg/databases two download and format the 
+reference databases if your lab doesn't already have them.
 
-With a config file that looks like this:
+With a config file that looks like test/data/configs/reads.annot.prod/yml or reads.annot.six.yml.
+Or like this:
 reads_file: /path/to/file.bam
 annot_prefix: reads
 clade_rank: order
@@ -23,22 +24,20 @@ threads:
     hmmer:    2
     lastal:   10
     prodigal: 50
+aa_conversion: prodigal
 dbs:
     RefSeq:
-        path: "/projectb/scratch/jmeppley/seqdbs/RefSeq/78/RefSeq-78.           AllProteins.faa.ldb/lastdb"
-        type: lastdb
-        istaxdb: True
+        path: "/seqdbs/RefSeq/78/RefSeq-78.AllProteins.faa.ldb/lastdb"
+        format: lastp
+        type: tax
     KEGG:
-        path: "/projectb/scratch/jmeppley/seqdbs/KEGG/KeggGene.pep.20160919/    lastdb"
-        type: lastdb
+        path: "/seqdbs/KEGG/KeggGene.pep.20160919/lastdb"
+        format: lastp
     PFAM:
-        path: "/projectb/scratch/jmeppley/seqdbs/PFAM/30.0/frag-20/Pfam-A.{N:   02d}.hmm"
+        path: "/projectb/scratch/jmeppley/seqdbs/PFAM/30.0/frag-20/Pfam-A.{N:02d}.hmm"
         frags: 20
     COG:
-        path: "/projectb/scratch/jmeppley/seqdbs/cdd/16_January_2015/COG/frag-  10/COG.hmm.{N:02d}.ascii"
-        frags: 10
-    TIGR:
-        path: "/projectb/scratch/jmeppley/seqdbs/TIGRFAM/15.0/frag-10/TIGRFAMS. {N:02d}.hmm"
+        path: "/projectb/scratch/jmeppley/seqdbs/cdd/16_January_2015/COG/frag-10/COG.hmm.{N:02d}.ascii"
         frags: 10
 
 The reads can be embedded in a bam file or given as fasta or fastq.
@@ -78,11 +77,7 @@ else:
 #
 # add my tools to the path (Somewhat of a hack, maybe I'll get my stuff in
 # conda eventually)
-snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))
-pymg_dir = os.path.sep.join([snakefile_path, 'tools', 'pymg'])
-batch_dir = os.path.sep.join([snakefile_path, 'tools', 'batch'])
-os.environ['PATH'] += os.pathsep + os.pathsep.join([pymg_dir, batch_dir])
-logger.debug(os.environ['PATH'])
+include: "common/tool.path.snake"
 #
 # End configuration
 ##########

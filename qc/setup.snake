@@ -7,23 +7,26 @@ if config.get('remove_rna', True) in ['True', True]:
     include: "sort.rna.snake"
 
 # if we were given raw reads
-#if sum(1 for s in config['sample_data'] \
-#         if 'raw' in config['sample_data'][s]
-#      )>0:
-# includes based on cleaning protocol
-protocol = config.get('cleaning_protocol', 'joining')
-if protocol == 'joining':
-    # all three joining programs are interchangeable
-    joining_program = config.get('joining_program','pear')
-    include: '{joining_program}.snake'.format(**vars())
-elif protocol == 'assembly':
-    include: 'rename.snake'
-    include: 'bbduk.snake'
-    include: 'bfc.snake'
-    include: 'tmatic.snake'
-elif protocol == 'rename':
-    include: 'rename.snake'
-else:
-    raise Exception('QC protocol "{}" is not supported.'.format(protocol))
-
+if sum(1 for s in config['sample_data'] \
+         if 'raw' in config['sample_data'][s]
+      )>0:
+    # includes based on cleaning protocol
+    protocol = config.get('cleaning_protocol', 'joining')
+    if protocol == 'joining':
+        # all three joining programs are interchangeable
+        joining_program = config.get('joining_program','pear')
+        include: '{joining_program}.snake'.format(**vars())
+    elif protocol == 'assembly':
+        include: 'rename.snake'
+        include: 'bbduk.snake'
+        include: 'bfc.snake'
+        include: 'tmatic.snake'
+    elif protocol == 'assembly_no_ec':
+        include: 'rename.snake'
+        include: 'bbduk.snake'
+        include: 'tmatic.snake'
+    elif protocol == 'rename':
+        include: 'rename.snake'
+    elif protocol not in ['None', None]:
+        raise Exception('QC protocol "{}" is not supported.'.format(protocol))
 
