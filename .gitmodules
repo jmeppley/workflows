@@ -1,6 +1,0 @@
-[submodule "tools/pymg"]
-	path = tools/pymg
-	url = https://github.com/jmeppley/py-metagenomics
-[submodule "tools/batch"]
-	path = tools/batch
-	url = https://github.com/jmeppley/batch_launcher
