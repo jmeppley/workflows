@@ -24,9 +24,6 @@ see test/data/configs/spades.yaml for an example configuration
 import os, re, sys, glob, yaml, pandas, subprocess, tempfile
 from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
 
-# add pymg to path
-include: "common/tool.path.snake"
-
 from python.common import get_version, parse_stats
 from python.qc import setup_qc_outputs
 from python.assembly import get_contig_length_summary_stats

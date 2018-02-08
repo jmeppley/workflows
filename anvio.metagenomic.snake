@@ -69,9 +69,6 @@ import yaml
 transitions = config.setdefault('transitions',{})
 outputs = config.setdefault('outputs',set())
 
-# add pymg to path
-include: "common/tool.path.snake"
-
 ## Bring in components
 # generate stats from fastx files
 include: "common/stats.snake"

@@ -77,10 +77,6 @@ if 'coverage_file' in config or os.path.exists(local_coverage_file):
 else:
     include: 'annotation/dummy.coverage.snake'
 
-# add my tools to the path (Somewhat of a hack, maybe I'll get my stuff in
-# conda eventually)
-include: "common/tool.path.snake"
-
 include: "common/stats.snake"
 include: "common/transitions.snake"
 include: "annotation/common.genes.snake"

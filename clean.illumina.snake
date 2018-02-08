@@ -16,9 +16,6 @@ from python.common import get_version
 from python.qc import setup_qc_outputs
 from snakemake.logging import logger
 
-# adds tools (pymg, batch) to path
-include: "common/tool.path.snake"
-
 # parses config to setup outputs
 outputs = config.setdefault('outputs',set())
 outputs.update(setup_qc_outputs(config))
