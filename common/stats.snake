@@ -36,7 +36,6 @@ if enable_hist:
              if re.search(r'\.gz$',wildcards.ext) else "cat"
         shell:
             """
-            which histograms.py
             {params.cat} {input} | \
             seqtk comp | \
             cut -f 2 | \

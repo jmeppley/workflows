@@ -27,6 +27,7 @@ from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
 from python.common import get_version, parse_stats
 from python.qc import setup_qc_outputs
 from python.assembly import get_contig_length_summary_stats
+snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))
 
 # Initialize transitions
 config.setdefault('transitions', {})
@@ -59,7 +60,7 @@ elif assembler == 'megahit':
                     "megahit-{params}/megahit.contigs.fa" \
                                 .format(params=config['megahit']['preset'])
 else:
-    raise Excption("Unknown assembler: " + config['assembler'])
+    raise Exception("Unknown assembler: " + config['assembler'])
 #
 # contig annotation (RNA, genes, coverage, stats)
 include: "assembly/contig.annotation.snake"
