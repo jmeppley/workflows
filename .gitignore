@@ -1,5 +1,6 @@
 *.sw[op]
 *.pyc
+.pytest_cache
 test/scratch
 test/conda/envs
 test/data/seqdbs/RefSeq/lastdb*
