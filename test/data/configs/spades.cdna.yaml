@@ -18,6 +18,9 @@ cmsearch:
     threads: 10
 spades:
     ram: 10
+map_clean_reads: False
+salmon:
+    quant_options: '--gcBias --seqBias'
 dbs:
     SilvaSSU:
         path: ../../data/seqdbs/Silva/SSU/bwadb

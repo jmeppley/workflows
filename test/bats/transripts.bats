@@ -32,9 +32,9 @@ setup() {
     mkdir -p test/scratch/transcripts
     cd test/scratch/transcripts
 
-    run bash -c "snakemake -j 10 -s ../../../assembly.transcriptomic.snake -p --configfile ../../data/configs/spades.cdna.yaml --config long_ssu_length=150 long_lsu_length=150 transcript_mapper=bwa --verbose > assembly.log 2>&1"
+    run bash -c "snakemake -j 10 -s ../../../assembly.transcriptomic.snake -p --configfile ../../data/configs/spades.cdna.yaml --config long_ssu_length=150 long_lsu_length=150 map_clean_reads=True transcript_mapper=bwa --verbose > assembly.log 2>&1"
     [ "$status" -eq 0 ]
-    run bash -c "snakemake -j 10 -s ../../../assembly.transcriptomic.snake -p --configfile ../../data/configs/spades.cdna.yaml --config long_ssu_length=150 long_lsu_length=150 transcript_mapper=bwa -n 2>&1 | grep -v '^Multiple include'"
+    run bash -c "snakemake -j 10 -s ../../../assembly.transcriptomic.snake -p --configfile ../../data/configs/spades.cdna.yaml --config long_ssu_length=150 long_lsu_length=150 map_clean_reads=True transcript_mapper=bwa -n 2>&1 | grep -v '^Multiple include'"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" == "Nothing to be done." ]
 }
