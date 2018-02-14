@@ -13,6 +13,8 @@ the assembly
 include: "../common/mapping_bwa.snake"
 
 from python.common import get_file_name
+from python.assembly import get_contig_stats, \
+                            generate_histogram
 
 """
 # Some extra hoops to jump through because the contigs stats aren't a proper 
@@ -22,6 +24,7 @@ config['pymg_dir'] = os.path.join(snakefile_path, 'tools', 'pymg')
 sys.path.append(config['pymg_dir'])
 from edl import __version__ as PYMG_VERSION
 """
+include: "contig.genes.snake"
 include: "rrna.annotation.snake"
 include: "../annotation/lastal.snake"
 
@@ -31,58 +34,103 @@ for sample in config['sample_data']:
             'raw' in config['sample_data'][sample]:
         config['outputs'].add("contigs.annotations.coverage.{sample}.tsv"\
                                         .format(sample=sample))
-rule prodigal:
-    """ get gene predictions form prodigal """
-    input:
-        "contigs.fasta"
-    output:
-        "contigs.prodigal.genes.gff"
-    benchmark:
-        "benchmarks/contigs.prodigal.genes.time"
-    version:
-        get_version('prodigal','-v')
-    shell:
-        "prodigal -i {input} -f gff -o {output} -p meta -q"
 
-rule prodigal_complete:
-    """ filter for just the complete genes """
-    input: "contigs.prodigal.genes.gff"
-    output: "contigs.prodigal.complete.genes.gff"
-    benchmark: "benchmarks/contigs.prodigal.complete.genes.gff"
-    shell: "grep 'partial=00' {input} > {output} || true"
-
-rule merge_annotations:
-    """ 
-    merge all GFFs and drop genes that overlap rRNA
+rule contig_stats_table:
+    """
+    Make a table of contig sequence stats (length, gc)
     """
     input:
-        contigs="contigs.fasta",
-        rrnas="contigs.vs.rRNA.cmsearch.gff",
-        trnas="contigs.vs.tRNA.cmsearch.gff",
-        genes="contigs.prodigal.complete.genes.gff"
+        "contigs.all.fasta",
     output:
-        "contigs.annotations.gff",
-        "contigs.annotations.fna",
-        "contigs.annotations.faa"
-    params:
-        output_root="contigs.annotations"
+        temp("contigs.all.sequence.stats.txt"),
     benchmark:
-        "benchmarks/contigs.annotations.merge.time"
-    version:
-        get_version('merge_gffs.py')
-    shell:
-        "merge_gffs.py -r {input.rrnas} -r {input.trnas} -c {input.genes} {input.contigs} {params.output_root}"
+        "benchmarks/contig.sequence.stats.time"
+    run:
+        get_contig_stats(get_file_name(input), get_file_name(output))
 
-#rule rrna_gff:
-#    """ find LSU or SSU annotations """
-#    input:
-#        "{prefix}.gff"
-#    output:
-#        temp("{prefix}.{mol,[LS]SU}.gff")
-#    benchmark:
-#        "benchmarks/{prefix}.{mol}.time"
-#    shell:
-#        "grep {wildcards.mol} {input} > {output} || true"
+rule contig_master_stats_table:
+    """
+    Merge sequence and coverage stats into one table
+    """
+    input:
+        seq="contigs.all.sequence.stats.txt",
+        cov=expand('contigs.all.coverages.{sample}.txt', \
+                   sample=[s for s in config['sample_data'] \
+                             if 'clean' in config['sample_data'][s]])
+    output:
+        'contigs.all.stats.txt'
+    benchmark: 'benchmarks/contigs.stats.time'
+    run:
+        # load sequence stats
+        contig_stats = pandas.read_table(get_file_name(input.seq), index_col=0)
+
+        if isinstance(input.cov, str):
+            input.cov = [input.cov, ]
+        # merge in coverages from each sample
+        for cov_file in input.cov:
+            sample = re.search(r'coverages.(.+).txt$', cov_file).group(1)
+            cov_stats = pandas.read_table(cov_file, index_col=0)
+            cov_stats.columns = ["_".join([sample, c]) for c in cov_stats.columns]
+            contig_stats = contig_stats.join(cov_stats, how='left')
+            # add up read count and mean cov from all samples
+            if 'ReadCount' not in contig_stats:
+                contig_stats['ReadCount'] = contig_stats[sample + "_ReadCount"]
+                contig_stats['MeanCov'] = contig_stats[sample + "_MeanCov"]
+            else:
+                contig_stats['ReadCount'] = contig_stats['ReadCount'] + \
+                                            contig_stats[sample + "_ReadCount"]
+                contig_stats['MeanCov'] = contig_stats['MeanCov'] + \
+                                            contig_stats[sample + "_MeanCov"]
+
+        # write table to file
+        contig_stats.to_csv(get_file_name(output), sep='\t')
+
+rule contigs_filter:
+    """
+    Get list of contigs that have at least config[mapped_read_cutoff]  reads mapped
+    """
+    input: "contigs.all.stats.txt"
+    output: 
+        list="contigs.filter.list",
+        table="contigs.final.stats.txt"
+    benchmark: 'benchmarks/contig.filter.list.time'
+    params:
+        cutoff=str(config.get('mapped_read_cutoff', '5'))
+    run:
+        contig_table = pandas.read_table(get_file_name(input), index_col=0)
+        good_contig_table = contig_table.query('ReadCount>=' + params.cutoff)
+        good_contig_table.to_csv(get_file_name(output.table), sep='\t')
+        with open(get_file_name(output.list), 'wt') as OUT:
+            OUT.write('\n'.join(iter(good_contig_table.index)))
+            OUT.write('\n')
+
+rule contig_histogram:
+    input:
+        "contigs.final.stats.txt"
+    output:
+        "histograms/contigs_gt_{length_cutoff}/{metric}.hist"
+    params:
+        width=75,
+        log=True
+    run:
+        generate_histogram(get_file_name(input),
+                           get_file_name(output),
+                           metric=wildcards.metric,
+                           length_cutoff=int(wildcards.length_cutoff),
+                           txt_width=params.width,
+                           log=params.log)
+
+rule contigs_filtered:
+    """
+    Get fasta of contigs with config[mapped_read_cutoff] mapped reads
+    """
+    input: 
+        fasta="contigs.all.fasta",
+        list="contigs.filter.list"
+    output: "contigs.fasta"
+    benchmark: "benchmarks/contigs.fitered.fasta.time"
+    shell:
+        "screen_list.py -k {input.fasta} -l {input.list} -o {output}"
 
 rule annotation_coverage:
     """
@@ -91,14 +139,14 @@ rule annotation_coverage:
     """
     input:
         gff="contigs.annotations.gff",
-        stats="contigs.coverages.{sample}.txt"
+        stats="contigs.final.stats.txt"
     output:
         table="contigs.annotations.coverage.{sample}.tsv"
     run:
         # Read stats table, but just keep median coverage
         cov_dict = pandas.read_table(get_file_name(input.stats),
                                      index_col=0,
-                                     usecols=['contig', config['cov_col']])\
+                                     usecols=['Contig', config['cov_col']])\
                                                              [config['cov_col']]
         with open(get_file_name(output.table),'w') as OUT:
             with open(get_file_name(input.gff)) as GFF:

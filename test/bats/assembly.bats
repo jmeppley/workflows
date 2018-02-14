@@ -52,4 +52,3 @@ setup() {
     [ "$status" -eq 0 ]
     [ "${lines[0]}" == "Nothing to be done." ]
 }
-

@@ -65,6 +65,8 @@ rule assign_taxa:
 rule assign_paths:
     """
     Turn a hit table (from hmmer or lastal) into a one-to-many map from reads to gene families.
+
+    The first hit with the best evalue is used. About 0.05% to 0.1% of reads had ambiguous hits in test data.
     """
     input:
         "{prefix}.vs.{db}.{ext}"
@@ -86,7 +88,7 @@ rule assign_paths:
     shell:
          "cat {input} \
           | {params.filter} \
-          | assign_paths.py -C first -f {params.format} {params.params} \
+          | assign_paths.py --sort evalue -C first -f {params.format} {params.params} \
             -o {output}"
 
 rule count_tax_hits:

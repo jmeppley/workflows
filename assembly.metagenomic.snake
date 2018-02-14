@@ -23,11 +23,13 @@ see test/data/configs/spades.yaml for an example configuration
 """
 import os, re, sys, glob, yaml, pandas, subprocess, tempfile
 from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
-from python.common import get_version, parse_stats
-from python.qc import setup_qc_outputs
 
 # add pymg to path
 include: "common/tool.path.snake"
+
+from python.common import get_version, parse_stats
+from python.qc import setup_qc_outputs
+from python.assembly import get_contig_length_summary_stats
 
 # Initialize transitions
 config.setdefault('transitions', {})
@@ -95,20 +97,24 @@ rule all:
 
 rule contigs_fasta:
     """
-    Rename contigs to sample or assembly name
+    Renames the contigs from whatever the assembler outputs 
+    to names based on config[assembly_name]
+
+    The outputs is contigs.fasta, the root of all the annotation rules.
     """
     input:
         "contigs.raw.fasta"
     output:
-        "contigs.fasta"
+        "contigs.all.fasta"
     log:
         "logs/contigs.fasta.link.log"
     benchmark:
-        "benchmarks/contigs.fasta.txt"
+        "benchmarks/contigs.rename.time"
     version:
         "biopython-{}".format(BIOPYTHON_VERSION)
     run:
         root_name = config['assembly_name']
+        logger.debug("root name: {}".format(root_name))
         with open(input[0]) as INPUT:
             with open(output[0], 'w') as OUTPUT:
                 for i, (title, sequence) \
@@ -117,10 +123,14 @@ rule contigs_fasta:
                         OUTPUT.write(">%s %s\n%s\n" % (contig_name,
                                                        title,
                                                        sequence))
+                logger.debug("renamed {} contigs".format(i))
 
 def get_read_files(reads_types, config):
     """
     code to get all the reads files for all samples
+
+    This is needed so the final report can indicate how many reads went into
+    the assembly.
     """
     # support either list of types or single type string (usu clean or raw)
     if isinstance(reads_types, str):
@@ -137,6 +147,8 @@ def get_read_files(reads_types, config):
                 for reads_file in reads_files:
                     yield reads_file
 
+contig_cutoffs=[0, 500, 2000]
+report_metrics=['Length', 'GC', 'ReadCount', 'MeanCov']
 rule final_report:
     input:
         read_stats=['stats/{}.stats'.format(reads_file) \
@@ -145,16 +157,17 @@ rule final_report:
         ssu_rrnas="contigs.vs.rRNA.cmsearch.SSU.gt1200.tsv",
         lsu_rrnas="contigs.vs.rRNA.cmsearch.LSU.gt2000.tsv",
         gene_stats="stats/contigs.annotations.faa.stats",
-        contig_stats="stats/contigs.fasta.stats",
-        histograms=expand("contigs.histograms.{sample}.txt",
-                     sample=[s for s in config['sample_data'] \
-                               if 'clean' in config['sample_data'][s]])
+        contig_stats="contigs.final.stats.txt",
+        histograms=expand("histograms/contigs_gt_{cutoff}/{metric}.hist", \
+                          cutoff=contig_cutoffs, \
+                          metric=report_metrics)
     output:
         "contigs.report"
     run:
         read_stats={}
 
         # paired reads
+        total_clean_reads = 0
         for sample, sample_data in config['sample_data'].items():
             for reads_type in ['raw', 'clean']:
                 if reads_type not in sample_data:
@@ -173,23 +186,20 @@ rule final_report:
             
                     read_stats['{} reads'.format(key_pref)]=stats['reads']
                     read_stats['{} bases'.format(key_pref)]=stats['bases']
+                    
+                    if reads_type=='clean':
+                        total_clean_reads += stats['reads']
 
-        # contigs
-        contig_stats={}
-        stats = parse_stats(input.contig_stats)
-        contig_stats['contigs']=stats['reads']
-        contig_stats['contig bases']=stats['bases']
+        # contigs (count, bases, N50)
+        stats_table = pandas.read_table(get_file_name(input.contig_stats),
+                        index_col=0)
+        contig_stats = get_contig_length_summary_stats(stats_table,
+                                                       N_levels=[50, 75, 90])
 
-        # N##
-        stats=pandas.read_table(input.histograms[0],
-                                sep=':',
-                                index_col='key', 
-                                names=('key','value'),
-                                nrows=8)
-        stats=stats.set_index(stats.index.str.strip())['value']
-        contig_stats['N50']=int(stats['N50'])
-        contig_stats['N75']=int(stats['N75'])
-        contig_stats['N90']=int(stats['N90'])
+        contig_stats['GC'] = float(stats_table.GC.mean())
+        contig_stats['mapped reads'] = int(stats_table.ReadCount.sum())
+        contig_stats['mapped fraction'] = float(stats_table.ReadCount.sum() / \
+                                                (2*total_clean_reads))
 
         # annotations
         stats = parse_stats(input.gene_stats)
@@ -212,4 +222,10 @@ rule final_report:
         report={"reads":read_stats,"assembly":contig_stats}
         with open(output[0],'w') as OUTF:
             OUTF.write(yaml.dump(report, default_flow_style=False))
+
+            OUTF.write("\n\n################\nHISTOGRAMS\n################\n")
+            for hist_file in sorted(input.histograms):
+                OUTF.write('\n')
+                with open(hist_file) as INF:
+                    OUTF.write(''.join(INF.readlines()))
 

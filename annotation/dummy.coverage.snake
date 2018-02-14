@@ -1,0 +1,27 @@
+"""
+Creates a dummy coverage files for a gene catalog that sets the
+multiplier to 1 for each gene
+
+The parent makfile must define a naming prefix in the variable 'prefix'. 
+
+Files used:
+ {prefix}.faa
+
+Files created:
+ {prefix}.coverage.dummy.tsv
+ {prefix}.coverage.tsv
+"""
+from Bio import SeqIO
+
+dummy_coverage_file = prefix + ".coverage.dummy.tsv"
+local_coverage_file = '{}.coverage.tsv'.format(prefix)
+transitions[local_coverage_file] = dummy_coverage_file
+
+rule dummy_gene_coverage:
+    """ generate a coverage table of all 1s """
+    input: "{prefix}.faa"
+    output: "{prefix}.coverage.dummy.tsv"
+    run:
+        with open(output[0], 'w') as OUTF:
+            for record in SeqIO.parse(input[0], 'fasta'):
+                OUTF.write("{}\t1\n".format(record.id))

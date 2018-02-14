@@ -4,10 +4,12 @@ clade_ranks:
  - order
  - genus
 output_style: long
-threads:
-    hmmer:    2
-    lastal:   10
-    prodigal: 20
+hmmer:
+    threads: 2
+lastal:
+    threads: 10
+prodigal:
+    threads: 20
 aa_conversion: prodigal
 dbs:
     RefSeq: 

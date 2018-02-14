@@ -1,4 +1,8 @@
-reads_file: ../../data/raw_reads/sample.reads.bam
+assembly_list:
+ - ALOHA_04
+ - ALOHA_15
+ - ALOHA_21
+cross_tab: True
 clade_ranks: 
  - order
  - genus
@@ -9,6 +13,7 @@ lastal:
     threads: 10
 prodigal:
     threads: 20
+aa_conversion: prodigal
 dbs:
     RefSeq: 
         path: ../../data/seqdbs/RefSeq/lastdb

@@ -1,0 +1,197 @@
+"""
+Python Makefile to create an anntotated gene catalog
+
+Starting point is either:
+    1) faa file of gene sequences (already clustered)
+    2) multiple assembled metagenomes (configured in configfile) 
+
+Workflow:
+
+If starting from assemblies:
+ * collect all faa and fna annotations
+ * pull out just coding sequences from fna files
+ * cluster all nucl CDS at 95%
+ * pull out faa version of cluster reps
+
+ Annotations:
+ * query genes in configured databases: usu RefSeq, KEGG, COG, PFAM, and EGGnog
+ * tabulate tax v gene_families counts
+ * generate db specific annotations and merge into final table
+
+The initial annoation steps are the same as the annotation.genes.snake workflow.
+"""
+# add my tools to the path (Somewhat of a hack, maybe I'll get my stuff in
+# conda eventually)
+include: "common/tool.path.snake"
+
+import os
+import glob
+import re
+import yaml
+import pandas
+from Bio import SeqIO
+from python import gene_catalog
+from python.common import get_version, apply_defaults, get_file_name, TRUTH 
+from python.annotate import get_db_dot_fmt_strings
+
+#########
+# CONFIGURATION
+#
+# defaults for basic operation
+# ranks to collect taxa on (defaults to order)
+config.setdefault('clade_ranks', ['order'])
+
+# set some defaults
+defaults = {
+    'hmmer': {'threads': 2},
+    'lastal': {'threads': 10},
+}
+apply_defaults(config, defaults)
+
+# Define some trasitions to break the workflow up into segments
+transitions = config.setdefault('transitions',{})
+
+# do we do the full taxon/funtion cross tabulations?
+run_cross_tab = config.get('cross_tab', False) in TRUTH
+
+# if no gene catalog file given, try to build it from assemblies
+GENE_CATALOG_KEY='genes_file'
+prefix = 'all_genes.clustered'
+if GENE_CATALOG_KEY not in config:
+    # you'll need to configure an assembly_list
+    include: 'annotation/build.gene_catalog.snake'
+else:
+    # symlink the genes in as a starting point
+    prefix = config.get('naming_prefix', prefix)
+    transitions[prefix + '.faa'] = config[GENE_CATALOG_KEY]
+
+    # we can't calculate coverages, so look for config or create dummy
+    local_coverage_file = '{}.coverage.tsv'.format(prefix)
+    if run_cross_tab:
+        if 'coverage_file' in config:
+            coverage_file = config.get('coverage_file', local_coverage_file)
+            if coverage_file != local_coverage_file:
+                transitions[local_coverage_file] = coverage_file
+        else:
+            include: 'annotation/dummy.coverage.snake'
+
+# rules for gene annotation workflow
+include: "common/stats.snake"
+include: "annotation/common.genes.snake"
+
+# the annotaton will work from the clustered genes
+# the last part will merge all the annotation files
+gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs, config, 'faa')
+for dbdotfmt in gene_family_db_dot_fmts:
+    db = dbdotfmt.split(".",1)[0]
+    transitions['{}.annotations.{}'.format(prefix, db)] = \
+            '{}.annot.gene_family.{}.tsv'.format(prefix, dbdotfmt)
+
+# include transitions makefile only after all transitions defined
+include: "common/transitions.snake"
+
+# how to search against taxdb
+config['taxdbfmt'] = config['dbs'][config['taxdb']].get('format','lastx')
+
+# End configuration
+##########
+
+##########
+# set up list of files to create
+#  - The final tabulations
+#  - Stats and histrogram files for fasta files
+#  - The final annotation table
+output_files = config.get('outputs', set())
+# per-database annotation counts
+if run_cross_tab:
+    output_files.update(
+        expand("{prefix}.annot.{taxdb}.{taxdbfmt}.{clade_rank}.vs.{db_dot_fmt}.tsv",
+               prefix=prefix,
+               taxdbfmt=config['taxdbfmt'],
+               taxdb=config['taxdb'],
+               clade_rank=config['clade_ranks'],
+               db_dot_fmt=gene_family_db_dot_fmts,))
+# gene catalog stats
+output_files.update(
+    expand("stats/{prefix}.{suffix}.{ext}", 
+           ext=['stats','hist'],
+           suffix=['faa'],
+           prefix=prefix))
+# final annotations
+output_files.add(prefix + ".annotations.tab")
+
+# debugging
+logger.debug("Snakefile config:\n" + yaml.dump(config))
+
+# The first target defines the files to be created 
+#  (Counterintuitively, these are listed as the "input" of the rule
+rule gene_annotation_all:
+    input:
+        output_files
+#########
+
+##########
+# RULES:
+#  This lays out the dependencies and logic of the workflow
+
+rule refseq_annotations:
+    input:
+        hits='{}.vs.RefSeq.lastp'.format(prefix),
+        db=config['dbs'][config['taxdb']]['path'] + ".prj",
+        ids=config['dbs'][config['taxdb']]['path'] + ".ids"
+    output: '{}.annotations.RefSeq'.format(prefix)
+    benchmark: 'benchmarks/{}.annotations.RefSeq'.format(prefix)
+    params:
+        db=config['dbs'][config['taxdb']]['path']
+    run:
+        a = gene_catalog.RefSeqGeneAnnotator(get_file_name(params.db))
+        a.annotate_genes_rs_prot(get_file_name(input.hits), 
+                                 get_file_name(output))
+
+rule kegg_annotations:
+    input:
+        hits='{}.vs.KEGG.lastp'.format(prefix),
+        db=config['dbs']['KEGG']['path'] + '.prj',
+        ids=config['dbs']['KEGG']['path'] + ".ids"
+    output: '{}.annotations.KEGG'.format(prefix)
+    benchmark: 'benchmarks/{}.annotations.KEGG'.format(prefix)
+    params:
+        db=config['dbs']['KEGG']['path']
+    run:
+        a = gene_catalog.KeggGeneAnnotator(get_file_name(params.db))
+        a.annotate_genes_kg(get_file_name(input.hits), get_file_name(output))
+
+rule final_table:
+    input: expand('{prefix}.annotations.{db}', \
+                  prefix=prefix, \
+                  db=config['dbs'])
+    output: '{}.annotations.tab'.format(prefix)
+    benchmark: 'benchmarks/{}.annotations.tab'.format(prefix)
+    run:
+        # scan table file names so we can start with RefSeq
+        db_file_map = {}
+        ref_seq_table = None
+        for table_file in input:
+            db_name = re.search(r'annotations\.(.+)$', table_file)\
+                        .group(1).strip()
+            if re.search(r'^(RS|RefSeq)$', db_name, re.IGNORECASE):
+                ref_seq_table = table_file
+            else:
+                db_file_map[db_name] = table_file
+
+        # load RefSeq annotations
+        annot = pandas.read_table(ref_seq_table, header=0, index_col=0)
+        logger.debug("Annotation table shape is: {}".format(annot.shape))
+
+        # iteratively join other annotations
+        for db in sorted(db_file_map.keys()):
+            table = pandas.read_table(db_file_map[db],
+                                      index_col=0,
+                                      header=0,
+                                      names=['Gene', db])
+            annot = annot.join(table, how='outer')
+            logger.debug("Annotation table shape is: {}".format(annot.shape))
+
+        # save table to output file
+        annot.to_csv(get_file_name(output), sep='\t')
+

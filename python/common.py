@@ -16,6 +16,8 @@ import yaml
 import pandas
 from snakemake.logging import logger
 
+TRUTH = ['True', True, 'true', 'TRUE', 'T']
+
 def get_version(command, version_flag='--version',
                 cmd_prefix='',
                 lines=None,
@@ -119,7 +121,8 @@ def add_stats_outputs(snakefile, config):
             '-n',
         ]
 
-        if logger.logger.getEffectiveLevel() <= logging.DEBUG:
+        if logger.logger.getEffectiveLevel() >= logging.DEBUG:
+        #if logger.logger.getEffectiveLevel() <= logging.DEBUG:
             command += ['--verbose']
 
         logger.debug("Performing dry-run to get outputs")

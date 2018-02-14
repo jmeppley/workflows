@@ -7,7 +7,8 @@ BWA_VERSION = \
                     regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
 from snakemake.utils import update_config
 update_config(config, {'bwa': {'threads': 15}})
-config['cov_col'] = 'md cov'
+config['cov_col'] = 'MeanCov'
+from python.assembly import get_coverage_stats
 from python.samples import get_sample_reads_for_mapping
 
 #######
@@ -17,38 +18,38 @@ from python.samples import get_sample_reads_for_mapping
 rule index_contigs:
     """ prepare contigs for mapping with BWA """
     input:
-        "contigs.fasta"
+        "{contigs}.fasta"
     output:
-        "mapping/contigs.index.bwa.bwt"
+        "mapping/{contigs}.index.bwa.bwt"
     log:
         "logs/bwa_index.log"
     benchmark:
         "benchmarks/bwa_pre_index.time"
     version: BWA_VERSION
     shell:
-        "bwa index -p mapping/contigs.index.bwa {input} > {log} 2>&1 "
+        "bwa index -p mapping/{wildcards.contigs}.index.bwa {input} > {log} 2>&1 "
 
 rule map_sample_reads:
     """
     map cleaned reads onto contigs
     """
     input:
-        "mapping/contigs.index.bwa.bwt",
+        "mapping/{contigs}.index.bwa.bwt",
         # prefer the raw reads, but cleaned are OK
         lambda w: get_sample_reads_for_mapping(w, config)
     output:
-        temp("mapping/{sample}.reads.vs.contigs.sam")
+        temp("mapping/{sample}.reads.vs.{contigs}.sam")
     log:
-        "logs/{sample}.vs.contigs.bwa_mem.log"
+        "logs/{sample}.vs.{contigs}.bwa_mem.log"
     benchmark:
-        "benchmarks/{sample}.vs.contigs.bwa_mem.time"
+        "benchmarks/{sample}.vs.{contigs}.bwa_mem.time"
     version: BWA_VERSION
     threads: config['bwa']['threads']
     shell:
-        "bwa mem -p -t {threads} mapping/contigs.index.bwa {input[1]} \
+        "bwa mem -p -t {threads} \
+          mapping/{wildcards.contigs}.index.bwa {input[1]} \
             2> {log} \
             > {output}"
-
 
 rule sam_to_bam:
     input: "{root}.sam"
@@ -77,15 +78,15 @@ rule mapped_read_counts:
     and uses uniq -c to get a count.
     """
     input:
-        "mapping/{sample}.vs.contigs.bam.bai"
+        "mapping/{sample}.vs.{contigs}.bam.bai"
     output:
-        "mapping/{sample}.vs.contigs.read_counts"
+        "mapping/{sample}.vs.{contigs}.read_counts"
     benchmark:
         "benchmarks/bwa_count_reads.{sample}.time"
     version:
         get_version('samtools', lines=0)
     params:
-        input="mapping/{sample}.vs.contigs.bam"
+        input="mapping/{sample}.vs.{contigs}.bam"
     shell:
         "samtools view {params.input} \
          | cut -f 3 \
@@ -98,34 +99,29 @@ rule mapped_read_depths:
     coverage calculation later.
     """
     input:
-        "mapping/{sample}.vs.contigs.bam.bai"
+        "mapping/{sample}.vs.{contigs}.bam.bai"
     output:
-        "mapping/{sample}.vs.contigs.depths"
+        "mapping/{sample}.vs.{contigs}.depths"
     benchmark:
         "benchmarks/bwa_get_depths.{sample}.time"
     version:
         get_version('samtools', lines=0)
     params:
-        input="mapping/{sample}.vs.contigs.bam"
+        input="mapping/{sample}.vs.{contigs}.bam"
     shell:
         "samtools depth {params.input} > {output}"
 
-rule contig_stats_table:
+rule contig_coverage_table:
     """
-    Combine stats from fasta header with depths and read counts to 
-    make a master table of contig stats
+    Use depths and read counts to build table of coverage stats per contig
     """
     input:
-        "contigs.fasta",
-        "mapping/{sample}.reads.vs.contigs.depths",
-        "mapping/{sample}.reads.vs.contigs.read_counts",
+        "mapping/{sample}.reads.vs.{contigs}.depths",
+        "mapping/{sample}.reads.vs.{contigs}.read_counts",
     output:
-        "contigs.coverages.{sample}.txt",
-        "contigs.histograms.{sample}.txt"
+        temp("{contigs}.coverages.{sample}.txt"),
     benchmark:
         "benchmarks/contig.stats.{sample}.time"
-    version:
-        "py-metagenomics-{}".format(PYMG_VERSION)
-    shell:
-        "python {config[pymg_dir]}/edl/assembly.py get_contig_stats {input} {output} txt_width=75 log=True"
+    run:
+        get_coverage_stats(*input, get_file_name(output))
 
