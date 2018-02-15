@@ -1,3 +1,12 @@
+"""
+1_extract_standards_w_lastal
+
+maps prepared reads (from 0_Process_reads_for_mapping_qual) against a 
+lastal database of sequencing standard sequences.
+
+USing the lastal results, counts occurences of the standards and cacluate a scaling factor for each sample
+"""
+
 import numpy
 import glob
 import os
@@ -30,6 +39,11 @@ final_factor_files = \
                    f)
             ) \
      for f in glob.glob(os.path.join(input_dir, 'sorted_rna', "*" + clean_fasta_suffix))]
+
+if len(final_factor_files) == 0:
+    raise Exception("No files found in {} matching {}".format(
+        os.path.join(input_dir, 'sorted_rna'),
+        "*" + clean_fasta_suffix))
 
 ## The first rule is run by default
 rule collate_factors:
@@ -118,11 +132,12 @@ rule assign_top_hit:
 #################################################################################
 # Map reads against standard database to count them and remove them before further mapping
 ################################################################################
-standards_root = re.sub(r'/.fasta$','',standards_fasta)
+standards_root = re.sub(r'\.fasta$','',standards_fasta.strip())
+print(standards_root)
 standards_prj = standards_root + ".prj"
 rule run_lastal:
     input: 
-        fasta="{path}/sorted_rna/{prefix}.cut.sickle.non_rRNA.masked.fasta",
+        fasta="{path}/sorted_rna/{prefix}" + clean_fasta_suffix,
         standards=standards_prj
     output: 
         "{path}/standard_info/{prefix}.non_rRNA.masked.fasta.vs.standards.lastout"
@@ -130,7 +145,7 @@ rule run_lastal:
         standards=standards_root
     threads: int(config.setdefault("lastal_threads", 8))
     shell:
-        'lastal -P {threads} -Q 0 -f BlastTab {params.standards} {input} > {output} 2> {output}.log'
+        'lastal -P {threads} -Q 0 -f BlastTab {params.standards} {input.fasta} > {output} 2> {output}.log'
 
 rule lastdb:
     input:
