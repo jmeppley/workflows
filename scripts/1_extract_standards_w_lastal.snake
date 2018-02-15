@@ -1,3 +1,30 @@
+"""
+1_extract_standards_w_lastal
+
+maps prepared reads (from 0_Process_reads_for_mapping_qual) against a 
+lastal database of sequencing standard sequences.
+
+You need:
+  1.) a set of cleaned fasta files processed by the 0_ script
+  2.) a fasta file of the spiked standard sequences
+  3.) a table (tab separated text) of spiked standard quantities. EG:
+
+  s10_hyp1806_v1_969_Frag 700
+  s11_tynA_v1_996_Frag    35000
+  s13_therm_v1_613_Frag   600
+  s14_virB_v1_301_Frag    500
+  s15_alpha_v1_1504_Frag  37000
+  s1_arsB_v1_1068_frag    200
+  s2_huyA_v1_1077_Frag    150
+  s3_pdhD_v1_1000_Frag    60000
+  s4_mcrB_v1_1028_Frag    1000
+
+NB: The standards' names in the first column must match the sequence IDs in the fasta file.
+
+Uses lastal to find standards in your reads. Compares counts to the spiked quantities to get a scaling factor for normalizing each sample's counts.
+
+"""
+
 import numpy
 import glob
 import os
@@ -19,6 +46,12 @@ clean_fasta_suffix = config.get('clean_fasta_suffix', ".cut.sickle.non_rRNA.mask
 standards_fasta = config.get("standards_fasta",
                              "/slipstream/home/faylward/lysine/HOE_Legacy_II/standards/standard_refs/standards.fasta")
 
+
+# check that the spiked amounts table exists and has data:
+if not os.path.exists(spike_amounts_table) or os.stat(spike_amounts_table).st_size == 0:
+    raise Exception("The 'spike_amounts_table' must be a text table of counts. The file is empty or missing:\n{}" \
+                    .format(spike_amounts_table))
+
 ## get the list of factor file names to be produced
 # this looks for all the lastout files in the give dir
 # and replaces the suffix with "factor"
@@ -30,6 +63,11 @@ final_factor_files = \
                    f)
             ) \
      for f in glob.glob(os.path.join(input_dir, 'sorted_rna', "*" + clean_fasta_suffix))]
+
+if len(final_factor_files) == 0:
+    raise Exception("No files found in {} matching {}".format(
+        os.path.join(input_dir, 'sorted_rna'),
+        "*" + clean_fasta_suffix))
 
 ## The first rule is run by default
 rule collate_factors:
@@ -118,11 +156,12 @@ rule assign_top_hit:
 #################################################################################
 # Map reads against standard database to count them and remove them before further mapping
 ################################################################################
-standards_root = re.sub(r'/.fasta$','',standards_fasta)
+standards_root = re.sub(r'\.fasta$','',standards_fasta.strip())
+print(standards_root)
 standards_prj = standards_root + ".prj"
 rule run_lastal:
     input: 
-        fasta="{path}/sorted_rna/{prefix}.cut.sickle.non_rRNA.masked.fasta",
+        fasta="{path}/sorted_rna/{prefix}" + clean_fasta_suffix,
         standards=standards_prj
     output: 
         "{path}/standard_info/{prefix}.non_rRNA.masked.fasta.vs.standards.lastout"
@@ -130,7 +169,7 @@ rule run_lastal:
         standards=standards_root
     threads: int(config.setdefault("lastal_threads", 8))
     shell:
-        'lastal -P {threads} -Q 0 -f BlastTab {params.standards} {input} > {output} 2> {output}.log'
+        'lastal -P {threads} -Q 0 -f BlastTab {params.standards} {input.fasta} > {output} 2> {output}.log'
 
 rule lastdb:
     input:

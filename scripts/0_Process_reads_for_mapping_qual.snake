@@ -1,3 +1,18 @@
+"""
+0_Process_reads_for_mapping_qual
+
+This is a port of Frank Aylward's QC script into a (snake) Makefile.
+
+It uses a few different tools to clean and pair-wise assemble illumna reads.
+ - cutadapt
+ - tantan
+ - pandaseq
+ - illuminaPrep.py (from my old (python2) py-metagenomics module)
+
+Most of the binary paths are hard coded and will only work on molculardb
+
+The output is a set of masked, cleaned, pair-joined, non-rRNA reads.
+"""
 import argparse
 import os
 import sys

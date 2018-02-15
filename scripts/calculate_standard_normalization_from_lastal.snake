@@ -1,3 +1,12 @@
+"""
+calculate_standard_normalization_from_lastal
+
+Given a set of lastal results where the reads from each sample have been
+compared to a database of the sequences of the spiked standards:
+
+count occurences of the standards and cacluate a scaling factor for each sample
+"""
+
 import pandas
 import numpy
 import glob
