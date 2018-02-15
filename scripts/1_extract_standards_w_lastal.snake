@@ -4,7 +4,25 @@
 maps prepared reads (from 0_Process_reads_for_mapping_qual) against a 
 lastal database of sequencing standard sequences.
 
-USing the lastal results, counts occurences of the standards and cacluate a scaling factor for each sample
+You need:
+  1.) a set of cleaned fasta files processed by the 0_ script
+  2.) a fasta file of the spiked standard sequences
+  3.) a table (tab separated text) of spiked standard quantities. EG:
+
+  s10_hyp1806_v1_969_Frag 700
+  s11_tynA_v1_996_Frag    35000
+  s13_therm_v1_613_Frag   600
+  s14_virB_v1_301_Frag    500
+  s15_alpha_v1_1504_Frag  37000
+  s1_arsB_v1_1068_frag    200
+  s2_huyA_v1_1077_Frag    150
+  s3_pdhD_v1_1000_Frag    60000
+  s4_mcrB_v1_1028_Frag    1000
+
+NB: The standards' names in the first column must match the sequence IDs in the fasta file.
+
+Uses lastal to find standards in your reads. Compares counts to the spiked quantities to get a scaling factor for normalizing each sample's counts.
+
 """
 
 import numpy
