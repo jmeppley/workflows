@@ -46,6 +46,12 @@ clean_fasta_suffix = config.get('clean_fasta_suffix', ".cut.sickle.non_rRNA.mask
 standards_fasta = config.get("standards_fasta",
                              "/slipstream/home/faylward/lysine/HOE_Legacy_II/standards/standard_refs/standards.fasta")
 
+
+# check that the spiked amounts table exists and has data:
+if not os.path.exists(spike_amounts_table) or os.stat(spike_amounts_table).st_size == 0:
+    raise Exception("The 'spike_amounts_table' must be a text table of counts. The file is empty or missing:\n{}" \
+                    .format(spike_amounts_table))
+
 ## get the list of factor file names to be produced
 # this looks for all the lastout files in the give dir
 # and replaces the suffix with "factor"
