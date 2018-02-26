@@ -98,14 +98,14 @@ rule contigs_fasta:
     Renames the contigs from whatever the assembler outputs 
     to names based on config[assembly_name]
 
-    The outputs is contigs.fasta, the root of all the annotation rules.
+    The outputs is contigs.all.fasta, the root of all the annotation rules.
     """
     input:
         "contigs.raw.fasta"
     output:
         "contigs.all.fasta"
     log:
-        "logs/contigs.fasta.link.log"
+        "logs/contigs.all.fasta.link.log"
     benchmark:
         "benchmarks/contigs.rename.time"
     version:
