@@ -152,18 +152,20 @@ rule final_report:
         read_stats=['stats/{}.stats'.format(reads_file) \
                     for reads_file \
                     in get_read_files(['raw','clean'], config)],
-        ssu_rrnas="contigs.vs.rRNA.cmsearch.SSU.gt1200.tsv",
-        lsu_rrnas="contigs.vs.rRNA.cmsearch.LSU.gt2000.tsv",
-        gene_stats="stats/contigs.annotations.faa.stats",
+        ssu_rrnas="contigs.all.vs.rRNA.cmsearch.SSU.gt1200.tsv",
+        lsu_rrnas="contigs.all.vs.rRNA.cmsearch.LSU.gt2000.tsv",
+        gene_stats="stats/contigs.all.annotations.faa.stats",
         filtered_gene_stats="stats/contigs.filter.annotations.faa.stats",
-        contig_stats="contigs.final.stats.txt",
+        contig_stats="contigs.all.stats.txt",
+        contig_filtered_stats="contigs.final.stats.txt",
         histograms=expand("histograms/contigs_gt_{cutoff}/{metric}.hist", \
                           cutoff=contig_cutoffs, \
                           metric=report_metrics)
     output:
         "contigs.report"
     run:
-        read_stats={}
+        report = {}
+        read_stats = report.setdefault('reads', {})
 
         # paired reads
         total_clean_reads = 0
@@ -189,23 +191,35 @@ rule final_report:
                     if reads_type=='clean':
                         total_clean_reads += stats['reads']
 
-        # contigs (count, bases, N50)
-        stats_table = pandas.read_table(get_file_name(input.contig_stats),
-                        index_col=0)
-        contig_stats = get_contig_length_summary_stats(stats_table,
-                                                       N_levels=[50, 75, 90])
+        stats_files = {
+            'all_contigs': {'contigs': get_file_name(input.contig_stats),
+                            'genes': get_file_name(input.gene_stats)},
+            'filtered_contigs': 
+                {'contigs': get_file_name(input.contig_filtered_stats),
+                 'genes': get_file_name(input.filtered_gene_stats)},
+        }
+        for label, file_names in stats_files.items():
+            # contigs (count, bases, N50)
+            stats_table = pandas.read_table(file_names['contigs'], index_col=0)
 
-        contig_stats['GC'] = float(stats_table.GC.mean())
-        contig_stats['mapped reads'] = int(stats_table.ReadCount.sum())
-        contig_stats['mapped fraction'] = float(stats_table.ReadCount.sum() / \
-                                                (2*total_clean_reads))
+            if len(stats_table.index) == 0:
+                contig_stats = {'contig count': 0}
+            else:
+                contig_stats = get_contig_length_summary_stats(stats_table,
+                                                               N_levels=[50, 75, 90])
 
-        # annotations
-        stats = parse_stats(input.gene_stats)
-        contig_stats['genes']=stats['reads']
-        stats = parse_stats(input.filtered_gene_stats)
-        contig_stats['genes_from_filtered_contigs']=stats['reads']
+                contig_stats['GC'] = float(stats_table.GC.mean())
+                contig_stats['mapped reads'] = int(stats_table.ReadCount.sum())
+                contig_stats['mapped fraction'] = float(stats_table.ReadCount.sum() / \
+                                                        (2*total_clean_reads))
 
+                # annotations
+                stats = parse_stats(file_names['genes'])
+                contig_stats['genes']=stats['reads']
+            report[label] = contig_stats
+
+        # rRNA counts done for all contigs
+        contig_stats = report['all_contigs']
         # full length SSUs
         ssu_count=-1
         with open(input.ssu_rrnas) as INF:
@@ -220,7 +234,6 @@ rule final_report:
                 lsu_count+=1
         contig_stats['LSUs']=lsu_count
 
-        report={"reads":read_stats,"assembly":contig_stats}
         with open(output[0],'w') as OUTF:
             OUTF.write(yaml.dump(report, default_flow_style=False))
 

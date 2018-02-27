@@ -223,6 +223,9 @@ def get_contig_length_summary_stats(contig_stats, N_levels=[50, 75, 90]):
     uses "length" and "cumulength" columns in contig_stats table
     to quickly get N50 and others for given N_levels (def: 50,75,90)
     """
+    if len(contig_stats.index) == 0:
+        return {'contig count': 0}
+
     # tota length is last cumulative length value
     total_length = int(contig_stats['CumuLength'].iloc[-1])
 
@@ -273,7 +276,7 @@ def fna_hit_iterator(fasta_file):
 gene_rexp = re.compile(r'^>?(\S+)_\d+\s+#\s+(\d+)\s+#\s+(\d+)\s+#')
 def fna_rec_parser(record):
     """ parse start/end from prodigal fasta header """
-    return gene_rexp.search(r.description).groups()
+    return gene_rexp.search(record.description).groups()
 
 def get_annotation_locations(gff_files):
     """ Given some gff files, build dict of hit locations """
@@ -285,19 +288,19 @@ def get_annotation_locations(gff_files):
         for gene in gff_hit_iterator(gff_file, nonoverlapping=True):
             contig, start, end = gff_location_parser(gene)
             new_rna_pos = sorted([int(p) for p in (start, end)])
-            hit_locations[contig].append(new_rna_pos)
+            hit_locations.setdefault(contig, []).append(new_rna_pos)
 
     return hit_locations
 
-def merge_and_filter_genes(input_file, output_all, output_filtered,
-                           rna_locations, good_contigs, buffer=0):
-    """
-    For gene in input file (fasta or gff), print out genes that
-    do not overlap rna_locations to two files (_all and _filtered).
+def get_good_contig_list(good_contigs):
+    """ parse contig list into set """
+    with open(good_contigs) as contig_handle:
+        good_contigs = set(c.strip() for c in contig_handle.readlines())
+    return good_contigs
 
-    Only print genes from good_Contigs to _filtered.
-    """
 
+def get_file_handlers(input_file):
+    """ based on extension return tools for looping over annots """
     # set up parsing by file type
     file_type = input_file[-3:]
     if file_type.startswith('f'):
@@ -308,33 +311,59 @@ def merge_and_filter_genes(input_file, output_all, output_filtered,
         iterator = gff_hit_iterator
         record_parser = gff_location_parser
         formatter = lambda l: l.line
+    return iterator, record_parser, formatter
+
+
+def filter_annotations(good_contig_file, input_file, output_file):
+    """ Filter the annotations in the given file (input_file) using
+    the supplied list of good contigs """
+    good_contigs = get_good_contig_list(good_contig_file)
+    iterator, record_parser, formatter = get_file_handlers(input_file)
+    
+    # Only keep genes in good contigs
+    in_genes = 0
+    out_genes = 0
+    with open(output_file, 'wt') as out_handle:
+        for gene in iterator(input_file):
+            in_genes += 1
+            contig, start, end = record_parser(gene)
+            if contig in good_contigs:
+                out_genes += 1
+                out_handle.write(formatter(gene))
+    logger.debug("Kept {} of {} genes from {}" \
+                 .format(out_genes, in_genes, input_file))
+
+
+def drop_rna_overlaps(input_file, output_file,
+                      rna_locations, buffer=0):
+    """
+    For gene in input file (fasta or gff), print out genes that
+    do not overlap rna_locations to output_file 
+    """
+    iterator, record_parser, formatter = get_file_handlers(input_file)
 
     # Only keep genes that don't overlap
     in_genes = 0
     out_genes = 0
-    filtered_genes = 0
-    with open(output_all, 'wt') as all_handle:
-        with open(output_filtered, 'wt') as filtered_handle:
-            for gene in iterator(input_file):
-                in_genes += 1
-                contig, start, end = record_parser(gene)
-                gene_pos = sorted([int(p) for p in (start, end)])
-                for rna_pos in rna_locations.get(contig, []):
-                    if ranges_intersect(gene_pos, rna_pos, buffer):
-                        break
-                else:
-                    out_genes += 1
-                    all_handle.write(formatter(gene))
-                    if contig in good_contigs:
-                        filtered_genes += 1
-                        filtered_handle.write(formatter(gene))
-        logger.debug("Kept {}(all) and {}(filtred) of {} genes from {}" \
-                     .format(out_genes, filtered_genes, in_genes, input_file))
+    with open(output_file, 'wt') as out_handle:
+        for gene in iterator(input_file):
+            in_genes += 1
+            contig, start, end = record_parser(gene)
+            gene_pos = sorted([int(p) for p in (start, end)])
+            for rna_pos in rna_locations.get(contig, []):
+                if ranges_intersect(gene_pos, rna_pos, buffer):
+                    break
+            else:
+                out_genes += 1
+                out_handle.write(formatter(gene))
+    logger.debug("Kept {} of {} genes from {}" \
+                 .format(out_genes, in_genes, input_file))
 
 
 def filter_and_extract_rRNA(raw_gff, contigs_fasta,
                             output_rna_fna,
                             output_rna_gff,
+                            molecule,
                             buffer=0):
     """
     Take raw GFF of rRNA hits, and output GFF and fna of non-overlapping
@@ -344,10 +373,10 @@ def filter_and_extract_rRNA(raw_gff, contigs_fasta,
     gff_hits = {c: list(h) for c, h in generate_hits(raw_gff,
                                                      format=GFF,
                                                      **filter_args)}
-    with open(get_file_name(output_rna_fna), 'wt') as FNA_OUT:
-        with open(get_file_name(output_rna_gff), 'wt') as GFF_OUT:
+    with open(output_rna_fna, 'wt') as FNA_OUT:
+        with open(output_rna_gff, 'wt') as GFF_OUT:
             # loop over contigs
-            for contig in SeqIO.parse(contigs.fasta, 'fasta'):
+            for contig in SeqIO.parse(contigs_fasta, 'fasta'):
                 # get naming informatoion from gff line and contig 
                 # from spades:
                 m = re.search(r'length_(\d+)_cov_([0-9.]+)',
@@ -373,7 +402,7 @@ def filter_and_extract_rRNA(raw_gff, contigs_fasta,
                     # name gene with contig name and index
                     gene_name = contig.id + "_{mol}_{n}" \
                                                 .format(n=i+1,
-                                                        mol=wildcards.mol)
+                                                        mol=molecule)
                     # put everything else in the description
                     gene_desc =\
                         ("source={source};type={feature_type};"
