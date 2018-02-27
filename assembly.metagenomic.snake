@@ -155,6 +155,7 @@ rule final_report:
         ssu_rrnas="contigs.vs.rRNA.cmsearch.SSU.gt1200.tsv",
         lsu_rrnas="contigs.vs.rRNA.cmsearch.LSU.gt2000.tsv",
         gene_stats="stats/contigs.annotations.faa.stats",
+        filtered_gene_stats="stats/contigs.filter.annotations.faa.stats",
         contig_stats="contigs.final.stats.txt",
         histograms=expand("histograms/contigs_gt_{cutoff}/{metric}.hist", \
                           cutoff=contig_cutoffs, \
@@ -202,6 +203,8 @@ rule final_report:
         # annotations
         stats = parse_stats(input.gene_stats)
         contig_stats['genes']=stats['reads']
+        stats = parse_stats(input.filtered_gene_stats)
+        contig_stats['genes_from_filtered_contigs']=stats['reads']
 
         # full length SSUs
         ssu_count=-1

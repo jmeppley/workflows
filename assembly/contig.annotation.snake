@@ -11,7 +11,6 @@ the assembly
 """
 
 include: "../common/mapping_bwa.snake"
-
 from python.common import get_file_name
 from python.assembly import get_contig_stats, \
                             generate_histogram
@@ -87,7 +86,11 @@ rule contig_master_stats_table:
 
 rule contigs_filter:
     """
-    Get list of contigs that have at least config[mapped_read_cutoff]  reads mapped
+    Get list of contigs that pass provided filter:
+
+    Filter defaults to:
+        ReadCount>=5
+        Length>=2000
     """
     input: "contigs.all.stats.txt"
     output: 
@@ -95,13 +98,15 @@ rule contigs_filter:
         table="contigs.final.stats.txt"
     benchmark: 'benchmarks/contig.filter.list.time'
     params:
-        cutoff=str(config.get('mapped_read_cutoff', '5'))
+        cutoffs=config.get('contig_cutoffs', ['ReadCount>=5',
+                                              'Length>=2000']),
     run:
         contig_table = pandas.read_table(get_file_name(input), index_col=0)
-        good_contig_table = contig_table.query('ReadCount>=' + params.cutoff)
-        good_contig_table.to_csv(get_file_name(output.table), sep='\t')
+        for filter_string in params.cutoffs:
+            contig_table = contig_table.query(filter_string)
+        contig_table.to_csv(get_file_name(output.table), sep='\t')
         with open(get_file_name(output.list), 'wt') as OUT:
-            OUT.write('\n'.join(iter(good_contig_table.index)))
+            OUT.write('\n'.join(iter(contig_table.index)))
             OUT.write('\n')
 
 rule contig_histogram:
