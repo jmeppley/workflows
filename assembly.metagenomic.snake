@@ -24,12 +24,10 @@ see test/data/configs/spades.yaml for an example configuration
 import os, re, sys, glob, yaml, pandas, subprocess, tempfile
 from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
 
-# add pymg to path
-include: "common/tool.path.snake"
-
 from python.common import get_version, parse_stats
 from python.qc import setup_qc_outputs
 from python.assembly import get_contig_length_summary_stats
+snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))
 
 # Initialize transitions
 config.setdefault('transitions', {})
@@ -62,7 +60,7 @@ elif assembler == 'megahit':
                     "megahit-{params}/megahit.contigs.fa" \
                                 .format(params=config['megahit']['preset'])
 else:
-    raise Excption("Unknown assembler: " + config['assembler'])
+    raise Exception("Unknown assembler: " + config['assembler'])
 #
 # contig annotation (RNA, genes, coverage, stats)
 include: "assembly/contig.annotation.snake"
@@ -100,14 +98,14 @@ rule contigs_fasta:
     Renames the contigs from whatever the assembler outputs 
     to names based on config[assembly_name]
 
-    The outputs is contigs.fasta, the root of all the annotation rules.
+    The outputs is contigs.all.fasta, the root of all the annotation rules.
     """
     input:
         "contigs.raw.fasta"
     output:
         "contigs.all.fasta"
     log:
-        "logs/contigs.fasta.link.log"
+        "logs/contigs.all.fasta.link.log"
     benchmark:
         "benchmarks/contigs.rename.time"
     version:

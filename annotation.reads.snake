@@ -75,10 +75,6 @@ else:
     raise Exception("Initial file must be bam or fasta! I don't know what to do "
             "with {reads_file}".format(**vars()))
 #
-# add my tools to the path (Somewhat of a hack, maybe I'll get my stuff in
-# conda eventually)
-include: "common/tool.path.snake"
-#
 # End configuration
 ##########
 

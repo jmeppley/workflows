@@ -1,4 +1,3 @@
-include: "../common/tool.path.snake"
 from edl import __version__ as PYMG_VERSION
 SAMTOOLS_VERSION = get_version('samtools', lines=0)
 BWA_VERSION = \

@@ -1,6 +1,7 @@
 channels:
  - bioconda
  - conda-forge
+ - jmeppley
 dependencies:
  - python=3.5
  - snakemake<4
@@ -14,3 +15,5 @@ dependencies:
  - emboss
  - infernal
  - prodigal
+ - py-metagenomics
+ - batch_launcher

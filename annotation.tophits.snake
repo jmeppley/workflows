@@ -19,9 +19,6 @@ from python.common import get_version
 from python.tophit import get_top_hit_outputs
 from snakemake.logging import logger
 
-# adds tools (pymg, batch) to path
-include: "common/tool.path.snake"
-
 needs_qc = get_top_hit_outputs(config)
 if needs_qc:
     include: "qc/setup.snake"

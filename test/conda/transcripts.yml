@@ -1,6 +1,7 @@
 channels:
  - bioconda
  - conda-forge
+ - jmeppley
 dependencies:
  - python=3.5
  - snakemake<4
@@ -17,3 +18,5 @@ dependencies:
  - sed
  - spades
  - salmon
+ - py-metagenomics
+ - batch_launcher

@@ -20,10 +20,6 @@ If starting from assemblies:
 
 The initial annoation steps are the same as the annotation.genes.snake workflow.
 """
-# add my tools to the path (Somewhat of a hack, maybe I'll get my stuff in
-# conda eventually)
-include: "common/tool.path.snake"
-
 import os
 import glob
 import re
