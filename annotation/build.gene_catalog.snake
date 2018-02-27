@@ -75,11 +75,13 @@ def get_all_gene_call_files(wildcards):
 
     Replace file name with renamed file name if assembly needs 
     renaming
+
+    Defaults to using unfiltered gene calls
     """
     ext = wildcards.ext
     # hack for sliding in fixed gene calls
     path_prefix = config.setdefault('gene_path_prefix', '')
-    gene_file_root = config.get('gene_file_root', 'contigs.annotations')
+    gene_file_root = config.get('gene_file_root', 'contigs.all.annotations')
     if 'gene_path_prefix' in config and ext=='fna':
         ext='ffn'
 

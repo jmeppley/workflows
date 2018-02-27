@@ -4,7 +4,7 @@ Rules that predict genes on a set of contigs using prodigal
 from python.common import get_file_name, apply_defaults
 from python.assembly import filter_and_extract_rRNA, \
                             get_annotation_locations, \
-                            merge_and_filter_genes
+                            drop_rna_overlaps, filter_annotations
 # get gff parsing from py-metagenomics
 from snakemake import logger
 
@@ -18,11 +18,11 @@ rule prodigal:
     input:
         "contigs.all.fasta"
     output:
-        gff="contigs.prodigal.genes.gff",
-        faa="contigs.prodigal.genes.faa",
-        ffn="contigs.prodigal.genes.ffn"
+        gff="contigs.all.prodigal.genes.gff",
+        faa="contigs.all.prodigal.genes.faa",
+        ffn="contigs.all.prodigal.genes.ffn"
     benchmark:
-        "benchmarks/contigs.prodigal.genes.time"
+        "benchmarks/contigs.all.prodigal.genes.time"
     version:
         get_version('prodigal','-v')
     params:
@@ -33,67 +33,76 @@ rule prodigal:
 
 rule rna_annotation:
     input:
-        'contigs.vs.{mol}.cmsearch.gff',
-        'contigs.fasta'
+        'contigs.all.vs.{mol}.cmsearch.gff',
+        'contigs.all.fasta'
     output:
-        fna='contigs.annotations.{mol}.fna',
-        gff='contigs.annotations.{mol}.gff' 
-    benchmark: 'benchmarks/contigs.annotations.{mol}.time'
+        fna='contigs.all.annotations.{mol}.fna',
+        gff='contigs.all.annotations.{mol}.gff' ,
+    benchmark: 'benchmarks/contigs.all.annotations.{mol}.time'
     params:
         buffer=config.get('max_annot_overlap', 0)
     run:
         filter_and_extract_rRNA(input[0], input[1],
                                 get_file_name(output.fna),
                                 get_file_name(output.gff),
+                                wildcards.mol,
                                 buffer=params.buffer)
-rule merge_annotations:
+
+rule drop_rna_overlaps:
     """ 
-    merge all GFFs and drop genes that overlap rRNA
+    Drop genes that overlap RNA predictions.
     """
     input:
-        genes=expand("contigs.prodigal.genes.{ext}", \
+        genes=expand("contigs.all.prodigal.genes.{ext}", \
                      ext=['faa', 'ffn', 'gff']),
-        rna=expand('contigs.annotations.{mol}.gff', \
+        rna=expand('contigs.all.annotations.{mol}.gff', \
                     mol=['rRNA', 'tRNA']),
-        contig_filter='contigs.filter.list',
     output:
-        unfiltered=expand('contigs.annotations.{suff}', \
+        expand('contigs.all.annotations.{suff}', \
                           suff=['CDS.gff', 'ffn', 'faa']),
-        filtered=expand('contigs.filter.annotations.{suff}', \
-                        suff=['CDS.gff', 'ffn', 'faa']),
     benchmark:
-        "benchmarks/contigs.annotations.merge.time"
+        "benchmarks/contigs.annotations.drop_rna_ovrlp.time"
     params:
         buffer=config.get('max_annot_overlap', 0)
     run:
         # get dict of rRNA locations
         rna_locations = get_annotation_locations(input.rna)
 
-        # get list of good contigs
-        with open(get_file_name(input.contig_filter)) as CONTIGS:
-            good_contigs = set(c.strip() for c in CONTIGS.readlines())
-
         # filter files
         for input_file in input.genes:
             print("Filtering {}".format(input_file))
-            unfiltered_out = [f for f in output.unfiltered \
-                                if f.endswith(input_file[:4])]
-            filtered_out = [f for f in output.filtered \
-                              if f.endswith(input_file[:4])]
-            merge_and_filter_genes(input_file, filtered_out, unfiltered_out,
-                                   rna_locations, good_contigs,
-                                   buffer=params.bufffer)
+            output_file = [f for f in output \
+                                if f.endswith(input_file[-4:])][0]
+            drop_rna_overlaps(input_file, output_file, rna_locations,
+                              buffer=params.buffer)
 
 
+rule filter_annotations:
+    """
+    pull out only annotations of good contigs
+    """
+    input:
+        filter='contigs.filter.list',
+        annots='contigs.all.annotations.{suff}'
+    output: 'contigs.filter.annotations.{suff}'
+    benchmark: 'contigs.filter.annotations.{suff}'
+    wildcard_constraints:
+        suff=r'.+(gff|fna|faa|ffn)'
+    run:
+        # filter annotations
+        filter_annotations(get_file_name(input.filter),
+                           get_file_name(input.annots),
+                           get_file_name(output))
+        
 
-"""
+
 rule merge_annotations:
     input:
-        genes='contigs.annotations.ffn',
-        rna=expand('contigs.annotations.{mol}.fna', mol=['rRNA', 'tRNA'])
+        genes='contigs.all.annotations.ffn',
+        rna=expand('contigs.all.annotations.{mol}.fna', mol=['rRNA', 'tRNA'])
     output:
-        faa='contigs.annotations.fna',
-    benchmark: 'benchmarks/contigs.merged.fna.time'
+        faa='contigs.all.annotations.fna',
+    benchmark: 'benchmarks/contigs.all.merged.fna.time'
     run:
         rna_genes = {}
         for gf in input.rna:
@@ -121,13 +130,12 @@ rule merge_annotations:
 
 
 rule merge_annotation_gff:
+    """ put filtered RNA and genes into one file """
     input:
-        genes='contigs.annotations.CDS.gff',
-        rna=expand('contigs.annotations.{mol}.gff', mol=['rRNA', 'tRNA'])
+        genes='contigs.all.annotations.CDS.gff',
+        rna=expand('contigs.all.annotations.{mol}.gff', mol=['rRNA', 'tRNA'])
     output:
-        faa='contigs.annotations.gff',
-    benchmark: 'benchmarks/contigs.merged.gff.time'
+        faa='contigs.all.annotations.gff',
+    benchmark: 'benchmarks/contigs.all.merged.gff.time'
     shell:
         "cat {input.rna} {input.genes} | grep -v '^#' | sort > {output}"
-        """
-
