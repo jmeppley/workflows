@@ -13,8 +13,10 @@ Another use if for when the input file is in another part of the file system. We
 
 We can also concat multiple files into one here by giving list of files
 """
+logger.debug("BUILDING TRANSITIONS")
+from paramiko.ssh_exception import AuthenticationException
 
-def get_transition_command(wildcards):
+def get_link_or_cat_command(wildcards):
     """ choose 'ln -s' for single files, cat for multiple. Also use abs paths """
     input_files = config['transitions'][wildcards.transition_file_name]
     if isinstance(input_files, str):
@@ -23,18 +25,97 @@ def get_transition_command(wildcards):
     # otherwise, we have a list of files to concatenate
     return "cat {} >".format(" ".join(os.path.abspath(f) for f in input_files))
 
+url_rexp = re.compile(r'^([A-Za-z]+)://(.+)$')
+
+# To prevent trying to copy or link from a file to itself
+#  remove redundant transistions here (prefilter URLs so we don't trip os.path)
+transitions = {s:t for s,t in config.get('transitions', {}).items() \
+                   if url_rexp.search(s) is not None \
+                   or os.path.abspath(s) != os.path.abspath(t)}
+logger.debug(transitions)
+
+providers = {}
+def get_provider(protocol, host):
+    """
+    Creates a unique RemoteProvider object for each (protocol, host) pair.
+
+    Connection options taken from:
+    config['remote'][protocol][host]
+
+    With defaults from:
+    config['remote'][protocol]['defaults']
+
+    protocol must be one of SFTP, SCP, HTTP, HTTPS, FTP, but case can be
+    different. Case is used when keying options, though, so be consistent in
+    your configuration
+    """
+   
+    provider_key = (protocol, host)
+    protocol = protocol.upper()
+    if provider_key not in providers:
+        remote_defaults = config.get('remote', {}) \
+                                .get(protocol, {}) \
+                                .get('defaults', {})
+        remote_options = config.get('remote', {}) \
+                                .get(protocol, {}) \
+                                .get(host, {})
+        apply_defaults(remote_options, remote_defaults)
+        logger.debug("Creating RemoteProvider for {protocol} "
+                     "using:\n{remote_options}".format(**vars()))
+        if protocol in ['SFTP', 'SCP']:
+            from snakemake.remote.SFTP import RemoteProvider as sftp_rp
+            providers[provider_key] = sftp_rp(**remote_options)
+        elif protocol in ['HTTP', 'HTTPS']:
+            from snakemake.remote.HTTP import RemoteProvider as http_rp
+            providers[provider_key] = http_rp(**remote_options)
+        elif protocol == 'FTP':
+            from snakemake.remote.FTP import RemoteProvider as ftp_rp
+            providers[provider_key] = ftp_rp(**remote_options)
+        else:
+            raise Exception("Remote protocol {} not yet supported"
+                            .format(provider_key[0]))
+    return providers[provider_key]
+
+def get_transition_input(wildcards):
+    """
+    return input file based on output.
+    add remote wrappers if needed
+    """
+    source = transitions[wildcards.transition_file_name]
+
+    logger.debug("Processing " + source)
+
+    try:
+        m = url_rexp.search(source)
+        if m is not None:
+            # replace source file with a remote object
+            protocol, source_path = m.groups()
+            host = re.search(r'^([^/]+)/', source_path).group(1)
+            source =  get_provider(protocol, host).remote(source_path)
+    except Exception as e:
+        print("Error in transitions: " + repr(e))
+        raise e
+
+    logger.debug("Input for {} is {}".format(wildcards.transition_file_name,
+                                             str(source)))
+
+    return source
+
+
+
 # To prevent transition rule from matchin every file on earth:
 #  dynamically generate overly specific regex constraint that lists all file names
-pattern = "(" + "|".join(config.get('transitions',{}).keys()) + ")"
+pattern = "(" + "|".join(transitions.keys()) + ")"
+logger.debug(pattern)
 wildcard_constraints:
     transition_file_name=pattern
 
 # transition rule will only match one of the configured files
 rule transition_link_or_cat:
     """ Creates a symbolic link to or concatenates files from a config mapping """
-    input: lambda w: config['transitions'][w.transition_file_name]
+    input: get_transition_input
     output: "{transition_file_name}"
     params:
-        command = get_transition_command,
+        command = get_link_or_cat_command,
     shell: "rm -f {output} && {params.command} {output}"
 

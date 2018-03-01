@@ -19,12 +19,13 @@ config['megahit'].setdefault('threads', 40)
 # 
 ######################
 
-cleaned_reads = [data['clean'] \
-                         for sample,data in config['sample_data'].items() \
-                         if 'clean' in data]
+#cleaned_reads = [data['clean'] \
+#                         for sample,data in config['sample_data'].items() \
+#                         if 'clean' in data]
 
 logger.debug("Sample reads: " + repr(config['sample_data']))
-logger.debug("Cleaned reads: " + repr(cleaned_reads))
+logger.debug("Cleaned reads: " + repr(config['cleaned_read_list']))
+#logger.debug("Cleaned reads: " + repr(cleaned_reads))
 
 ######################
 # Rules
@@ -33,7 +34,7 @@ rule megahit:
     requires "reads" dictionary in config with map from sample names to list of fastq files of prepped reads for each sample
     """
     input:
-        cleaned_reads
+        config['cleaned_read_list']
     output:
         "megahit-{preset}/megahit.contigs.fa"
     log:

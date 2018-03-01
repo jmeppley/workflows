@@ -31,18 +31,18 @@ QC_PROTOCOLS = {
                           'trimmed',
                           'dropse',
                          ]),
-     "assembly_no_ec": '.'.join(['renamed',
-                                 'interleaved',
-                                 'noadapt',
-                                 'nophix',
-                                 'trimmed',
-                                 'dropse',
-                         ]),
+    "assembly_no_ec": '.'.join(['renamed',
+                                'interleaved',
+                                'noadapt',
+                                'nophix',
+                                'trimmed',
+                                'dropse',
+                               ]),
     "joining": '.'.join(['trim_adapt', 'joined', 'nophix']),
 }
 
 # list of protocols with no error correction
-non_ec_protocols = ['joining', 'assembly_no_ec']
+NON_EC_PROTOCOLS = ['joining', 'assembly_no_ec']
 
 READ_DIRECTIONS = ['R1', 'R2']
 
@@ -66,11 +66,11 @@ def get_sample_from_reads_prefix(prefix, config):
     return prefix
 
 
-def is_in_working_dir(path):
-    """
-    Check if given path is in the working directory
-    """
-    return not os.path.relpath(path).startswith("..")
+#def is_in_working_dir(path):
+#    """
+#    Check if given path is in the working directory
+#    """
+#    return not os.path.relpath(path).startswith("..")
 
 
 def setup_qc_outputs(config):
@@ -111,9 +111,10 @@ def setup_qc_outputs(config):
 
     # Loop over samples that came with their own clean reads and:
     #  1) set up pairs to be interleaved
-    #  2) replace with locally named file and add transition if not in workdir 
+    #  2) replace with locally named file and add transition if not in workdir
     samples_with_clean_reads = [s for s in samples if 'clean' in sample_data[s]]
     drop_clean_reads_for_these_samples = []
+    cleaned_read_list = config.setdefault('cleaned_read_list', [])
     for sample in samples_with_clean_reads:
         remote_cleaned_reads = sample_data[sample]['clean']
         if not isinstance(remote_cleaned_reads, str) and \
@@ -126,20 +127,22 @@ def setup_qc_outputs(config):
             drop_clean_reads_for_these_samples.append(sample)
             # set protocol to None, so the pair just gets interleaved
             sample_data[sample].setdefault('protocol', 'None')
-        elif len(remote_cleaned_reads)==0:
-            raise Exception("No clean reads for sample {}:\n{}".format(sample,
-                                                repr(sample_data[sample])))
+        elif len(remote_cleaned_reads) == 0:
+            raise Exception("No clean reads for sample {}:\n{}"
+                            .format(sample, repr(sample_data[sample])))
         else:
+            # change list with one string into single str object
             if not isinstance(remote_cleaned_reads, str):
                 remote_cleaned_reads = remote_cleaned_reads[0]
-            if not is_in_working_dir(remote_cleaned_reads):
-                logger.debug("{} is not in working dir".format(remote_cleaned_reads))
-                local_cleaned_reads = '{sample}.clean.fastq'.format(**vars())
-                if re.search(r'\.gz$', remote_cleaned_reads) is not None:
-                    local_cleaned_reads += ".gz"
-                if local_cleaned_reads != remote_cleaned_reads:
-                    transitions[local_cleaned_reads] = remote_cleaned_reads
-                    sample_data[sample]['clean'] = local_cleaned_reads
+            #if nddot is_in_working_dir(remote_cleaned_reads):
+            #    logger.debug("{} is not in working dir".format(remote_cleaned_reads))
+            # if input file does not conform to naming convention, create link
+            local_cleaned_reads = '{sample}.clean.fastq'.format(**vars())
+            if re.search(r'\.gz$', remote_cleaned_reads) is not None:
+                local_cleaned_reads += ".gz"
+            transitions[local_cleaned_reads] = remote_cleaned_reads
+            sample_data[sample]['clean'] = local_cleaned_reads
+            cleaned_read_list.append(local_cleaned_reads)
 
     for sample in drop_clean_reads_for_these_samples:
         del sample_data[sample]['clean']
@@ -227,6 +230,7 @@ def setup_qc_outputs(config):
                                       '.{}.fastq'.format(rrna_split),
                                       cleaned_reads))
         else:
+            cleaned_read_list.append(cleaned_reads)
             outputs.append(cleaned_reads)
 
     return outputs
