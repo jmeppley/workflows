@@ -85,7 +85,7 @@ rule filter_annotations:
         filter='contigs.filter.list',
         annots='contigs.all.annotations.{suff}'
     output: 'contigs.filter.annotations.{suff}'
-    benchmark: 'contigs.filter.annotations.{suff}'
+    benchmark: 'benchmarks/contigs.filter.annotations.{suff}.time'
     wildcard_constraints:
         suff=r'.+(gff|fna|faa|ffn)'
     run:
