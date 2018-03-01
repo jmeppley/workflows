@@ -42,32 +42,40 @@ def generate_histogram(contig_stats_file,
     Generate an ASCII histrogram of the selected data
     """
     stats_table = pandas.read_table(contig_stats_file, index_col=0)
-    values = stats_table.query('Length >= ' + str(length_cutoff))[metric]
+    # filter by length, get metric column, replace NA with 0
+    values = stats_table \
+                .query('Length >= ' + str(length_cutoff)) \
+                [metric] \
+                .fillna(0)
     with open(histogram_file, 'wt') as hist_handle:
-        hist_handle.write(
-            """Summary of {metric} for {count} contigs longer than {length_cutoff}bp:
-    Min:    {min}
-    Max:    {max}
-    Mean:   {mean}
-    Median: {median}
-    StdDev: {std}
+        if len(values) == 0:
+            hist_handle.write("There are no contigs longer than "
+                              "{length_cutoff}bp".format(**vars()))
+        else:
+            hist_handle.write(
+                """Summary of {metric} for {count} contigs longer than {length_cutoff}bp:
+        Min:    {min}
+        Max:    {max}
+        Mean:   {mean}
+        Median: {median}
+        StdDev: {std}
 
-Histogram of {metric} {log}:
-{histogram}
-""".format(metric=metric,
-           length_cutoff=length_cutoff,
-           count=len(values),
-           min=values.min(),
-           max=values.max(),
-           mean=values.mean(),
-           median=values.median(),
-           std=values.std(),
-           log="(log)" if log else "",
-           histogram=ascii_histogram(numpy.histogram(values,
-                                                     **kwargs),
-                                     log=log,
-                                     width=txt_width),
-          ))
+    Histogram of {metric} {log}:
+    {histogram}
+    """.format(metric=metric,
+               length_cutoff=length_cutoff,
+               count=len(values),
+               min=values.min(),
+               max=values.max(),
+               mean=values.mean(),
+               median=values.median(),
+               std=values.std(),
+               log="(log)" if log else "",
+               histogram=ascii_histogram(numpy.histogram(values,
+                                                         **kwargs),
+                                         log=log,
+                                         width=txt_width),
+              ))
 
 
 def get_coverage_stats(contig_depth_file,
