@@ -87,7 +87,7 @@ rule filter_annotations:
     output: 'contigs.filter.annotations.{suff}'
     benchmark: 'benchmarks/contigs.filter.annotations.{suff}.time'
     wildcard_constraints:
-        suff=r'.+(gff|fna|faa|ffn)'
+        suff=r'(CDS\.)?(gff|fna|faa|ffn)'
     run:
         # filter annotations
         filter_annotations(get_file_name(input.filter),
