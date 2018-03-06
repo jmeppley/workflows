@@ -1,6 +1,7 @@
 """
 Methods used across all or most workflows including:
 
+    is_in_working_dir: return True if path is in working dir or subdir
     get_version: figure out the version of a command
     parse_stats: get the read and base counts from prinseq output
     apply_defaults: set dict (usually config) defaults recursively
@@ -12,11 +13,19 @@ import re
 import logging
 import subprocess
 import tempfile
-import yaml
 import pandas
+import yaml
 from snakemake.logging import logger
 
 TRUTH = ['True', True, 'true', 'TRUE', 'T']
+
+
+def is_in_working_dir(path):
+    """
+    Check if given path is in the working directory
+    """
+    return not os.path.relpath(path).startswith("..")
+
 
 def get_version(command, version_flag='--version',
                 cmd_prefix='',
@@ -104,11 +113,20 @@ def add_stats_outputs(snakefile, config):
     We do this by calling the snakemake API to get the output summary.
     """
     if config.get('discover_fastx_for_stats', False) in [True, 'True']:
+
+        # run the snakemake workflow that started this with a few changes:
+        #  - skip this step (discover_fastx_for_stats=False)
+        #  - don't lock the directory
+        #  - just do a dry run
+        #  - just print the summary table
+
+        # create a new config file with the stats option turned off
         config_copy = dict(config)
         config_copy['discover_fastx_for_stats'] = False
         config_file = tempfile.NamedTemporaryFile(mode='w')
         yaml.dump(config_copy, config_file)
 
+        # setup snakemake command in summary mode
         command = [
             'snakemake',
             '-s',
@@ -121,23 +139,26 @@ def add_stats_outputs(snakefile, config):
             '-n',
         ]
 
-        if logger.logger.getEffectiveLevel() >= logging.DEBUG:
-        #if logger.logger.getEffectiveLevel() <= logging.DEBUG:
-            command += ['--verbose']
+        # try to preserve the logging setting. (This might not be working...)
+        #if logger.logger.getEffectiveLevel() >= logging.DEBUG:
+        #    command += ['--verbose']
 
         logger.debug("Performing dry-run to get outputs")
         logger.debug(" ".join(command))
+
+        # run snakemake and capture summary output
         try:
             complete = subprocess.run(command,
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE)
         except:
             logger.warning("Cannot get fastx files, there is something wrong "
-                            "with your workflow!")
+                           "with your workflow!")
             raise
-            return
 
         if complete.returncode != 0:
+            # try to print out enough info for user to see what caused the
+            # error
             logger.warning("STDOUT:\n" + get_str(complete.stdout))
             logger.warning("STDERR:\n" + get_str(complete.stderr))
             raise Exception("Cannot get fastx files, there is something wrong "
@@ -145,18 +166,47 @@ def add_stats_outputs(snakefile, config):
 
         logger.debug("Dry run complete")
 
+        # Scan the summary. Output files are the first column
         new_outputs = config.setdefault('outputs', set())
         output_count = 0
         for line in complete.stdout.decode().split('\n'):
             output = line.split('\t')[0]
-            logger.debug(output)
-            if re.search(r'f(aa|fn|na|a|asta|astq)(\.gz)?$', output):
-                output_count += 1
-                for extension in ['.hist', '.stats']:
-                    new_outputs.add('stats/' + output + extension)
+            if len(output.strip()) == 0:
+                continue
+            logger.debug("output file: " + output)
+
+            # only do fasta or fastq files
+            if re.search(r'f(aa|fn|na|a|asta|astq)(\.gz)?$', output) is None:
+                continue
+
+            # only get stats for files in the working folder
+            if not is_in_working_dir(output):
+                continue
+
+            # skip the source of transitions (we'll get the target)
+            if file_in_collection(output,
+                                  config.get('transitions', {}).keys()):
+                continue
+
+            # If we're still going, add to stats list
+            logger.debug("stats file: " + output)
+            output_count += 1
+            for extension in ['.hist', '.stats']:
+                new_outputs.add('stats/' + output + extension)
 
         logger.debug("Added stats and hist files for {} fasta files"\
                      .format(output_count))
+
+
+def file_in_collection(path, other_paths):
+    """ Compares abspath of path to everything in other_paths. True if any are
+    the same """
+    abspath = os.path.abspath(path)
+    for other_path in other_paths:
+        if abspath == os.path.abspath(other_path):
+            return True
+    return False
+
 
 def get_str(possibly_byte_array):
     if isinstance(possibly_byte_array, str):

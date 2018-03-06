@@ -132,7 +132,7 @@ rule contigs_filtered:
     input: 
         fasta="contigs.all.fasta",
         list="contigs.filter.list"
-    output: "contigs.fasta"
+    output: "contigs.filter.fasta"
     benchmark: "benchmarks/contigs.fitered.fasta.time"
     shell:
         "screen_list.py -k {input.fasta} -l {input.list} -o {output}"

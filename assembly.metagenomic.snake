@@ -44,7 +44,9 @@ config.setdefault('remove_rna', False)
 # use the assembly cleaning protocol
 config.setdefault('cleaning_protocol', 'assembly')
 outputs = config.setdefault('outputs',set())
-cleaned_reads = setup_qc_outputs(config)
+if not config.get('qc_setup_complete', False):
+    cleaned_reads = setup_qc_outputs(config)
+    config['qc_setup_complete'] = True
 #outputs.update(cleaned_reads)
 include: "qc/setup.snake"
 include: "common/gunzip.snake"
@@ -92,6 +94,7 @@ rule all:
     input:
         config['outputs'],
         "contigs.report",
+        "contigs.filter.fasta",
 
 rule contigs_fasta:
     """

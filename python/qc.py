@@ -19,6 +19,7 @@ from snakemake.logging import logger
 from python.samples import process_sample_data
 from python.tmatic import get_chemistry_barcodes
 from python.common import get_file_name
+#from python.common import is_in_working_dir
 
 # interleaved will be automatically dropped if single file given per sample
 QC_PROTOCOLS = {
@@ -64,13 +65,6 @@ def get_sample_from_reads_prefix(prefix, config):
         return match.group(1)
 
     return prefix
-
-
-#def is_in_working_dir(path):
-#    """
-#    Check if given path is in the working directory
-#    """
-#    return not os.path.relpath(path).startswith("..")
 
 
 def setup_qc_outputs(config):
@@ -182,22 +176,27 @@ def setup_qc_outputs(config):
         extension = "fastq.gz" if files_gzipped else "fastq"
 
         # starting files (define as transitions from raw files)
+        new_raw_files = []
         if len(raw_files) > 2:
             # The reads are probably split up into lanes, merge into one pair
-            new_raw_files = []
             for direction, file_list in setup_merge_by_lanes(raw_files,
                                                              sample).items():
                 merged_file = '{sample}.{direction}.{extension}'.format(**vars())
                 transitions[merged_file] = file_list
                 new_raw_files.append(merged_file)
-            raw_files = new_raw_files
-            sample_data[sample]['raw'] = new_raw_files
         elif len(raw_files) == 2:
             for direction, source_file in zip(READ_DIRECTIONS, raw_files):
-                transitions['{sample}.{direction}.{extension}'\
-                                                .format(**vars())] = source_file
+                new_raw_file = '{sample}.{direction}.{extension}'\
+                                                .format(**vars())
+                transitions[new_raw_file] = source_file
+                new_raw_files.append(new_raw_file)
         else:
-            transitions['{sample}.{extension}'.format(**vars())] = raw_files[0]
+            new_raw_files.append('{sample}.{extension}'.format(**vars()))
+            transitions[new_raw_files[0]] = raw_files[0]
+
+        # everything else should work from the linked files
+        raw_files = new_raw_files
+        sample_data[sample]['raw'] = new_raw_files
 
         # cleaned suffix
         cleaned_suffix = QC_PROTOCOLS.get(cleaning_protocol, '')
@@ -218,8 +217,10 @@ def setup_qc_outputs(config):
 
 
         # result of QC
-        cleaned_reads = '{sample}.{cleaned_suffix}.fastq'\
+        cleaned_raw_reads = '{sample}.{cleaned_suffix}.fastq'\
                                                     .format(**vars())
+        cleaned_reads = '{sample}.clean.fastq'.format(**vars())
+        transitions[cleaned_reads] = cleaned_raw_reads
         sample_data[sample]['clean'] = cleaned_reads
 
         if config.get('remove_rna', True) in ['True', True]:
