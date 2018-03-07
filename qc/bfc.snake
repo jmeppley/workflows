@@ -1,7 +1,6 @@
 # default configuration
 from python.common import apply_defaults
-defaults={'bfc':{'ram':'5g',
-                 'params':'-1 -k 21'}}
+defaults={'bfc':{'params':'-k 21'}}
 apply_defaults(config, defaults)
 
 rule bfc_error_correction:
@@ -21,7 +20,7 @@ rule bfc_error_correction:
     threads:
         config.get('bfc',{}).get('threads',5)
     shell:
-        """bfc -s {config[bfc][ram]} {config[bfc][params]} \
+        """bfc {config[bfc][params]} \
               -t {threads} {input} 2> {log} \
               > {output}"""
 
