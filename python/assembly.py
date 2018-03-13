@@ -247,12 +247,12 @@ def get_contig_length_summary_stats(contig_stats, N_levels=[50, 75, 90]):
 
     # Loop over N's. Since they are sorted, we don't need to restart
     #  the length/cumul_length iterator
+    cumulength = 0
     for N in sorted(N_levels):
         # looking for N% of the total length
         target = total_length * N / 100
 
         # stop when we get there
-        cumulength = 0
         while cumulength < target:
             contig, (length, cumulength) = next(cumulen_iter)
 
