@@ -72,9 +72,15 @@ rule prinseq_any:
     version:
         get_version('prinseq-lite.pl','-version')
     shell:
-        "{params.cat} {input} | \
-        prinseq-lite.pl {params.input_flag} stdin \
-         -stats_len -stats_info {params.aa} > {output}"
-
+        """
+        LINES=$({params.cat} {input} | wc -l)
+        if [ "$LINES" -gt "0" ]; then 
+          {params.cat} {input} | \
+          prinseq-lite.pl {params.input_flag} stdin \
+           -stats_len -stats_info {params.aa} > {output}
+        else
+          echo -e "stats_info\tbases\t0\nstats_info\treads\t0" > {output}
+        fi
+        """
 
 

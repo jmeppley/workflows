@@ -124,7 +124,7 @@ rule contigs_fasta:
                         OUTPUT.write(">%s %s\n%s\n" % (contig_name,
                                                        title,
                                                        sequence))
-                logger.debug("renamed {} contigs".format(i))
+                #logger.debug("renamed {} contigs".format(i))
 
 def get_read_files(reads_types, config):
     """
