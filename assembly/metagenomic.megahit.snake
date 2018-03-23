@@ -13,7 +13,8 @@ with megahit.
 ######################
 # Configuration
 #
-# Default to "meta" preset for megahit
+# Default to "meta-sensitive" preset for megahit
+#  (I also often use meta-large)
 config.setdefault('megahit',{}).setdefault('preset','meta-sensitive')
 config['megahit'].setdefault('threads', 40)
 # 
