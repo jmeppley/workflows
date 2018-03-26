@@ -1,0 +1,23 @@
+
+
+# software parameters
+defaults = {
+    'vsearch': {
+        'threads': 20,
+        'options': '--id 0.95 --iddef 0 --strand plus --minsl 0.6'
+        'output_str': 'vsearch.id.95.minsl.6',
+    },
+}
+apply_defaults(config, defaults)
+cluster_suffix = config['vsearch']['output_str']
+
+rule cluster_ffn:
+    input: "all_genes.ffn"
+    output: "all_genes.ffn.{}".format(cluster_suffix)
+    benchmark: 'benchmarks/all_genes.ffn.{}.time' \
+                        .format(cluster_suffix)
+    threads: config['vsearch']['threads']
+    shell:
+        "vsearch --cluster_fast --no_progress {input} \
+         {config[vsearch][options]} \
+         --threads {threds} --centroids {output}"
