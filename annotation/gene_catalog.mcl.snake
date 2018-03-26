@@ -1,4 +1,4 @@
-from python.common import get_version, apply_defaults
+from python.common import get_version, apply_defaults, get_file_name
 from python.gene_catalog import process_for_mcl
 
 # software parameters
@@ -17,7 +17,7 @@ rule mcl:
     input: "all_genes.v.self.pctid.tab"
     output: "all_genes.ffn.mcl.raw"
     threads: config['mcl']['threads']
-    shell: "mcl {input} {config[mcl][options]} \
+    shell: "mcl {input} --abc {config[mcl][options]} \
             -o {output} -te {threads}"
 
 rule get_reps:
@@ -25,7 +25,8 @@ rule get_reps:
         cluster=rules.mcl.output,
         faa='all_genes.ffn',
     output: 'all_genes.ffn.{}'.format(cluster_suffix)
-    shell: "exit 1"
+    shell: "screen_list.py {input.faa} -k -l <(cut -f 1 {input.cluster}) \
+            -o {output}"
 
 rule all_v_all_self_db:
     input: "all_genes.ffn"
@@ -51,12 +52,15 @@ rule all_v_all_self:
         """
 
 rule process_for_mcl:
-    input: rules.all_v_all_self.output
+    input:
+        hits=rules.all_v_all_self.output,
+        fasta='all_genes.ffn',
     output: "all_genes.v.self.pctid.tab"
     benchmark: "benchmarks/process_for_mcl.time"
     run:
-        process_for_mcl(get_file_name(input),
-                        get_gile_name(output),
-                        format=last,
+        process_for_mcl(get_file_name(input.hits),
+                        get_file_name(input.fasta),
+                        get_file_name(output),
+                        format='blast',
                         pctid=config['mcl']['filters']['pctid'],
                         minbit=config['mcl']['filters']['minbit'],)
