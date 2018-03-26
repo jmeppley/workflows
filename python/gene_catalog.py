@@ -312,4 +312,45 @@ def normalize_coverages(input):
 
 
 
+def process_for_mcl(input_file, output_file, format='last',
+                    pctid=.95, minbit=.5):
+    """ generates a table of graph edges from an all v all """
+    params = blastm8.FilterParams(format=format, pctid=pctid)
+    inputm8 = blastm8.M8File(input_file)
+    self_bits = {}
+    hits_waiting_for_self = {}
+    processed_seqs = set()
+    with open(output_file, 'wt') as OUTPUT:
+        for seq, hits in blastm8.filterHits(inputm8, params, returnLines=False):
+            for hit in hits:
+                if hit.hit == seq:
+                    self_bits[seq] = hit.score
+                    hits_to_check = hits_waiting_for_self.pop(seq)
+                    for h in hits_to_check:
+                        process_hit(h, OUTPUT, hits_waiting_for_self,
+                                    self_bits, minbit)
+                    continue
+
+                process_hit(hit, OUTPUT, hits_waiting_for_self,
+                            self_bits, minbit)
+
+    if len(hits_waiting_for_self) > 0:
+        raise Exception("{} hits left unprocessed for lack of self hits!"
+                        .format(len(hits_waiting_for_self)))
+
+
+def process_hit(hit, output_handle, waiting, self_bits, minbit):
+    for seq in [hit.hit, hit.read]:
+        if seq not in self_bits:
+            waiting.setdefault(seq, []).append(hit)
+            return
+
+    bitratio = hit.score / min(self_bits[hit.hit],
+                               self_bits[hit.read])
+    if bitratio < minbit:
+        return
+
+    output_handle.write("{}\t{}\t{}\n".format(hit.hit, hit.read, hit.pctid))
+                
+
 

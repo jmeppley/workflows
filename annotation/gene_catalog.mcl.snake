@@ -1,0 +1,62 @@
+from python.common import get_version, apply_defaults
+from python.gene_catalog import process_for_mcl
+
+# software parameters
+defaults = {
+    'mcl': {
+        'threads': 20,
+        'options': '-I 2',
+        'filters': {'pctid': .95, 'minbit': .5},
+        'output_str': 'mcl.I2'
+    },
+}
+apply_defaults(config, defaults)
+cluster_suffix = config['mcl']['output_str']
+
+rule mcl:
+    input: "all_genes.v.self.pctid.tab"
+    output: "all_genes.ffn.mcl.raw"
+    threads: config['mcl']['threads']
+    shell: "mcl {input} {config[mcl][options]} \
+            -o {output} -te {threads}"
+
+rule get_reps:
+    input:
+        cluster=rules.mcl.output,
+        faa='all_genes.ffn',
+    output: 'all_genes.ffn.{}'.format(cluster_suffix)
+    shell: "exit 1"
+
+rule all_v_all_self_db:
+    input: "all_genes.ffn"
+    output: "all_genes.ffn.prj"
+    benchmark: 'benchmarks/all_genes.ffn.v.self.db.time'
+    threads: config['mcl']['threads']
+    shell:
+        """
+        lastdb -P {threads} {input} {input}
+        """
+
+rule all_v_all_self:
+    input:
+        "all_genes.ffn",
+        "all_genes.ffn.prj",
+    output: "all_genes.ffn.v.self.last"
+    benchmark: 'benchmarks/all_genes.ffn.v.self.time'
+    threads: config['mcl']['threads']
+    shell:
+        """
+        lastal -P {threads} -f BlastTab {input[0]} {input[0]} \
+         > {output}
+        """
+
+rule process_for_mcl:
+    input: rules.all_v_all_self.output
+    output: "all_genes.v.self.pctid.tab"
+    benchmark: "benchmarks/process_for_mcl.time"
+    run:
+        process_for_mcl(get_file_name(input),
+                        get_gile_name(output),
+                        format=last,
+                        pctid=config['mcl']['filters']['pctid'],
+                        minbit=config['mcl']['filters']['minbit'],)
