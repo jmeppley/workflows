@@ -29,26 +29,21 @@ if "assembly_list" not in config:
 # Change to a simple dict for use in makefile
 assembly_renaming_map = {x['assembly']:x['regex'] \
                          for x in config.get('assembly_renaming', [])}
-
-# software parameters
-defaults = {
-    'cdhit': {
-        'threads': 20,
-        'options': '-c 0.95 -M 1000000 -G 0 -aS 0.9 -g 1 -r 1 -d 0',
-        'output_str': 'c.95.aS.9.g1.r1.G0',
-    },
-}
-apply_defaults(config, defaults)
-
+# chose clustering method
+#  clustering snake file should define the variable cluster_suffix
+clustering_method = config.get('clustering_method', 'cdhit')
+cluster_suffix = clustering_method
+include: "anntation/gene_catalog.{}.snake".format(clustering_method)
+#
 # Define some trasitions to break the workflow up into segments
 transitions = config.setdefault('transitions',{})
 # the first part creates the clustered faa (prefix defined in parent makefile)
 transitions[prefix + '.faa'] = \
-            'all_genes.ffn.{}.faa'.format(config['cdhit']['output_str'])
+            'all_genes.ffn.{}.faa'.format(cluster_suffix)
 # the clustered ffn is ambiguously named, so lets add ffn to the end
-transitions['all_genes.ffn.{}.ffn'.format(config['cdhit']['output_str'])] = \
-            'all_genes.ffn.{}'.format(config['cdhit']['output_str'])
-
+transitions['all_genes.ffn.{}.ffn'.format(cluster_suffix) = \
+            'all_genes.ffn.{}'.format(cluster_suffix)
+#
 # End configuration
 ##########
 
@@ -170,18 +165,6 @@ rule filter_fna:
         "all_genes.ffn"
     benchmark: 'benchmarks/all_genes.ffn.time'
     shell: "screen_list.py -l {input[0]} -k {input[1]} > {output}"
-
-rule cluster_ffn:
-    input: "all_genes.ffn"
-    output: "all_genes.ffn.{}".format(config['cdhit']['output_str'])
-    benchmark: 'benchmarks/all_genes.ffn.{}.time' \
-                        .format(config['cdhit']['output_str'])
-    threads: config['cdhit']['threads']
-    params:
-        cd_hit_options=config['cdhit']['options']
-    shell:
-        "cd-hit-est -T {threads} {params.cd_hit_options} \
-         -i {input} -o {output}"
 
 rule get_cluster_rep_faa:
     input:
