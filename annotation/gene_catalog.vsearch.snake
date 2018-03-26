@@ -1,13 +1,14 @@
-
+from python.common import apply_defaults
 
 # software parameters
 defaults = {
     'vsearch': {
         'threads': 20,
-        'options': '--id 0.95 --iddef 0 --strand plus --minsl 0.6'
+        'options': '--id 0.95 --iddef 0 --strand plus --minsl 0.6',
         'output_str': 'vsearch.id.95.minsl.6',
     },
 }
+
 apply_defaults(config, defaults)
 cluster_suffix = config['vsearch']['output_str']
 
@@ -18,6 +19,6 @@ rule cluster_ffn:
                         .format(cluster_suffix)
     threads: config['vsearch']['threads']
     shell:
-        "vsearch --cluster_fast --no_progress {input} \
+        "vsearch --cluster_fast {input} --no_progress \
          {config[vsearch][options]} \
-         --threads {threds} --centroids {output}"
+         --threads {threads} --centroids {output}"
