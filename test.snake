@@ -18,7 +18,10 @@ or EG: to get histogram of read lengths in reads.fastq:
 Multiple workflows can be separated by a colon (":").
 """
 import os
+import yaml
 from python.common import get_version
+
+logger.debug(yaml.dump(config))
 
 if 'workflow' not in config:
     raise Exception("ERROR: must specity workflow(s) in the config[workflow] setting!")
