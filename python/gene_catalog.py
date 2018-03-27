@@ -95,7 +95,7 @@ class RefSeqGeneAnnotator():
 
     def set_m8_params(self, **kwargs):
         kwargs.setdefault('format',blastm8.BLASTPLUS)
-        kwargs.setdefault('topPct',0.)
+        kwargs.setdefault('top_pct',0.)
         self.m8_params = edlhits.FilterParams(**kwargs)
 
     def set_bad_refs_from_file(self, bad_ref_file, **kwargs):
@@ -220,7 +220,7 @@ class KeggGeneAnnotator():
     def __init__(self, db_location=kegg20160201):
         self.keggdb=db_location
         self.parse_db_metadata()
-        self.m8_params = edlhits.FilterParams(format=blastm8.BLASTPLUS, topPct=5., sort='score')
+        self.m8_params = edlhits.FilterParams(format=blastm8.BLASTPLUS, top_pct=5., sort='score')
     
     def parse_db_metadata(self):
         """
