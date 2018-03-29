@@ -46,7 +46,7 @@ setup() {
     cd test/scratch/catalog
     run bash -c "snakemake -s ../../../annotation.gene_catalog.snake --configfile ../../data/configs/gene_catalog.yaml -p -k -j 20 --notemp > gene_catalog.log 2>&1"
     [ "$status" -eq 0 ]
-    run bash -c "snakemake -s ../../../annotation.gene_catalog.snake --configfile ../../data/configs/gene_catalog.yaml -p -k -j 20 -n 2>&1"
+    run bash -c "snakemake -s ../../../annotation.gene_catalog.snake --configfile ../../data/configs/gene_catalog.yaml -p -k -j 20 -n 2>&1 | grep '^Nothing to be done'"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" == "Nothing to be done." ]
 }

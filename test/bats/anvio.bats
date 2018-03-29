@@ -18,6 +18,10 @@ setup() {
 
     # activate for testing below
     source activate $ANVIENV 2>/dev/null || true
+    if [ "$CONDA_PREFIX" != "$ENV_DIR" ]; then
+        echo "ERROR activating cond env $ENV_DIR"
+        exit 1
+    fi
 }
 
 @test "From reads through megahit to anvio" {
