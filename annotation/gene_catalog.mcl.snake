@@ -1,5 +1,5 @@
 from python.common import get_version, apply_defaults, get_file_name
-from python.gene_catalog import process_for_mcl
+from python.gene_catalog import process_for_mcl, get_longest_seq
 
 # software parameters
 defaults = {
@@ -16,22 +16,41 @@ apply_defaults(config, defaults)
 cluster_suffix = config['mcl']['output_str']
 cluster_type = config.setdefault('cluster_type', 'fna')
 
+wildcard_constraints:
+    cluster_suffix=cluster_suffix
+
 rule mcl:
     input: "all_genes.{cluster_type}.v.self.pctid.tab"
-    output: "all_genes.{cluster_type}.mcl.raw"
+    output: "all_genes.{cluster_type}.{cluster_suffix}.raw"
     benchmark: "benchmarks/genes.{cluster_type}.mcl.time"
     threads: config['mcl']['threads']
     shell: "mcl {input} --abc {config[mcl][options]} \
             -o {output} -te {threads}"
 
-rule get_reps:
+rule list_reps:
+    """ Find the longest gene in each cluster """
     input:
         cluster=rules.mcl.output,
         faa='all_genes.{cluster_type}'
-    output: 'all_genes.{cluster_type}.' + cluster_suffix
+    output: 'all_genes.{cluster_type}.{cluster_suffix}.reps'
+    benchmark: "benchmarks/all_genes.{cluster_type}.mcl.get_reps_list.time"
+    run:
+        with open(get_file_name(output), 'wt') as LIST:
+            for gene_id in get_longest_seq(get_file_name(input.cluster),
+                                           get_file_name(input.faa),):
+                LIST.write(gene_id)
+                LIST.write('\n')
+
+
+rule get_reps:
+    input:
+        list=rules.list_reps.output,
+        faa='all_genes.{cluster_type}'
+    output: 'all_genes.{cluster_type}.{cluster_suffix}'
     benchmark: "benchmarks/all_genes.{cluster_type}.mcl.get_reps.time"
-    shell: "screen_list.py {input.faa} -k -l <(cut -f 1 {input.cluster}) \
+    shell: "screen_list.py {input.faa} -k -l {input.list} \
             -o {output}"
+
 
 rule all_v_all_self_db:
     input: "all_genes.{cluster_type}"

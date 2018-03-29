@@ -338,3 +338,16 @@ def process_hit(hit, output_handle, self_bits, minbit):
                 
 
 
+def get_longest_seq(clusters, genes, format='fastq'):
+    """
+    Given a clsuter file from mcl where each line is a cluster with
+    tab separated gene ids.
+    And given a fasta file of gene sequences.
+    return the ID of the longest gene in each cluster
+    """
+    gene_lengths = {g.id:len(g) for g in SeqIO.parse(genes, format)}
+    with open(clusters) as CLUSTERS:
+        for line in CLUSTERS:
+            genes = line.rstrip().split('\t')
+            yield sorted(genes, reverse=True,
+                         key=lambda g: gene_lengths[g])[0]
