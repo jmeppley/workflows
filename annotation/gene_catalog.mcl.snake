@@ -14,10 +14,11 @@ defaults = {
 }
 apply_defaults(config, defaults)
 cluster_suffix = config['mcl']['output_str']
+cluster_type = config.setdefault('cluster_type', 'fna')
 
 rule mcl:
-    input: "all_genes.v.self.pctid.tab"
-    output: "all_genes.ffn.mcl.raw"
+    input: "all_genes.{cluster_type}.v.self.pctid.tab"
+    output: "all_genes.{cluster_type}.mcl.raw"
     threads: config['mcl']['threads']
     shell: "mcl {input} --abc {config[mcl][options]} \
             -o {output} -te {threads}"
@@ -25,29 +26,30 @@ rule mcl:
 rule get_reps:
     input:
         cluster=rules.mcl.output,
-        faa='all_genes.ffn',
-    output: 'all_genes.ffn.{}'.format(cluster_suffix)
+        faa='all_genes.{cluster_type}'
+    output: 'all_genes.{cluster_type}.' + cluster_suffix
     shell: "screen_list.py {input.faa} -k -l <(cut -f 1 {input.cluster}) \
             -o {output}"
 
 rule all_v_all_self_db:
-    input: "all_genes.ffn"
-    output: "all_genes.ffn.prj"
-    benchmark: 'benchmarks/all_genes.ffn.v.self.db.time'
+    input: "all_genes.{cluster_type}"
+    output: "all_genes.{cluster_type}.prj"
+    benchmark: 'benchmarks/all_genes.{cluster_type}.v.self.db.time'
     threads: config['mcl']['threads']
     params:
         exe='lastdb8' if config['mcl']['use_last8'] else 'lastdb',
+        prot='-p' if cluster_type == 'faa' else '',
     shell:
         """
-        {params.exe} -P {threads} {input} {input}
+        {params.exe} -P {threads} {params.prot} {input} {input}
         """
 
 rule all_v_all_self:
     input:
-        "all_genes.ffn",
-        "all_genes.ffn.prj",
-    output: "all_genes.ffn.v.self.last"
-    benchmark: 'benchmarks/all_genes.ffn.v.self.time'
+        "all_genes.{cluster_type}",
+        "all_genes.{cluster_type}.prj",
+    output: "all_genes.{cluster_type}.v.self.last"
+    benchmark: 'benchmarks/all_genes.{cluster_type}.v.self.time'
     threads: config['mcl']['threads']
     params:
         exe='lastal8' if config['mcl']['use_last8'] else 'lastal',
@@ -61,8 +63,8 @@ rule all_v_all_self:
 rule process_for_mcl:
     input:
         hits=rules.all_v_all_self.output,
-        fasta='all_genes.ffn',
-    output: "all_genes.v.self.pctid.tab"
+        fasta='all_genes.{cluster_type}',
+    output: "all_genes.{cluster_type}.v.self.pctid.tab"
     benchmark: "benchmarks/process_for_mcl.time"
     run:
         process_for_mcl(get_file_name(input.hits),
