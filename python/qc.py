@@ -90,7 +90,6 @@ def setup_qc_outputs(config):
             one of 'None', 'rename', 'assembly', or 'joining'
 
     """
-
     try:
         sample_data = config['sample_data']
     except KeyError:

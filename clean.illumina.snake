@@ -16,6 +16,8 @@ from python.common import get_version
 from python.qc import setup_qc_outputs
 from snakemake.logging import logger
 
+include: 'common/stats.snake'
+
 # parses config to setup outputs
 outputs = config.setdefault('outputs',set())
 outputs.update(setup_qc_outputs(config))
@@ -23,7 +25,6 @@ outputs.update(setup_qc_outputs(config))
 include: "common/transitions.snake"
 include: "qc/setup.snake"
 
-include: 'common/stats.snake'
 
 logger.debug("Snakefile config:\n" + yaml.dump(config))
 

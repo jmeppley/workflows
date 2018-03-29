@@ -28,12 +28,16 @@ from python.common import get_version, parse_stats
 from python.qc import setup_qc_outputs
 from python.assembly import get_contig_length_summary_stats
 snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))
+from snakemake.logging import logger
 
 # Initialize transitions
 config.setdefault('transitions', {})
 
 ##
 # Bring in components
+#
+# for counting reads in fasta files
+include: "common/stats.snake"
 #
 # for mapping reads back to contigs
 include: "common/mapping_bwa.snake"
@@ -69,7 +73,6 @@ include: "assembly/contig.annotation.snake"
 #
 # rule to create links
 include: "common/transitions.snake"
-include: "common/stats.snake"
 
 # 
 # Make sure assembly has name
