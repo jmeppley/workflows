@@ -18,6 +18,7 @@ cluster_suffix = config['mcl']['output_str']
 rule mcl:
     input: "all_genes.v.self.pctid.tab"
     output: "all_genes.ffn.mcl.raw"
+    benchmark: "benchmarks/mcl.time"
     threads: config['mcl']['threads']
     shell: "mcl {input} --abc {config[mcl][options]} \
             -o {output} -te {threads}"
@@ -27,6 +28,7 @@ rule get_reps:
         cluster=rules.mcl.output,
         faa='all_genes.ffn',
     output: 'all_genes.ffn.{}'.format(cluster_suffix)
+    benchmark: "benchmarks/get_reps.time"
     shell: "screen_list.py {input.faa} -k -l <(cut -f 1 {input.cluster}) \
             -o {output}"
 
@@ -49,6 +51,7 @@ rule all_v_all_self:
     output: "all_genes.ffn.v.self.last"
     benchmark: 'benchmarks/all_genes.ffn.v.self.time'
     threads: config['mcl']['threads']
+    params:
         exe='lastal8' if config['mcl']['use_last8'] else 'lastal',
     shell:
         """
