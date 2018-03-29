@@ -17,10 +17,35 @@ config['cluster_type'] = 'faa'
 tmp_dir = tempfile.TemporaryDirectory(dir=config['mmseqs2']['tmp_dir_root'],
                                       prefix='tmp_mmseqs2_')
 
+rule extract_faa:
+    input: 
+        reps="all_genes.faa.{}.reps".format(cluster_suffix),
+        db="all_genes.faa"
+    output: "all_genes.faa.{}".format(cluster_suffix)
+    benchmark: 'benchmarks/all_genes.faa.{}.extract.faa.time' \
+                        .format(cluster_suffix)
+    shell:
+        """
+         mmseqs result2flat {input.db} {input.db} {input.reps} {output} \
+           --use-fasta-header > {output}.log
+        """
+
+rule extract_reps:
+    input:
+        clusters="all_genes.faa.{}.result".format(cluster_suffix),
+        db='all_genes.faa',
+    output: "all_genes.faa.{}.reps".format(cluster_suffix)
+    benchmark: 'benchmarks/all_genes.faa.{}.extract.reps.time' \
+                        .format(cluster_suffix)
+    shell:
+        """
+         mmseqs result2repseq {input.db} {input.clusters} {output} > {output}.log
+        """
+
 rule cluster_faa:
     input: "all_genes.faa.dbtype"
-    output: "all_genes.faa.{}".format(cluster_suffix)
-    benchmark: 'benchmarks/all_genes.faa.{}.time' \
+    output: "all_genes.faa.{}.result".format(cluster_suffix)
+    benchmark: 'benchmarks/all_genes.faa.{}.cluster.time' \
                         .format(cluster_suffix)
     threads: config['mmseqs2']['threads']
     params:
@@ -35,4 +60,4 @@ rule formatdb_for_mmseqs:
     input: "all_genes.faa"
     output: 'all_genes.faa.dbtype'
     benchmark: 'benchmarks/format_for_mmseqs.time'
-    shell: "mmseqs2 createdb {input} {input} > {input}.createdb.log > 2>&1"
+    shell: "mmseqs createdb {input} {input} > {input}.createdb.log 2>&1"
