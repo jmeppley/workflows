@@ -49,6 +49,7 @@ rule all_v_all_self:
     output: "all_genes.ffn.v.self.last"
     benchmark: 'benchmarks/all_genes.ffn.v.self.time'
     threads: config['mcl']['threads']
+    params:
         exe='lastal8' if config['mcl']['use_last8'] else 'lastal',
     shell:
         """

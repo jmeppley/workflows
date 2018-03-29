@@ -10,16 +10,15 @@ defaults = {
 }
 apply_defaults(config, defaults)
 cluster_suffix = config['cdhit']['output_str']
-config['cluster_type'] = 'faa'
 
-rule cluster_faa:
-    input: "all_genes.faa"
-    output: "all_genes.faa.{}".format(cluster_suffix)
-    benchmark: 'benchmarks/all_genes.faa.{}.time' \
+rule cluster_ffn:
+    input: "all_genes.ffn"
+    output: "all_genes.ffn.{}".format(cluster_suffix)
+    benchmark: 'benchmarks/all_genes.ffn.{}.time' \
                         .format(cluster_suffix)
     threads: config['cdhit']['threads']
     params:
         cd_hit_options=config['cdhit']['options']
     shell:
-        "cd-hit -T {threads} {params.cd_hit_options} \
+        "cd-hit-est -T {threads} {params.cd_hit_options} \
          -i {input} -o {output}"

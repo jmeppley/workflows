@@ -1,0 +1,38 @@
+import tempfile
+from python.common import apply_defaults
+
+# software parameters
+defaults = {
+    'mmseqs2': {
+        'threads': 20,
+        'program': 'cluster',
+        'options': '--min-seq-id 0.97 -c 0.8 --cov-mode 0 --cluster-mode 0',
+        'output_str': 'cluster.setcover.97',
+        'tmp_dir_root': '.',
+    },
+}
+apply_defaults(config, defaults)
+cluster_suffix = config['mmseqs2']['output_str']
+config['cluster_type'] = 'faa'
+tmp_dir = tempfile.TemporaryDirectory(dir=config['mmseqs2']['tmp_dir_root'],
+                                      prefix='tmp_mmseqs2_')
+
+rule cluster_faa:
+    input: "all_genes.faa.dbtype"
+    output: "all_genes.faa.{}".format(cluster_suffix)
+    benchmark: 'benchmarks/all_genes.faa.{}.time' \
+                        .format(cluster_suffix)
+    threads: config['mmseqs2']['threads']
+    params:
+        input='all_genes.faa',
+        tmp_dir=tmp_dir.name
+    shell:
+        "mmseqs {config[mmseqs2][program]} \
+            {params.input} {output} {params.tmp_dir} \
+            {config[mmseqs2][options]} --threads {threads}"
+
+rule formatdb_for_mmseqs:
+    input: "all_genes.faa"
+    output: 'all_genes.faa.dbtype'
+    benchmark: 'benchmarks/format_for_mmseqs.time'
+    shell: "mmseqs2 createdb {input} {input} > {input}.createdb.log > 2>&1"
