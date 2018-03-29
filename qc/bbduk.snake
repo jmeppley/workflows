@@ -85,7 +85,7 @@ rule trim_bbduk_phix:
     input:
         "{prefix}.fastq"
     output:
-        temp("{prefix}.nophix.fastq"),
+        "{prefix}.nophix.fastq",
         "{prefix}.nophix.gchist.txt"
     benchmark:
         "benchmarks/{prefix}.nophix.fastq.time"
