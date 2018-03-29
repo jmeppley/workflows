@@ -4,9 +4,8 @@ channels:
  - brwnj
  - jmeppley
 dependencies:
- - python=3.5
- - snakemake<4
- - gsl
+ - python=3.6
+ - snakemake
  - anvio
  - pandas
  - biopython
