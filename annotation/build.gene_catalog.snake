@@ -31,18 +31,21 @@ assembly_renaming_map = {x['assembly']:x['regex'] \
                          for x in config.get('assembly_renaming', [])}
 # chose clustering method
 #  clustering snake file should define the variable cluster_suffix
-clustering_method = config.get('clustering_method', 'cdhit')
+clustering_method = config.get('clustering_method', 'cdhitest')
 cluster_suffix = clustering_method
 include: "anntation/gene_catalog.{}.snake".format(clustering_method)
+#
+# are we clustering faa or ffn? The cluster method should determine this
+cluster_type = config.get("cluster_type", 'ffn')
 #
 # Define some trasitions to break the workflow up into segments
 transitions = config.setdefault('transitions',{})
 # the first part creates the clustered faa (prefix defined in parent makefile)
 transitions[prefix + '.faa'] = \
-            'all_genes.ffn.{}.faa'.format(cluster_suffix)
-# the clustered ffn is ambiguously named, so lets add ffn to the end
-transitions['all_genes.ffn.{}.ffn'.format(cluster_suffix) = \
-            'all_genes.ffn.{}'.format(cluster_suffix)
+            'all_genes.{}.{}.faa'.format(cluster_type, cluster_suffix)
+# the clustered output is ambiguously named, so lets add ffn or faa to the end
+transitions['all_genes.{0}.{1}.0{}'.format(cluster_type, cluster_suffix) = \
+            'all_genes.{}.{}'.format(cluster_type, cluster_suffix)
 #
 # End configuration
 ##########
