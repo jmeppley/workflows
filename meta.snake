@@ -1,19 +1,19 @@
 """
-Snakefile to run arbitrary sub workflow for testing
+Snakefile to run arbitrary sub workflow, useful for testing
 
 Running through this, lets it pick up the correct path info
 
 Use, run:
 
- snakemake -s /path/to/test.snake --config workflow=subdir/name.snake output_file
+ snakemake -s /path/to/meta.snake --config workflow=subdir/name.snake output_file
 
 EG: to run QC and pandaseq joining on aloha1b.fastq:
  
- snakemake -s ../workflows/test.snake --config workflow=qc/pandas aloha1b.scripseq.ATCACG.trim_adapt.joined.fastq
+ snakemake -s ../workflows/meta.snake --config workflow=qc/pandas aloha1b.scripseq.ATCACG.trim_adapt.joined.fastq
 
 or EG: to get histogram of read lengths in reads.fastq:
 
- snakemake -s ../workflows/test.snake --config workflow=common/stats.fasta reads.fastq.hist
+ snakemake -s ../workflows/meta.snake --config workflow=common/stats.fasta reads.fastq.hist
 
 Multiple workflows can be separated by a colon (":").
 """
