@@ -338,7 +338,7 @@ def process_hit(hit, output_handle, self_bits, minbit):
                 
 
 
-def get_longest_seq(clusters, genes, format='fastq'):
+def get_longest_seq(clusters, genes, format='fasta'):
     """
     Given a clsuter file from mcl where each line is a cluster with
     tab separated gene ids.
