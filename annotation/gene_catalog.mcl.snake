@@ -1,4 +1,4 @@
-from python.common import get_version, apply_defaults, get_file_name
+from python.common import get_version, apply_defaults, get_file_name, TRUTH
 from python.gene_catalog import process_for_mcl, get_longest_seq
 
 # software parameters
@@ -13,8 +13,8 @@ defaults = {
     },
 }
 apply_defaults(config, defaults)
+config['mcl']['use_last8'] = config['mcl']['use_last8'] in TRUTH
 cluster_suffix = config['mcl']['output_str']
-cluster_type = config.setdefault('cluster_type', 'fna')
 
 wildcard_constraints:
     cluster_suffix=cluster_suffix
@@ -59,7 +59,7 @@ rule all_v_all_self_db:
     threads: config['mcl']['threads']
     params:
         exe='lastdb8' if config['mcl']['use_last8'] else 'lastdb',
-        prot='-p' if cluster_type == 'faa' else '',
+        prot=lambda w: '-p' if w.cluster_type == 'faa' else '',
     shell:
         """
         {params.exe} -P {threads} {params.prot} {input} {input}
@@ -92,5 +92,5 @@ rule process_for_mcl:
                         get_file_name(input.fasta),
                         get_file_name(output),
                         format='blast',
-                        pctid=config['mcl']['filters']['pctid'],
-                        minbit=config['mcl']['filters']['minbit'],)
+                        pctid=float(config['mcl']['filters']['pctid']),
+                        minbit=float(config['mcl']['filters']['minbit']),)
