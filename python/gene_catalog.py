@@ -348,6 +348,6 @@ def get_longest_seq(clusters, genes, format='fasta'):
     gene_lengths = {g.id:len(g) for g in SeqIO.parse(genes, format)}
     with open(clusters) as CLUSTERS:
         for line in CLUSTERS:
-            genes = line.rstrip().split('\t')
-            yield sorted(genes, reverse=True,
+            member_genes = line.rstrip().split('\t')
+            yield sorted(member_genes, reverse=True,
                          key=lambda g: gene_lengths[g])[0]
