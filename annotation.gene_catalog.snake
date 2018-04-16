@@ -8,8 +8,8 @@ Starting point is either:
 Workflow:
 
 If starting from assemblies:
- * collect all faa and fna annotations
- * pull out just coding sequences from fna files
+ * collect all faa and ffn annotations
+ * pull out just coding sequences from ffn files
  * cluster all nucl CDS at 95%
  * pull out faa version of cluster reps
 

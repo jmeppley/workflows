@@ -58,7 +58,7 @@ transitions['all_genes.{0}.{1}.{0}'.format(cluster_type, cluster_suffix)] = \
 catalog_stats_files = \
                 expand("stats/{prefix}.{suffix}.{ext}", 
                        ext=['stats','hist'],
-                       suffix=['faa','fna'],
+                       suffix=['faa','ffn'],
                        prefix="all_genes")
 config['outputs'] = set(catalog_stats_files)
 #
@@ -139,7 +139,7 @@ rule collect_gene_calls:
     output: "all_genes.{ext}"
     benchmark: 'benchmarks/all_genes.{ext}.time'
     wildcard_constraints:
-        ext=r'(fna|faa)'
+        ext=r'(ffn|faa)'
     shell:
         """
         cat {input} > {output}
@@ -160,10 +160,10 @@ rule get_fasta_id_list:
          > {output}
         """
 
-rule filter_fna:
+rule filter_ffn:
     input:
         "all_genes.faa.idlist",
-        "all_genes.fna"
+        "all_genes.ffn"
     output: 
         "all_genes.ffn"
     benchmark: 'benchmarks/all_genes.ffn.time'
