@@ -18,5 +18,6 @@ dependencies:
  - sed
  - spades
  - salmon
+ - kallisto
  - py-metagenomics
  - batch_launcher

@@ -16,6 +16,11 @@ config['cov_col'] = 'tpm'
 config['read_col'] = 'est_counts'
 config['contig_col'] = 'target_id'
 
+if config['produce_bam']:
+    for sample in config['sample_data']:
+        config['transitions']["mapping/{}.reads.vs.contigs.all.bam".format(sample)] = \
+            "kallisto/{}.vs.contigs.all.quant/pseudoalignments.bam".format(sample)
+
 def get_sample_reads(w):
     sample_reads = get_sample_reads_for_mapping(w, config)
     #logger.debug('CONFIG: {}\nsample reads:\n{}\n'.format(yaml.dump(config), repr(sample_reads)))
@@ -29,23 +34,11 @@ def get_sample_reads(w):
                             "files per sample!\nSample {}\nFiles {}"\
                             .format(w.sample, repr(sample_reads)))
     # single files need to be split apart
-    return [sample_reads + ".1.fastq",
-            sample_reads + ".2.fastq"]
-
-def get_sample_reads_option(w):
-    """ return option string for reads to be mapped """
-    sample_reads = get_sample_reads_for_mapping(w, config)
-    if not isinstance(sample_reads, str):
-        if len(sample_reads)==2:
-            return ' '.join(sample_reads)
-        if len(sample_reads)==1:
-            sample_reads = sample_reads[0]
-        else:
-            raise Exception("I don't know how to handle more than two read "
-                            "files per sample!\nSample {}\nFiles {}"\
-                            .format(w.sample, repr(sample_reads)))
-    # single files need to be split apart
-    return '{file}.1.fastq {file}.2.fastq'.format(file=sample_reads)
+    if re.search(r'renamed.interleaved', sample_reads):
+        return [re.sub(r'interleaved', d, sample_reads) for d in ('R1', 'R2')]
+    else:
+        return [sample_reads + ".1.fastq",
+                sample_reads + ".2.fastq"]
 
 rule index_contigs_kallisto:
     """ process a set of transcripts for kallisto quanitfication """
@@ -94,23 +87,22 @@ rule quant_reads_kallisto:
     output:
         info="kallisto/{sample}.vs.{contigs}.quant/run_info.json",
         quant="kallisto/{sample}.vs.{contigs}.quant/abundance.tsv",
-        bamfile=temp("mapping/{sample}.reads.vs.{contigs}.bam")
+        bamfile="kallisto/{sample}.vs.{contigs}.quant/pseudoalignments.bam" \
+            if config['produce_bam'] else [],
     log: "logs/kallisto.{sample}.vs.{contigs}.quant.log"
     benchmark: "benchmarks/kallisto.{sample}.vs.{contigs}.time"
     version: config['kallisto_version']
     params:
-        reads=get_sample_reads_option,
         outdir="kallisto/{sample}.vs.{contigs}.quant",
+        bam="--pseudobam" if config['produce_bam'] else ""
     shell:
         """
         {config[kallisto_prefix]}
         rm -rf {params.outdir}
         kallisto quant -i {input.index} -t {threads} \
          -b {config[kallisto][bootstraps]} {config[kallisto][quant_options]} \
-         {params.reads} -o {params.outdir} --pseudobam \
+         {input.reads} -o {params.outdir} {params.bam} \
          > {log} 2>&1
-        ln -s $(realpath --relative-to=$(dirname {output.bamfile}) \
-         {params.outdir}/pseudoalignments.bam) {output.bamfile}
         """
 
 rule coverages_file:
