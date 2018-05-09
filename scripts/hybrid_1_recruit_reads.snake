@@ -8,6 +8,7 @@ mg_genome_fasta_files = glob.glob(data_dir + "/*/*/*/contigs.fasta")
 mg_genomes = {}
 mg_bams = {}
 mg_cleaned_reads = {}
+mg_renames = {}
 for fasta_file in mg_genome_fasta_files:
     rundate, sample = \
         re.search(r'/(\d\d\d\d\d\d)[_-]NS500.+/([^/]+)/contigs.fasta', \
@@ -20,6 +21,11 @@ for fasta_file in mg_genome_fasta_files:
         mg_cleaned_reads[sample_name] = cleaned_reads[0]
     else:
         mg_cleaned_reads[sample_name] = 'no_such_file'
+    mg_renames[sample_name] = glob.glob(re.sub(r'contigs.fasta','*.renamed.R1.tsv',fasta_file))
+
+mgs_by_depth = {}
+for mg in mg_genomes:
+    mgs_by_depth.setdefault(re.search(r'(\d+)-\d+$', mg).group(1), []).append(mg)
 
 # find all the SAG genomes
 sag_genome_fasta_files = glob.glob(data_dir + "/*/IMG*/*assembled.fna")
@@ -28,14 +34,28 @@ sag_fastq_tarballs = glob.glob(data_dir + "/*/QC_and*/*fastq.gz")
 sag_reads = {re.search(r'\[([^\]]+)\]/', t).group(1):t for t in sag_fastq_tarballs}
 
 logger.debug(yaml.dump(config))
+logger.debug("MG GENOMES: " + yaml.dump(mg_genomes))
 logger.debug("MG READS: " + yaml.dump(mg_cleaned_reads))
+
+# Define the final outputs
+sag_reads_outputs = expand('{sag}/reads.fastq', sag=sag_reads)
+logger.debug('SAGREADS: ' + repr(sag_reads_outputs) + "\n")
+mg_reads_outputs = expand('{sag}/matching_reads_from_mg.{mg}.fastq', \
+                          sag=sag_genomes, mg=mg_bams)
+logger.debug('MGREADS: ' + repr(mg_reads_outputs) + "\n")
+reads_by_depth_outputs = \
+        expand('{sag}/matching_reads_from_depth.{depth}.fastq', \
+                     sag=sag_genomes, depth=[d for d,ms in mgs_by_depth.items() if len(ms)>1])
+logger.debug("READSBYDEPTH: " + repr(reads_by_depth_outputs) + "\n")
+contig_outputs = expand('{sag}/matching_contigs_from_all_mgs.fna', sag=sag_genomes)
+logger.debug("CONTIG OUTPUTS: " + repr(contig_outputs) + "\n\n")
 
 rule output:
     input:
-        sag_reads=expand('{sag}/reads.fastq', sag=sag_reads),
-        mg_reads=expand('{sag}/matching_reads_from_mg.{mg}.fastq', \
-                     sag=sag_genomes, mg=mg_bams),
-        contigs=expand('{sag}/matching_contigs_from_all_mgs.fna', sag=sag_genomes)
+        sag_reads=sag_reads_outputs,
+        mg_reads=mg_reads_outputs,
+        depth_reads=reads_by_depth_outputs,
+        contigs=contig_outputs
 
 rule list_matching_contigs:
     input: '{sag}/matching_contigs_from_mg.{mg}.lastal'
@@ -76,8 +96,8 @@ rule matching_contigs_fna:
     shell: 'screen_list.py {input.fna} -l {input.list} -k -o {output}'
 
 rule all_mg_contigs_for_sag:
-    input:
-        expand('{{sag}}/matching_contigs_from_mg.{mg}.fna', mg=mg_genomes)
+    input: lambda w: \
+        expand('{sag}/matching_contigs_from_mg.{mg}.fna', mg=mg_genomes, sag=w.sag)
     output: '{sag}/matching_contigs_from_all_mgs.fna'
     shell: 'cat {input} > {output}'
 
@@ -132,6 +152,7 @@ rule mg_reads_for_sag_16:
     """
     input:
         fastq=lambda w: mg_cleaned_reads[w.mg16],
+        renames=lambda w: mg_renames[w.mg16],
         read_list='{sag}/matching_reads_from_mg.{mg16}.list'
     output: '{sag}/matching_reads_from_mg.{mg16}.fastq'
     wildcard_constraints:
@@ -139,6 +160,22 @@ rule mg_reads_for_sag_16:
     run:
         with open(input.read_list) as R:
             read_list = set(r.strip() for r in R)
+
+        # just cover the bases and add all versions of the read names
+        renames = input.renames if isinstance(input.renames, list) else [input.renames,]
+        for rename in renames:
+            with open(rename) as M:
+                for line in M:
+                    old, new = line.strip().split()
+                    if old in read_list or new in read_list:
+                        read_list.add(new) 
+                        read_list.add(old)
+
+        logger.debug("Loaded list of {} reads including '{}'".format(
+                        len(read_list),
+                        next(iter(read_list))
+                        ))
+
         read_rexp = re.compile(r'^@(\S+)\s')
         with open(output[0], 'wt') as OUT:
             with open(input.fastq) as F:
@@ -152,6 +189,11 @@ rule mg_reads_for_sag_16:
                                 OUT.write(line)
                 except StopIteration:
                     pass
+
+rule reads_by_depth:
+    input: lambda w: expand('{sag}/matching_reads_from_mg.{mg}.fastq', mg=mgs_by_depth[w.depth], sag=w.sag)
+    output: '{sag}/matching_reads_from_depth.{depth}.fastq'
+    shell: 'cat {input} > {output}'
 
 rule sag_reads:
     input: lambda w: sag_reads[w.sag]
