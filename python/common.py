@@ -148,7 +148,11 @@ def add_stats_outputs(snakefile, config):
         new_outputs = config.setdefault('outputs', set())
         output_count = 0
         for line in complete.stdout.decode().split('\n'):
-            output = line.split('\t')[0]
+            cells = line.split('\t')
+            if len(cells) < 4:
+                # not a summary line
+                continue
+            output = cells[0].strip()
             logger.debug(output)
             if re.search(r'f(aa|fn|na|a|asta|astq)(\.gz)?$', output):
                 output_count += 1
