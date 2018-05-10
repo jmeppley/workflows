@@ -17,6 +17,7 @@ dependencies:
  - prinseq
  - seqtk
  - sed
+ - coreutils
  - spades
  - salmon
  - kallisto
