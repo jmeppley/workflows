@@ -160,15 +160,6 @@ rule get_fasta_id_list:
          > {output}
         """
 
-rule filter_ffn:
-    input:
-        "all_genes.faa.idlist",
-        "all_genes.ffn"
-    output: 
-        "all_genes.ffn"
-    benchmark: 'benchmarks/all_genes.ffn.time'
-    shell: "screen_list.py -l {input[0]} -k {input[1]} > {output}"
-
 rule get_cluster_rep_faa:
     input:
         "all_genes.ffn.{cd_hit_output_str}.ffn.idlist",
