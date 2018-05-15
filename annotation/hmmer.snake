@@ -1,15 +1,33 @@
-rule hmmer_db_press:
+from python.annotate import get_db_frag, get_db_frags
+
+"""
+TODO:
+ rule to automatical split DBs
+ how do we account for multiple outputs?
+for db, dbdata in config['dbs'].items():
+    frags = dbdata.get('frags', 0)
+    if frags > 1:
+        # blindly assume it is HMM for now
+        hmm = dbdata['path']
+        frags = get_db_frags(hmm, frags)
+        rule split...
+
+        """
+rule frag_hmm_db:
     """
-    Press an hmm file for searching
+    create a fragmented hmm file
     """
-    input:
-        "{db_path}"
-    output:
-        "{db_path,.+\.[Hh][Mm][Mm](\.[Aa][Ss][Cc][Ii][Ii])?}.h3i"
-    version:
-        get_version('hmmpress','-h',lines=[1,])
-    shell:
-        "rm -f {input}.h3? && hmmpress {input}"
+    input: "{path}/{hmm_file}.{ext}"
+    output: "{path}/frag_{frags}/{hmm_file}.001.{ext}"
+    params:
+        outname="{path}/frag_{frags}/{hmm_file}.{ext}"
+    shell: "fragment_records.py -N {wildcards.frags} \
+             -P '^HMMER' -E -Z 3 -i {input} -o {params.outname}"
+    
+rule frag_hmm_db_others:
+    input: "{path}/frag_{frags}/{hmm_file}.001.{ext}"
+    output: "{path}/frag_{frags}/{hmm_file}.{N}.{ext}"
+    shell: "touch {output}"
 
 rule hmmer:
     """
@@ -39,8 +57,8 @@ rule hmmer_dbfrag:
     Look for profile matches in the Nth fragment of a DB
     """
     input:
-        db_file=lambda w: config['dbs'][w.db]['path'].format(N=int(w.N)) \
-                                                                    + ".h3i",
+        db_file=lambda wildcards: get_db_frag(config, wildcards.db, \
+                                              wildcards.N),
         fasta="{file_root}.faa"
     output:
         temp("{file_root}.vs.{db}.{N}.tbl.dfrag")
@@ -52,11 +70,9 @@ rule hmmer_dbfrag:
         get_version('hmmsearch','-h',lines=[1,])
     threads:
         config['hmmer'].get('threads',default_threads)
-    params:
-        db_path=lambda w: config['dbs'][w.db]['path'].format(N=int(w.N))
     shell:
         "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
-        {params.db_path} {input.fasta}"
+        {input.db_file} {input.fasta}"
 
 rule hmmer_fragdb:
     """

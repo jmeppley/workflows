@@ -4,7 +4,7 @@
 defaults = {
     'cdhit': {
         'threads': 20,
-        'options': '-c 0.95 -M 1000000 -G 0 -aS 0.9 -g 1 -r 1 -d 0',
+        'options': '-c 0.95 -M 1000000 -G 0 -aS 0.9 -g 1 -d 0',
         'output_str': 'c.95.aS.9.g1.r1.G0',
     },
 }
