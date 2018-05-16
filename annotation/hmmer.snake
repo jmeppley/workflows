@@ -1,33 +1,31 @@
 from python.annotate import get_db_frag, get_db_frags
 
-"""
-TODO:
- rule to automatical split DBs
- how do we account for multiple outputs?
-for db, dbdata in config['dbs'].items():
-    frags = dbdata.get('frags', 0)
-    if frags > 1:
-        # blindly assume it is HMM for now
-        hmm = dbdata['path']
-        frags = get_db_frags(hmm, frags)
-        rule split...
-
-        """
+#####
+# Fragmented HMM dbs:
+#
+#  The following two rules use a bit of a hack to get around
+#  a limitation of snakemake
 rule frag_hmm_db:
     """
     create a fragmented hmm file
     """
     input: "{path}/{hmm_file}.{ext}"
-    output: "{path}/frag_{frags}/{hmm_file}.001.{ext}"
+    output: "{path}/frag_{frags}/{hmm_file}.0001.{ext}"
     params:
         outname="{path}/frag_{frags}/{hmm_file}.{ext}"
     shell: "fragment_records.py -N {wildcards.frags} \
-             -P '^HMMER' -E -Z 3 -i {input} -o {params.outname}"
+             -P '^HMMER' -E -Z 4 -i {input} -o {params.outname}"
     
 rule frag_hmm_db_others:
-    input: "{path}/frag_{frags}/{hmm_file}.001.{ext}"
+    """
+    make snakemake aware of db fragments by creating shadow symlinks to the
+    pieces
+    """
+    input: "{path}/frag_{frags}/{hmm_file}.0001.{ext}"
     output: "{path}/frag_{frags}/{hmm_file}.{N}.{ext}"
-    shell: "touch {output}"
+    params:
+        input="{path}/frag_{frags}/{hmm_file}.0{N}.{ext}"
+    shell: "ln -s $(realpath --relative-to=$(dirname {output}) {params.input}) {output}"
 
 rule hmmer:
     """
