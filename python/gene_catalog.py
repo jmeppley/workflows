@@ -54,8 +54,8 @@ def get_lca(hits, translate=lambda x: [x]):
     return lca
 
 # Simplify the list of ranks 
-printed_ranks=[edltaxon.ranks[i] for i in [3,7,12,17,21,24]] + ['domain']
-major_ranks=[edltaxon.ranks[i] for i in [2,3,7,12,17,21,24,27,28]]
+printed_ranks=[edltaxon.ranks[i] for i in [3,7,11,17,21,24]] + ['domain']
+major_ranks=[edltaxon.ranks[i] for i in [2,3,7,11,17,21,24,27,28]]
 def get_major_rank(rank):
     " return the highest major rank below or equal to the given rank "
     rank_index = edltaxon.ranks.index(rank)
