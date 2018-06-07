@@ -5,13 +5,9 @@ from python.common import get_file_name
 # available rRNA DBs
 from python.annotate import get_last_alg
 
-# for transcriptomes, there is no contig filter step
-all_str = '' if config.get('is_transcriptomic', False) else 'all.'
-
 blank_file_name = ".empty.file"
 rna_search_hits_template = \
-    "contigs." + all_str + \
-    "vs.rRNA.cmsearch.{rmol}.gt{length}.gff.vs.{db_dot_fmt}"
+    "contigs.all.vs.rRNA.cmsearch.{rmol}.gt{length}.gff.vs.{db_dot_fmt}"
 
 def get_rna_search_hits(w):
     """ return search result that matches rmol (SSU or LSU) """
@@ -43,7 +39,7 @@ def get_rna_id_names_file(w):
     return blank_file_name
 
 sample_coverages = \
-        {s:"contigs.{all}coverages.{sample}.txt".format(all=all_str, sample=s) \
+        {s:"contigs.all.coverages.{sample}.txt".format(sample=s) \
                      for s in config['sample_data'] \
                      if 'clean' in config['sample_data'][s]}
 
@@ -96,12 +92,12 @@ rule rrna_report:
     Look at the rRNA annotations and get table of nearly full length LSUs or SSUs
     """
     input:
-        gff="contigs." + all_str + "vs.rRNA.cmsearch.{rmol}.gt{length}.gff",
+        gff="contigs.all.vs.rRNA.cmsearch.{rmol}.gt{length}.gff",
         stats=sample_coverages.values(),
         hits=get_rna_search_hits,
         id_names=get_rna_id_names_file,
     output:
-        "contigs." + all_str + "vs.rRNA.cmsearch.{rmol}.gt{length}.tsv"
+        "contigs.all.vs.rRNA.cmsearch.{rmol}.gt{length}.tsv"
     run:
         # get map from contigs to coverage
         coverages = {}

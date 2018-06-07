@@ -179,22 +179,26 @@ def setup_qc_outputs(config):
         extension = "fastq.gz" if files_gzipped else "fastq"
 
         # starting files (define as transitions from raw files)
+        new_raw_files = []
         if len(raw_files) > 2:
             # The reads are probably split up into lanes, merge into one pair
-            new_raw_files = []
             for direction, file_list in setup_merge_by_lanes(raw_files,
                                                              sample).items():
                 merged_file = '{sample}.{direction}.{extension}'.format(**vars())
                 transitions[merged_file] = file_list
                 new_raw_files.append(merged_file)
             raw_files = new_raw_files
-            sample_data[sample]['raw'] = new_raw_files
         elif len(raw_files) == 2:
             for direction, source_file in zip(READ_DIRECTIONS, raw_files):
-                transitions['{sample}.{direction}.{extension}'\
-                                                .format(**vars())] = source_file
+                local_raw_file = '{sample}.{direction}.{extension}'\
+                                                                .format(**vars())
+                transitions[local_raw_file] = source_file
+                new_raw_files.append(local_raw_file)
         else:
-            transitions['{sample}.{extension}'.format(**vars())] = raw_files[0]
+            local_raw_file = '{sample}.{extension}'.format(**vars())
+            transitions[local_raw_file] = raw_files[0]
+            new_raw_files.append(local_raw_file)
+        sample_data[sample]['raw'] = new_raw_files
 
         # cleaned suffix
         cleaned_suffix = QC_PROTOCOLS.get(cleaning_protocol, '')
