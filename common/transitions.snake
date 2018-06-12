@@ -141,6 +141,8 @@ wildcard_constraints:
     transition_file_name=pattern
 
 # transition rule will only match one of the configured files
+localrules: transition_link_or_cat
+
 rule transition_link_or_cat:
     """ Creates a symbolic link to or concatenates files from a config mapping """
     input: lambda w: transitions[w.transition_file_name]

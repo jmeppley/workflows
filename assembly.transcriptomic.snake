@@ -25,7 +25,6 @@ import os, re, sys, glob, yaml, pandas, subprocess, tempfile, numpy
 from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
 from python.common import get_version, parse_stats, get_file_name
 from python.qc import setup_qc_outputs
-snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))
 
 # Initialize transitions
 config.setdefault('transitions', {})
