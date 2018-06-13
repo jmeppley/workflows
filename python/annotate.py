@@ -1,7 +1,7 @@
 """
 Functions for the annotation workflows
 """
-
+import os
 
 def get_db_types(config):
     gene_family_dbs = []
@@ -93,3 +93,23 @@ def get_db_assignment_params(wildcards, config):
     return '-p hitid'
 
 
+def get_db_frag(config, db, N):
+    full_hmm = config['dbs'][db]['path']
+    n_frags = config['dbs'][db]['frags']
+    template = get_db_frag_template(full_hmm, n_frags)
+    return template.format(N=int(N))
+
+def get_db_frag_template(full_hmm, n_frags):
+    n_frag_digits = 3  # unless we can get the hard coded 000 out of the rules
+    #n_frag_digits = len(str(n_frags))
+    hmm_dir = os.path.dirname(full_hmm)
+    frag_dir = os.path.join(hmm_dir, 'frag_{}'.format(n_frags))
+    hmm_base, hmm_ext = os.path.splitext(os.path.basename(full_hmm))
+    template = "{}{}{}.{{N:0{}d}}{}".format(frag_dir, os.path.sep,
+                                            hmm_base, n_frag_digits,
+                                            hmm_ext)
+    return template
+
+def get_db_frags(full_hmm, n_frags):
+    template = get_db_frag_template(full_hmm, n_frags)
+    return [template.format(N) for N in range(1, n_frags+1)]

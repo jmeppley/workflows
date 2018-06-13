@@ -1,15 +1,31 @@
-rule hmmer_db_press:
+from python.annotate import get_db_frag, get_db_frags
+
+#####
+# Fragmented HMM dbs:
+#
+#  The following two rules use a bit of a hack to get around
+#  a limitation of snakemake
+rule frag_hmm_db:
     """
-    Press an hmm file for searching
+    create a fragmented hmm file
     """
-    input:
-        "{db_path}"
-    output:
-        "{db_path,.+\.[Hh][Mm][Mm](\.[Aa][Ss][Cc][Ii][Ii])?}.h3i"
-    version:
-        get_version('hmmpress','-h',lines=[1,])
-    shell:
-        "rm -f {input}.h3? && hmmpress {input}"
+    input: "{path}/{hmm_file}.{ext}"
+    output: "{path}/frag_{frags}/{hmm_file}.0001.{ext}"
+    params:
+        outname="{path}/frag_{frags}/{hmm_file}.{ext}"
+    shell: "fragment_records.py -N {wildcards.frags} \
+             -P '^HMMER' -E -Z 4 -i {input} -o {params.outname}"
+    
+rule frag_hmm_db_others:
+    """
+    make snakemake aware of db fragments by creating shadow symlinks to the
+    pieces
+    """
+    input: "{path}/frag_{frags}/{hmm_file}.0001.{ext}"
+    output: "{path}/frag_{frags}/{hmm_file}.{N}.{ext}"
+    params:
+        input="{path}/frag_{frags}/{hmm_file}.0{N}.{ext}"
+    shell: "ln -s $(realpath --relative-to=$(dirname {output}) {params.input}) {output}"
 
 rule hmmer:
     """
@@ -39,8 +55,8 @@ rule hmmer_dbfrag:
     Look for profile matches in the Nth fragment of a DB
     """
     input:
-        db_file=lambda w: config['dbs'][w.db]['path'].format(N=int(w.N)) \
-                                                                    + ".h3i",
+        db_file=lambda wildcards: get_db_frag(config, wildcards.db, \
+                                              wildcards.N),
         fasta="{file_root}.faa"
     output:
         temp("{file_root}.vs.{db}.{N}.tbl.dfrag")
@@ -52,11 +68,9 @@ rule hmmer_dbfrag:
         get_version('hmmsearch','-h',lines=[1,])
     threads:
         config['hmmer'].get('threads',default_threads)
-    params:
-        db_path=lambda w: config['dbs'][w.db]['path'].format(N=int(w.N))
     shell:
         "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
-        {params.db_path} {input.fasta}"
+        {input.db_file} {input.fasta}"
 
 rule hmmer_fragdb:
     """
