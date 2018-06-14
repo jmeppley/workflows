@@ -8,10 +8,14 @@
 ## 
 ###
 from Bio import SeqIO
-import re, os, logging, pandas
+import sys, re, os, logging, pandas
 from edl import taxon as edltaxon, util, hits as edlhits, blastm8, kegg
 from snakemake import logger
-from python.common import parse_stats
+try:
+    from python.common import parse_stats
+except:
+    # if running as a script
+    from common import parse_stats
 
 
 ####
@@ -310,6 +314,45 @@ def normalize_coverages(input):
     for item in coverages.items():
         yield item
 
+def main():
+    """
+    Run as a script:
 
+    gene_catalog.py {hit_table} {lastdb_path} {output_file}
+    """
+    import argparse
+    description = "annotate genes from refseq or kegg hits"
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument("hit_table", metavar="HIT_TABLE",
+                        help="The table of hits in blast format")
+    parser.add_argument("lastdb_path", metavar="LASTDB_PATH",
+                        help="The path given to lastal")
+    parser.add_argument("output_table", metavar="OUT_TABLE",
+                        help="The file to write the anntations to")
+    parser.add_argument("-t", "--type", default=None, metavar="TYPE",
+                        choices=['refseq','kegg'],
+                        help="The type of database. Either 'refseq' or 'kegg'")
+                       
+    arguments = parser.parse_args()
 
+    # try to guess type from DB name/path
+    if arguments.type is None:
+        if re.search(r'kegg', arguments.lastdb_path,
+                     flags=re.I):
+            arguments.type = 'kegg'
+        else:
+            arguments.type = 'refseq'
+
+    # annotate!
+    if arguments.type == 'kegg':
+        annotator = KeggGeneAnnotator(arguments.lastdb_path)
+        annotator.annotate_genes_kg(arguments.hit_table,
+                                    arguments.output_table)
+    else:
+        annotator = RefSeqGeneAnnotator(arguments.lastdb_path)
+        annotator.annotate_genes_rs_prot(arguments.hit_table,
+                                         arguments.output_table)
+
+if __name__ == '__main__':
+    main()
 
