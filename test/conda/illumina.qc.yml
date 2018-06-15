@@ -19,3 +19,4 @@ dependencies:
 - last
 - py-metagenomics
 - batch_launcher
+- coreutils

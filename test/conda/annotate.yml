@@ -18,3 +18,4 @@ dependencies:
  - prodigal
  - py-metagenomics
  - batch_launcher
+ - coreutils

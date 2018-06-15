@@ -33,7 +33,7 @@ rule hmmer:
     """
     input:
         fasta="{file_root}.faa",
-        db_file=lambda wildcards: config['dbs'][wildcards.db]['path'] + ".h3i"
+        db=lambda wildcards: config['dbs'][wildcards.db]['path']
     output:
         "{file_root}.vs.{db}.tbl"
     benchmark:
@@ -48,7 +48,7 @@ rule hmmer:
         db_path=lambda wildcards: config['dbs'][wildcards.db]['path']
     shell:
         "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
-        {params.db_path} {input.fasta}"
+        {input.db} {input.fasta}"
 
 rule hmmer_dbfrag:
     """

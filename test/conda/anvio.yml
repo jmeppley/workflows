@@ -27,3 +27,4 @@ dependencies:
  - py-metagenomics
  - batch_launcher
  - hmmer
+ - coreutils

@@ -21,7 +21,7 @@ Workflow for assembling transcriptomic samples
 see test/data/configs/spades.yaml for an example configuration
 
 """
-import os, re, sys, glob, yaml, pandas, subprocess, tempfile
+import os, re, sys, glob, yaml, pandas, subprocess, tempfile, numpy
 from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
 from python.common import get_version, parse_stats, get_file_name
 from python.qc import setup_qc_outputs
@@ -34,8 +34,16 @@ config.setdefault('transitions', {})
 include: "common/stats.snake"
 #
 ## set up any QC
-# don't separate rRNA in reads
-config.setdefault('remove_rna', False)
+# don't separate rRNA in reads before assembly
+config.setdefault('produce_bam', False)
+config.setdefault('produce_nonrrna_reads', False)
+if config.setdefault('remove_rna', False) or \
+    config.get('produce_nonrrna_reads', False):
+    # if user requests separation do it after
+    config['remove_rna'] = False
+    config['produce_bam'] = True
+    config['produce_nonrrna_reads'] = True
+
 # use the assembly cleaning protocol
 config.setdefault('cleaning_protocol', 'assembly')
 outputs = config.setdefault('outputs',set())
@@ -53,16 +61,25 @@ elif assembler == 'megahit':
 else:
     raise Excption("Unknown assembler: " + config['assembler'])
 #
+# Did they ask for non rRNA reads?
+if config['produce_nonrrna_reads']:
+    for stats_file in expand("stats/{sample}.raw.non-rRNA.fastq.{extension}",
+                             extension=['stats', 'hist'],
+                             sample=config['sample_data'],):
+        outputs.add(stats_file)
+#
 # separate rRNA from transcripts at end
 include: "qc/sort.rna.snake"
 for seqtype in ['non-rRNA', 'rRNA-only']:
     for extension in ['stats', 'hist']:
-        outputs.add('stats/contigs.{}.fasta.{}'.format(seqtype, extension))
+        outputs.add('stats/contigs.all.{}.fasta.{}'.format(seqtype, extension))
 #
 # contig annotation (RNA, genes, coverage, stats)
-transcript_mapper = config.setdefault('transcript_mapper','salmon')
+transcript_mapper = config.setdefault('transcript_mapper','kallisto')
 if transcript_mapper == 'salmon':
     include: "annotation/salmon.snake"
+elif transcript_mapper == 'kallisto':
+    include: "annotation/kallisto.snake"
 elif transcript_mapper == 'bwa':
     include: "common/mapping_bwa.snake"
 else:
@@ -70,7 +87,13 @@ else:
 
 config['is_transcriptomic'] = True
 include: "assembly/rrna.annotation.snake"
-#
+
+# run prodigal
+if config.get('predict_genes', False):
+    include: "assembly/contig.genes.snake"
+    outputs.add('stats/contigs.all.annotations.faa.stats')
+    outputs.add('stats/contigs.all.annotations.faa.hist')
+
 # rule to create links
 include: "common/transitions.snake"
 
@@ -110,11 +133,11 @@ rule contigs_fasta:
     input:
         "contigs.raw.fasta"
     output:
-        "contigs.fasta"
+        "contigs.all.fasta"
     log:
-        "logs/contigs.fasta.link.log"
+        "logs/contigs.all.fasta.link.log"
     benchmark:
-        "benchmarks/contigs.fasta.txt"
+        "benchmarks/contigs.all.fasta.txt"
     version:
         "biopython-{}".format(BIOPYTHON_VERSION)
     run:
@@ -128,58 +151,138 @@ rule contigs_fasta:
                                                        title,
                                                        sequence))
 
-def get_read_files(reads_type, config):
+
+if config.get('produce_nonrrna_reads', False):
+    rule get_raw_non_rrna_reads:
+        """
+        Pull non-rRNA reads out of raw fastq file using mapping results
+        
+        Must reference contig names to list of rRNA contigs.
+        """
+        input:
+            reads="{sample}.renamed.interleaved.fastq",
+            hits="mapping/{sample}.reads.vs.contigs.all.bam",
+            rrna_contigs_list="contigs.all.rRNA-only.fasta.ids"
+        output:
+            "{sample}.raw.non-rRNA.fastq"
+        benchmark:
+            "benchmarks/{sample}.remove_rrna.time"
+        log:
+            "logs/{sample}.remove_rrna.log"
+        version:
+            get_version("screen_list.py")
+        shell:
+            "screen_list.py \
+             -l <(samtools view {input.hits} | cut -f 1,3 \
+                  | screen_table.py -l {input.rrna_contigs_list} -k -c 1) \
+             -C 0 -f fastq -v {input.reads}  > {output} 2> {log}"
+
+    rule get_contig_ids:
+        input: "{contigs}.fasta"
+        output: "{contigs}.fasta.ids"
+        shell: r"""
+            grep "^>" {input} | perl -pe  's/^>(\S+).*/\1/' > {output}
+               """
+
+def get_read_files(reads_types, config, return_sample=False):
+    """
+    code to get all the reads files for all samples
+
+    This is needed so the final report can indicate how many reads went into
+    the assembly.
+    """
+    # support either list of types or single type string (usu clean or raw)
+    if isinstance(reads_types, str):
+        reads_types = [reads_types,]
+
     for sample, sample_data in config['sample_data'].items():
-        if reads_type in sample_data:
+        # only process types that exist in data for this sample
+        for reads_type in set(reads_types).intersection(sample_data.keys()):
             reads_files = sample_data[reads_type]
             if isinstance(reads_files, str):
-                yield reads_files
+                if return_sample:
+                    yield(sample, reads_files)
+                else:
+                    yield reads_files
             else:
                 for reads_file in reads_files:
-                    yield reads_file
+                    if return_sample:
+                        yield(sample, reads_file)
+                    else:
+                        yield reads_file
+
+def get_stats_file(fasta_file):
+    return "stats/{}.stats".format(fasta_file)
 
 rule final_report:
     input:
-        raw_stats=['stats/{}.stats'.format(reads_file) \
-                   for reads_file in get_read_files('raw', config)],
-        cleaned_stats=['stats/{}.stats'.format(reads_file) \
-                   for reads_file in get_read_files('clean', config)],
-        ssu_rrnas="contigs.vs.rRNA.cmsearch.SSU.gt{length}.tsv"\
+        read_stats=[get_stats_file(read_file) \
+                    for read_file in get_read_files(['raw','clean'], config)],
+        ssu_rrnas="contigs.all.vs.rRNA.cmsearch.SSU.gt{length}.tsv"\
                             .format(length=config.get('long_ssu_length',1200)),
-        lsu_rrnas="contigs.vs.rRNA.cmsearch.LSU.gt{length}.tsv"\
+        lsu_rrnas="contigs.all.vs.rRNA.cmsearch.LSU.gt{length}.tsv"\
                             .format(length=config.get('long_lsu_length',2000)),
-        contig_stats="stats/contigs.fasta.stats",
-    output:
-        "assembly.{assembly_name}.report"
+        contig_coverages=expand("contigs.all.coverages.{sample}.txt",
+                                sample=config['sample_data']),
+        rrna_contigs='contigs.all.rRNA-only.fasta',
+        contig_stats="stats/contigs.all.fasta.stats",
+        genes='stats/contigs.all.annotations.faa.stats' \
+            if config.get('predict_genes', False) else []
+    output: "assembly.{assembly_name}.report"
     run:
         read_stats={}
 
         # paired reads
-        for sample, sample_data in config['sample_data'].items():
-            #for reads_type in ['clean']:
-            for reads_type in ['raw', 'clean']:
-                if reads_type not in sample_data:
-                    continue
-                reads_files = sample_data[reads_type]
-                if isinstance(reads_files, str):
-                    reads_files = [reads_files,]
-                for reads_file in reads_files:
-                    stats_file = "stats/{}.stats".format(reads_file)
-                    stats = parse_stats(stats_file)
-                    match = re.search(r'R[12]', stats_file)
-                    if match:
-                        key_pref = sample + " " + reads_type + " " + match.group()
-                    else:
-                        key_pref = sample + " " + reads_type
-            
-                    read_stats['{} reads'.format(key_pref)]=stats['reads']
-                    read_stats['{} bases'.format(key_pref)]=stats['bases']
+        for reads_type in ['raw', 'clean']:
+            for sample, read_file in get_read_files([reads_type,],
+                                                    config,
+                                                    return_sample=True):
+                stats_file = get_stats_file(read_file)
+                stats = parse_stats(stats_file)
+                match = re.search(r'R[12]', stats_file)
+                if match:
+                    key_pref = sample + " " + reads_type + " " + match.group()
+                else:
+                    key_pref = sample + " " + reads_type
+        
+                for stat_type in ['reads', 'bases']:
+                    stat_key = ' '.join((key_pref, stat_type))
+                    read_stats[stat_key] = read_stats.get(stat_key, 0) \
+                                            + stats[stat_type]
+
+        # mapping
+        rrna_contigs = [r.id for r in \
+            SeqIO.parse(get_file_name(input.rrna_contigs), 'fasta')]
+        read_counts = pandas.read_table(get_file_name(input.contig_coverages),
+                                        index_col=0,
+                                        usecols=[config['contig_col'],
+                                                 config['read_col']])
+        mapped_reads = read_counts.sum()[config['read_col']]
+        rrna_mapped_reads = \
+            read_counts.loc[rrna_contigs,].sum()[config['read_col']]
+        
+        mapped_reads, rrna_mapped_reads = \
+            [float(n) for n in numpy.around((mapped_reads,
+                                            rrna_mapped_reads),
+                                           2)]
+        mapping_stats = {'mapped': mapped_reads,
+                         'mapped_to_rrna_contigs': rrna_mapped_reads,
+                         'mapped_to_other_contigs': \
+                            mapped_reads - rrna_mapped_reads,
+                        }
 
         # contigs
         contig_stats={}
         stats = parse_stats(get_file_name(input.contig_stats))
-        contig_stats['contigs']=stats['reads']
-        contig_stats['contig bases']=stats['bases']
+        contig_stats['contigs'] = stats['reads']
+        contig_stats['contig bases'] = stats['bases']
+        contig_stats['contigs_w_rrna'] = len(rrna_contigs)
+
+        # count genes and gene containing contigs
+        if config.get('predict_genes', False):
+            stats = parse_stats(get_file_name(input.genes))
+            contig_stats['gene_count'] = stats['reads']
+            contig_stats['gene_bases'] = stats['bases']
 
         # full length SSUs
         ssu_count=-1
@@ -197,6 +300,7 @@ rule final_report:
 
         report={"reads":read_stats,
                 "assembly":contig_stats,
+                "mapping":mapping_stats,
                 "assembly_name":wildcards.assembly_name}
         with open(output[0],'w') as OUTF:
             OUTF.write(yaml.dump(report, default_flow_style=False))

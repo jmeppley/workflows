@@ -1,0 +1,113 @@
+from python.common import get_file_name, apply_defaults
+from python.samples import get_sample_reads_for_mapping
+if 'kallisto_env' not in config:
+    config['kallisto_prefix']=""
+else:
+    config['kallisto_prefix'] = "source activate {}\n".format(config['kallisto_env'])
+
+config['kallisto_version'] = get_version("kallisto", "version",
+                                       cmd_prefix=config['kallisto_prefix'],)
+
+apply_defaults(config, {'kallisto': {'threads': 4,
+                                  'index_options': '',
+                                  'quant_options': '',
+                                  'bootstraps': '100'}})
+config['cov_col'] = 'tpm'
+config['read_col'] = 'est_counts'
+config['contig_col'] = 'target_id'
+
+if config['produce_bam']:
+    for sample in config['sample_data']:
+        config['transitions']["mapping/{}.reads.vs.contigs.all.bam".format(sample)] = \
+            "kallisto/{}.vs.contigs.all.quant/pseudoalignments.bam".format(sample)
+
+def get_sample_reads(w):
+    sample_reads = get_sample_reads_for_mapping(w, config)
+    #logger.debug('CONFIG: {}\nsample reads:\n{}\n'.format(yaml.dump(config), repr(sample_reads)))
+    if not isinstance(sample_reads, str):
+        if len(sample_reads)==2:
+            return sample_reads
+        if len(sample_reads)==1:
+            sample_reads = sample_reads[0]
+        else:
+            raise Exception("I don't know how to handle more than two read "
+                            "files per sample!\nSample {}\nFiles {}"\
+                            .format(w.sample, repr(sample_reads)))
+    # single files need to be split apart
+    if re.search(r'renamed.interleaved', sample_reads):
+        return [re.sub(r'interleaved', d, sample_reads) for d in ('R1', 'R2')]
+    else:
+        return [sample_reads + ".1.fastq",
+                sample_reads + ".2.fastq"]
+
+rule index_contigs_kallisto:
+    """ process a set of transcripts for kallisto quanitfication """
+    input: "{contigs}.fasta"
+    output: "kallisto/{contigs}.index"
+    log: "logs/kallisto.{contigs}.index"
+    benchmark: "benchmarks/kallisto.{contigs}.index.time"
+    version: config['kallisto_version']
+    shell:
+        """
+        {config[kallisto_prefix]}
+        kallisto index -i {output} {input} \
+         {config[kallisto][index_options]} \
+         > {log} 2>&1
+        """
+
+rule split_reads_for_quant:
+    """ take an interleaved fastq file and split
+    into .se .1 and .2"""
+    input: "{prefix}.fastq"
+    output:
+        "{prefix}.fastq.se.fastq",
+        "{prefix}.fastq.1.fastq",
+        "{prefix}.fastq.2.fastq"
+    run:
+        from Bio import SeqIO
+        unpaired_reads = {}
+        with open(output[1], 'w') as O1:
+          with open(output[2], 'w') as O2:
+            for record in SeqIO.parse(get_file_name(input), 'fastq'):
+                recordid = re.sub(r'/[12]$', '', record.id)
+                if recordid not in unpaired_reads:
+                    unpaired_reads[recordid] = record.format('fastq')
+                else:
+                    O1.write(record.format('fastq'))
+                    O2.write(unpaired_reads.pop(recordid))
+        with open(output[0], 'w') as SE:
+            for fastq in unpaired_reads.values():
+                SE.write(fastq)
+
+rule quant_reads_kallisto:
+    """ quantify a set of reads a gainst a kallisto index """
+    input:
+        index="kallisto/{contigs}.index",
+        reads=get_sample_reads,
+    output:
+        info="kallisto/{sample}.vs.{contigs}.quant/run_info.json",
+        quant="kallisto/{sample}.vs.{contigs}.quant/abundance.tsv",
+        bamfile="kallisto/{sample}.vs.{contigs}.quant/pseudoalignments.bam" \
+            if config['produce_bam'] else [],
+    log: "logs/kallisto.{sample}.vs.{contigs}.quant.log"
+    benchmark: "benchmarks/kallisto.{sample}.vs.{contigs}.time"
+    version: config['kallisto_version']
+    params:
+        outdir="kallisto/{sample}.vs.{contigs}.quant",
+        bam="--pseudobam" if config['produce_bam'] else ""
+    shell:
+        """
+        {config[kallisto_prefix]}
+        rm -rf {params.outdir}
+        kallisto quant -i {input.index} -t {threads} \
+         -b {config[kallisto][bootstraps]} {config[kallisto][quant_options]} \
+         {input.reads} -o {params.outdir} {params.bam} \
+         > {log} 2>&1
+        """
+
+rule coverages_file:
+    " Use quant.sf file as coverages file "
+    input: "kallisto/{sample}.vs.{contigs}.quant/abundance.tsv"
+    output: "{contigs}.coverages.{sample}.txt"
+    shell: "ln -s {input} {output}"
+

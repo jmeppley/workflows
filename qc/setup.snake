@@ -1,6 +1,7 @@
 """
 Sets up the environment and includes necessary snakefiles for running QC
 """
+from python.qc import JOINING_PROTOCOLS
 
 if config.get('remove_rna', True) in ['True', True]:
     include: "../common/fastq.snake"
@@ -12,7 +13,7 @@ if sum(1 for s in config['sample_data'] \
       )>0:
     # includes based on cleaning protocol
     protocol = config.get('cleaning_protocol', 'joining')
-    if protocol == 'joining':
+    if protocol in JOINING_PROTOCOLS:
         # all three joining programs are interchangeable
         joining_program = config.get('joining_program','pear')
         include: '{joining_program}.snake'.format(**vars())

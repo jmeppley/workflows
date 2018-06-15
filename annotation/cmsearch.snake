@@ -2,6 +2,9 @@ from python.cmsearch import get_cm_model_version
 from python.common import apply_defaults
 
 # models dir should contain pressed cm files named rRNA.cm and tRNA.cm
+snakefile_path = os.path.dirname(
+                    os.path.abspath(workflow.snakefile))
+
 defaults={'cmsearch': {
                    'threads': 20,
                    'models': \

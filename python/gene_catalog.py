@@ -220,7 +220,8 @@ class KeggGeneAnnotator():
     def __init__(self, db_location=kegg20160201):
         self.keggdb=db_location
         self.parse_db_metadata()
-        self.m8_params = edlhits.FilterParams(format=blastm8.BLASTPLUS, top_pct=5., sort='score')
+        self.m8_params = edlhits.FilterParams(format=blastm8.BLASTPLUS,
+                                              top_pct=5., sort='score')
     
     def parse_db_metadata(self):
         """
