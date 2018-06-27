@@ -10,11 +10,12 @@ config['salmon_version'] = get_version("salmon",
 
 apply_defaults(config, {'salmon': {'threads': 4,
                                   'index_options': '',
-                                  'quant_options': '',
+                                  'quant_options': '',  # consider --gcBias --seqBias
                                   'lib_type': 'A'}})
 config['cov_col'] = 'TPM'
 
 def get_sample_reads(w):
+    """ return read files for sample """
     sample_reads = get_sample_reads_for_mapping(w, config)
     #logger.debug('CONFIG: {}\nsample reads:\n{}\n'.format(yaml.dump(config), repr(sample_reads)))
     if not isinstance(sample_reads, str):
@@ -29,6 +30,13 @@ def get_sample_reads(w):
     # single files need to be split apart
     return [sample_reads + ".1.fastq",
             sample_reads + ".2.fastq"]
+
+    """
+    if 'clean' in config['sample_data'][w.sample]:
+        return config['sample_data'][w.sample]['clean']
+    else:
+        return config['sample_data'][w.sample]['raw']
+    """
 
 def get_sample_reads_option(w):
     """ return option string for salmon reads """
@@ -59,7 +67,7 @@ rule index_contigs_salmon:
     version: config['salmon_version']
     shell:
         """
-        {config[salmon_prefix]}
+#        {config[salmon_prefix]}
         rm -rf {params.outdir}
         salmon index -t {input} -i {params.outdir} \
          -p {threads} {config[salmon][index_options]} \

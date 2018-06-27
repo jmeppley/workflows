@@ -19,6 +19,9 @@ try:
 except:
     enable_hist = False
 
+print('I am printing pymg_dir:')
+print(config['pymg_dir'])
+
 if enable_hist:
     rule histogram_simple:
         """ produce a histogram of sequence lengths """
@@ -82,6 +85,6 @@ rule prinseq_any:
         else
           echo -e "stats_info\tbases\t0\nstats_info\treads\t0" > {output}
         fi
-        """
+         """
 
 

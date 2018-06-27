@@ -26,9 +26,9 @@ rule trim_bbduk_adapters_paired:
         fwd="{prefix}.R1{suffix}fastq",
         rev="{prefix}.R2{suffix}fastq",
     output:
-        fp=temp("{prefix}.R1{suffix}noadaptp.fastq"),
-        rp=temp("{prefix}.R2{suffix}noadaptp.fastq"),
-        sn=temp("{prefix}.solo{suffix}noadaptp.fastq"),
+        fp="{prefix}.R1{suffix}noadaptp.fastq",
+        rp="{prefix}.R2{suffix}noadaptp.fastq",
+        sn="{prefix}.solo{suffix}noadaptp.fastq",
     wildcard_constraints:
         suffix=r'\..*(?<=\.)'
     benchmark:
@@ -56,7 +56,7 @@ rule trim_bbduk_adapters:
     input:
         "{prefix}.{suffix}"
     output:
-        temp("{prefix}.noadapt.{suffix}")
+        "{prefix}.noadapt.{suffix}"
     wildcard_constraints:
         suffix=r'(R[12]\.)?fastq'
     benchmark:

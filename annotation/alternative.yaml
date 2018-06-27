@@ -1,0 +1,10 @@
+name: alternative
+channels:
+    - bioconda
+dependencies:
+    - python=2.7
+    - pandas
+    - qiime=1.9.1
+    - trimmomatic
+    - pear=0.9.6
+    - vsearch

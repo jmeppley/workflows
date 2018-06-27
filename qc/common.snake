@@ -26,4 +26,3 @@ rule drop_singles:
     version: SEQTK_VERSION
     shell: "seqtk dropse {input} > {output}"
     
-

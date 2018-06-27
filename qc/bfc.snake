@@ -10,7 +10,7 @@ rule bfc_error_correction:
     input:
         "{prefix}.fastq"
     output:
-        temp("{prefix}.corrected.fastq")
+        "{prefix}.corrected.fastq"
     benchmark:
         "benchmarks/{prefix}.kmer_trimmed.time"
     log:

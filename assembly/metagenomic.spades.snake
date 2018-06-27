@@ -34,6 +34,8 @@ config.setdefault('outputs', set()).update(
         'stats/all_cleaned_reads.fastq.hist',
     ])
 
+print(cleaned_reads)
+
 rule merge_reads_for_spades:
     """
     Spades only wants one set of paired reads, so we have to combine before assembly
@@ -45,6 +47,8 @@ rule merge_reads_for_spades:
         count=len(config['cleaned_read_list']),
     shell: 
         """
+        echo {params.count}
+        echo cleaned_reads
         if [ "{params.count}" == "1" ]; then
             # just link if it's one file
             ln -s {input} {output}
@@ -60,9 +64,11 @@ rule run_spades_metagenomic:
         --pe1-2 $(R2_FASTQ) --only-assembler --meta
     """
     input: rules.merge_reads_for_spades.output
+    
+    #snakemake 'looks' at all its rules and figures out which rule makes an output file that matches below.
     output: "spades/{product}.fasta"
     wildcard_constraints:
-        product=r'(contigs|transcripts)',
+        product=r'(contigs|transcripts)' #,
     log: "logs/spades.log"
     benchmark: "benchmarks/spades.time"
     version: get_version('spades.py')
@@ -75,7 +81,7 @@ rule run_spades_metagenomic:
         tmp_dir=tempfile.TemporaryDirectory( \
                                 suffix='tmp', \
                                 prefix='spades', \
-                                dir=config['spades']['tmp_dir']),
+                                dir=config['spades']['tmp_dir']), 
         continue_flags="--continue" if os.path.isdir('spades') else "",
         skip_ec='' if run_ec else '--only-assembler',
     shell:
