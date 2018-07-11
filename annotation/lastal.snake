@@ -34,9 +34,9 @@ rule lastal:
     output:
         "{file_root}.vs.{db}.last{alg,[xpn]}"
     benchmark:
-        "benchmarks/lastal.{db}.time"
+        "benchmarks/lastal.{file_root}.vs.{db}.{alg}.time"
     log:
-        "logs/lastal.{db}.log"
+        "logs/lastal.{file_root}.vs.{db}.{alg}.log"
     version:
         get_version('lastal')
     threads:

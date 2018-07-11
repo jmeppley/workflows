@@ -4,7 +4,7 @@ channels:
  - jmeppley
 dependencies:
  - python=3
- - snakemake
+ - snakemake<5
  - coreutils
  - pandas
  - biopython

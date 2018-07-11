@@ -34,9 +34,9 @@ rule trim_bbduk_adapters_paired:
     wildcard_constraints:
         suffix=r'\..*(?<=\.)'
     benchmark:
-        "benchmarks/{prefix}.noadapt_paired.fastq.time"
+        "benchmarks/{prefix}.{suffix}.noadapt_paired.fastq.time"
     log:
-        "logs/{prefix}.noadapt_paired.log"
+        "logs/{prefix}.{suffix}.noadapt_paired.log"
     version:
         bbduk_version
     threads:

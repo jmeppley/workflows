@@ -33,9 +33,9 @@ rule index_bwadb:
     output:
         "{bwadb_name}/bwadb.bwt"
     log:
-        "logs/bwadb_index.log"
+        "logs/bwadb.{bwadb_name}.index.log"
     benchmark:
-        "benchmarks/bwadb_index.time"
+        "benchmarks/bwadb.{bwadb_name}.index.time"
     version: BWA_VERSION
     shell:
         "bwa index -p {wildcards.bwadb_name}/bwadb {input} > {log} 2>&1 "

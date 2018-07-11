@@ -188,7 +188,6 @@ def setup_qc_outputs(config):
                                                         .format(**vars())
                 transitions[merged_file] = file_list
                 new_raw_files.append(merged_file)
-<<<<<<< HEAD
         elif len(raw_files) == 2:
             for direction, source_file in zip(READ_DIRECTIONS, raw_files):
                 new_raw_file = '{sample}.{direction}.{extension}'\
@@ -196,24 +195,12 @@ def setup_qc_outputs(config):
                 transitions[new_raw_file] = source_file
                 new_raw_files.append(new_raw_file)
         else:
-            new_raw_files.append('{sample}.{extension}'.format(**vars()))
-            transitions[new_raw_files[0]] = raw_files[0]
-
-        # everything else should work from the linked files
-        raw_files = new_raw_files
-=======
-            raw_files = new_raw_files
-        elif len(raw_files) == 2:
-            for direction, source_file in zip(READ_DIRECTIONS, raw_files):
-                local_raw_file = '{sample}.{direction}.{extension}'\
-                                                            .format(**vars())
-                transitions[local_raw_file] = source_file
-                new_raw_files.append(local_raw_file)
-        else:
             local_raw_file = '{sample}.{extension}'.format(**vars())
             transitions[local_raw_file] = raw_files[0]
             new_raw_files.append(local_raw_file)
->>>>>>> e8d1fdf7cec8b64e39c3589e53f10ce4f4d6d660
+
+        # everything else should work from the linked files
+        #raw_files = new_raw_files
         sample_data[sample]['raw'] = new_raw_files
 
         # cleaned suffix

@@ -73,9 +73,9 @@ rule assign_paths:
     output:
         temp("{prefix}.annot.gene_family.{db,[^.]+}.{ext}.tsv")
     benchmark:
-        "benchmarks/{prefix}.assign_paths.{db}.time"
+        "benchmarks/{prefix}.assign_paths.{db}.{ext}.time"
     log:
-        "logs/{prefix}.assign_paths.{db}.log"
+        "logs/{prefix}.assign_paths.{db}.{ext}.log"
     version:
         get_version('assign_paths.py')
     params:
