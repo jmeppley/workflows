@@ -1,0 +1,9 @@
+channels:
+    - bioconda
+    - conda-forge
+dependencies:
+    - snakemake
+    - sortmerna
+    - seqtk
+    - hmmer
+    - biopython

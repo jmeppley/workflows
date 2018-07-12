@@ -48,7 +48,7 @@ SORTMERNA_LSU_DBS = config.get('sortmerna_lsu_dbs',
 )
 RIBOFRAME_DIR = config.get('riboframe_dir',
              "/slipstream/home/jbryant/workflows/scripts/riboframe/")
-RIBORAME_HMMS = RIBOFRAME_DIR + "hmms/"
+RIBOFRAME_HMMS = RIBOFRAME_DIR + "hmms/"
 RIBOTRAP = "perl " + RIBOFRAME_DIR + "riboTrap.pl"
 RIBOMAP = "perl " + RIBOFRAME_DIR + "riboMap.pl"
 CLASSIFIER_JAR = config.get('rdp_jar',
@@ -111,14 +111,14 @@ rule sortmerna:
     params:
         prefix="ssu_rRNA/{sample}/{sample}.rna",
         dbs=":".join("{0}{1},{0}{2}".format(SORTMERNA_DIR, ref, index) \
-                     for ref, index in SORTMERNA_SSU_DBS),
+                     for ref, index in SORTMERNA_SSU_DBS.items()),
     benchmark: "benchmarks/sortmerna.{sample}.txt"
     shell:
         """
         echo {input}
         sortmerna --ref {params.dbs} \
          --reads {input} --aligned {params.prefix} \
-         --fastx --paired_in -F -m 10000
+         --fastx -F -m 10000
         """
 
 rule remove_23S:
@@ -135,14 +135,14 @@ rule remove_23S:
         ssu_prefix="ssu_rRNA/{sample}/{sample}.rna.2",
         lsu_prefix="ssu_rRNA/{sample}/{sample}.SSU_LSU",
         dbs=":".join("{0}{1},{0}{2}".format(SORTMERNA_DIR, ref, index) \
-                     for ref, index in SORTMERNA_LSU_DBS),
+                     for ref, index in SORTMERNA_LSU_DBS.items()),
     benchmark: "benchmarks/sortmerna_II_{sample}.txt"
     shell:
         """
         echo {input}
         sortmerna --ref {params.dbs} \
             --reads {input} --other {params.ssu_prefix} \
-            --fastx --paired_in -F -m 10000 --aligned {params.lsu_prefix}
+            --fastx -F -m 10000 --aligned {params.lsu_prefix}
         """
 
 rule fastq_to_fasta:
@@ -167,7 +167,7 @@ rule separate_out_18S:
     params:
         prefix="ssu_rRNA/{sample}/{sample}.rna.2.18S_0",
         dbs=":".join("{0}{1},{0}{2}".format(SORTMERNA_DIR, ref, index) \
-                     for ref, index in SORTMERNA_SSU_DBS \
+                     for ref, index in SORTMERNA_SSU_DBS.items() \
                      if re.search(r'18[sS]', ref)),
     shell:
         """
@@ -187,8 +187,9 @@ rule riboframe_hmms:
                 path=RIBOFRAME_HMMS,
                 phylum=w.phylum,
                 dir="for" if w.dir == 'fwd' else w.dir)
+    threads: 2
     shell:
-        "hmmsearch -E 0.00001 --domtblout {output} --noali --cpu 2 \
+        "hmmsearch -E 0.00001 --domtblout {output} --noali --cpu {threads} \
             -o /dev/null {params.db} {input}"
 
 
@@ -213,11 +214,11 @@ rule ribotrap:
              """
 
 rule extract_V4_16S:
-	"""
-	using riboframe.py
-	"""
-	input: "ssu_rRNA/{sample}/{sample}.rna.2.16S.fasta"
-	output: "ssu_rRNA/{sample}/{sample}.rna.2.16S.V4.fasta"
+    """
+    using riboframe.py
+    """
+    input: "ssu_rRNA/{sample}/{sample}.rna.2.16S.fasta"
+    output: "ssu_rRNA/{sample}/{sample}.rna.2.16S.V4.fasta"
     run:
         with open(input[0]) as input_handle:
             with open(output[0], 'wt') as output_handle:
@@ -227,15 +228,15 @@ rule extract_V4_16S:
                                                 out_handle=output_handle)
 
 rule classify:
-	"""
-	Using RDP classifier
-	"""
-	input: "ssu_rRNA/{sample}/{sample}.rna.2.16S.fasta"
-	output: "ssu_rRNA/{sample}/{sample}.rna.2.16S.rdp"
-	shell:
-	    """
-	    java -Xmx1g -jar {CLASSIFIER_JAR} -q {input} -o {output}
-	    """
+    """
+    Using RDP classifier
+    """
+    input: "ssu_rRNA/{sample}/{sample}.rna.2.16S.fasta"
+    output: "ssu_rRNA/{sample}/{sample}.rna.2.16S.rdp"
+    shell:
+        """
+        java -Xmx1g -jar {CLASSIFIER_JAR} -q {input} -o {output}
+        """
 
 rule assign_taxa_to_16S_with_uclust:
     """
@@ -270,7 +271,7 @@ rule extract_additional_18S_sequences:
        folder_name="ssu_rRNA/{sample}"
     shell:
         """
-         grep 'D_0__Eukaryota' {input.Uclust_assignments} | cut -f1 | grep -A 1 - {input.fasta_16S} | cat - {input.fasta_18S} > {output} || :
+         grep 'D_0__Eukaryota' {input.uclust_assignments} | cut -f1 | grep -A 1 - {input.fasta_16S} | cat - {input.fasta_18S} > {output} || :
         """
 
 rule count_Uclust_assignments:
@@ -279,7 +280,7 @@ rule count_Uclust_assignments:
     """
     input: "ssu_rRNA/{sample}/{prefix}_tax_assignments.txt"
     output:
-        D5="ssu_rRNA/{sample}/{prefix}_tax_assignments.D5.counts.txt"
+        D5="ssu_rRNA/{sample}/{prefix}_tax_assignments.D5.counts.txt",
         D6="ssu_rRNA/{sample}/{prefix}_tax_assignments.D6.counts.txt"
     conda: QIIME_CONDA
     shell:
@@ -313,16 +314,16 @@ rule assign_taxa_to_18S:
         """
 
 rule count_rdp:
-	"""
+    """
     covplot=1 abuplot=0 produces SSU coverage plots
     covplot=0 abuplot=0 produces count tables that accurately reflect read counts
-	"""
-	input: "ssu_rRNA/{sample}/{sample}.rna.2.16S.rdp"
-	output: "ssu_rRNA/{sample}/{sample}.rna.2.16S.rdp.count.genus.cnt"
-	params:
-	    output="ssu_rRNA/{sample}/{sample}.rna.2.16S.rdp.count"
-	shell:
-	    """
-	    {RIBOMAP} file={input} var=full conf=0.8 cross=any percmin=.05  covplot=0 abuplot=1 out={params.output}.fig;
-	    {RIBOMAP} file={input} var=full conf=0.8 cross=any percmin=.05  covplot=0 abuplot=0 out={params.output}
-	    """
+    """
+    input: "ssu_rRNA/{sample}/{sample}.rna.2.16S.rdp"
+    output: "ssu_rRNA/{sample}/{sample}.rna.2.16S.rdp.count.genus.cnt"
+    params:
+        output="ssu_rRNA/{sample}/{sample}.rna.2.16S.rdp.count"
+    shell:
+        """
+        {RIBOMAP} file={input} var=full conf=0.8 cross=any percmin=.05  covplot=0 abuplot=1 out={params.output}.fig;
+        {RIBOMAP} file={input} var=full conf=0.8 cross=any percmin=.05  covplot=0 abuplot=0 out={params.output}
+        """
