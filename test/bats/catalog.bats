@@ -54,7 +54,7 @@ setup() {
     cd test/scratch/catalog/cdhit
     run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=cdhit -p -k -j 20 --notemp > gene_catalog.log 2>&1"
     [ "$status" -eq 0 ]
-    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=cdhit -p -k -j 20 -n 2>&1"
+    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=cdhit -p -k -j 20 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" == "Nothing to be done." ]
 }
@@ -63,7 +63,7 @@ setup() {
     cd test/scratch/catalog/mmseqs2
     run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=mmseqs2 -p -k -j 20 --notemp > gene_catalog.log 2>&1"
     [ "$status" -eq 0 ]
-    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=mmseqs2 -p -k -j 20 -n 2>&1"
+    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=mmseqs2 -p -k -j 20 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" == "Nothing to be done." ]
 }
@@ -72,16 +72,16 @@ setup() {
     cd test/scratch/catalog/vsearch
     run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=vsearch -p -k -j 20 --notemp > gene_catalog.log 2>&1"
     [ "$status" -eq 0 ]
-    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=vsearch -p -k -j 20 -n 2>&1"
+    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=vsearch -p -k -j 20 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" == "Nothing to be done." ]
 }
 
 @test "Compile and annotate gene catalog: cdhit-est" {
     cd test/scratch/catalog/cdhit-est
-    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=cdhit-est -p -k -j 20 --notemp > gene_catalog.log 2>&1"
+    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=cdhitest -p -k -j 20 --notemp > gene_catalog.log 2>&1"
     [ "$status" -eq 0 ]
-    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=cdhit-est -p -k -j 20 -n 2>&1"
+    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=cdhitest -p -k -j 20 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" == "Nothing to be done." ]
 }
@@ -90,7 +90,7 @@ setup() {
     cd test/scratch/catalog/mcl
     run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=mcl cluster_type=faa -p -k -j 20 --notemp > gene_catalog.log 2>&1"
     [ "$status" -eq 0 ]
-    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=mcl cluster_type=faa -p -k -j 20 -n 2>&1"
+    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=mcl cluster_type=faa -p -k -j 20 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" == "Nothing to be done." ]
 }
