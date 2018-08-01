@@ -1,4 +1,5 @@
 from python.annotate import get_db_frag, get_db_frags
+DROP_COMMENTS = "perl -ne 'if (m/^[^#]/) { print; }'"
 
 #####
 # Fragmented HMM dbs:
@@ -90,5 +91,5 @@ rule hmmer_fragdb:
     version:
         get_version('sort',lines=[1,])
     shell:
-        "cat {input} | grep -v '^#' | sort -k 1,1 > {output}"
+        "cat {input} | {DROP_COMMENTS} | sort -k 1,1 > {output}"
 
