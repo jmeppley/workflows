@@ -12,7 +12,7 @@ else:
 config['anvio_version'] = \
         get_version("anvi-profile",
                     cmd_prefix=config['anvio_prefix'],
-                    regular_expression=r'Anvi\'?o\s+[Vv]ersion.+:\s+(\d.+)')
+                    regular_expression=r'Anvi\'?o\s+[Vv]ersion.+:\s+(\S.*)')
 
 # use centrifuge if configured
 centrifuge = 'centrifuge' in config
@@ -238,7 +238,8 @@ if centrifuge or dbtax:
         output:
             "anvio/status/{contigs}-tax"
         log:
-            "logs/anvio-import-taxonomy.log"
+            "logs/anvio-{contigs}-import-taxonomy.log"
+        benchmark: "benchmarks/anvio-{contigs}-import-taxonomy.time"
         params:
             format="centrifuge" if centrifuge else "default_matrix",
         version:
