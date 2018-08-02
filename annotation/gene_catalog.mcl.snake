@@ -1,0 +1,96 @@
+from python.common import get_version, apply_defaults, get_file_name, TRUTH
+from python.gene_catalog import process_for_mcl, get_longest_seq
+
+# software parameters
+defaults = {
+    'mcl': {
+        'threads': 20,
+        'options': '-I 2',
+        'filters': {'pctid': .95, 'minbit': .5},
+        'output_str': 'mcl.I2',
+        'use_last8': True,
+        'last_opts': "",
+    },
+}
+apply_defaults(config, defaults)
+config['mcl']['use_last8'] = config['mcl']['use_last8'] in TRUTH
+cluster_suffix = config['mcl']['output_str']
+
+wildcard_constraints:
+    cluster_suffix=cluster_suffix
+
+rule mcl:
+    input: "all_genes.{cluster_type}.v.self.pctid.tab"
+    output: "all_genes.{cluster_type}.{cluster_suffix}.raw"
+    benchmark: "benchmarks/genes.{cluster_type}.mcl.time"
+    threads: config['mcl']['threads']
+    shell: "mcl {input} --abc {config[mcl][options]} \
+            -o {output} -te {threads}"
+
+rule list_reps:
+    """ Find the longest gene in each cluster """
+    input:
+        cluster=rules.mcl.output,
+        faa='all_genes.{cluster_type}'
+    output: 'all_genes.{cluster_type}.{cluster_suffix}.reps'
+    benchmark: "benchmarks/all_genes.{cluster_type}.mcl.get_reps_list.time"
+    run:
+        with open(get_file_name(output), 'wt') as LIST:
+            for gene_id in get_longest_seq(get_file_name(input.cluster),
+                                           get_file_name(input.faa),):
+                LIST.write(gene_id)
+                LIST.write('\n')
+
+
+rule get_reps:
+    input:
+        list=rules.list_reps.output,
+        faa='all_genes.{cluster_type}'
+    output: 'all_genes.{cluster_type}.{cluster_suffix}'
+    benchmark: "benchmarks/all_genes.{cluster_type}.mcl.get_reps.time"
+    shell: "screen_list.py {input.faa} -k -l {input.list} \
+            -o {output}"
+
+
+rule all_v_all_self_db:
+    input: "all_genes.{cluster_type}"
+    output: "all_genes.{cluster_type}.prj"
+    benchmark: 'benchmarks/all_genes.{cluster_type}.v.self.db.time'
+    threads: config['mcl']['threads']
+    params:
+        exe='lastdb8' if config['mcl']['use_last8'] else 'lastdb',
+        prot=lambda w: '-p' if w.cluster_type == 'faa' else '',
+    shell:
+        """
+        {params.exe} -P {threads} {params.prot} {input} {input}
+        """
+
+rule all_v_all_self:
+    input:
+        "all_genes.{cluster_type}",
+        "all_genes.{cluster_type}.prj",
+    output: "all_genes.{cluster_type}.v.self.last"
+    benchmark: 'benchmarks/all_genes.{cluster_type}.v.self.time'
+    threads: config['mcl']['threads']
+    params:
+        exe='lastal8' if config['mcl']['use_last8'] else 'lastal',
+    shell:
+        """
+        {params.exe} -P {threads} -f BlastTab {config[mcl][last_opts]} \
+         {input[0]} {input[0]} \
+         > {output}
+        """
+
+rule process_for_mcl:
+    input:
+        hits=rules.all_v_all_self.output,
+        fasta='all_genes.{cluster_type}',
+    output: "all_genes.{cluster_type}.v.self.pctid.tab"
+    benchmark: "benchmarks/process_for_mcl.time"
+    run:
+        process_for_mcl(get_file_name(input.hits),
+                        get_file_name(input.fasta),
+                        get_file_name(output),
+                        format='blast',
+                        pctid=float(config['mcl']['filters']['pctid']),
+                        minbit=float(config['mcl']['filters']['minbit']),)

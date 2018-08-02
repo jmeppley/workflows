@@ -44,7 +44,7 @@ rule dummy_join:
 rule merge_flash:
     """ merges flash joins and dummy joins (after some end-trimming) """
     input:
-        pear="{file_root}.paired.extendedFrags.trimmed.fastq",
+        flah="{file_root}.paired.extendedFrags.trimmed.fastq",
         dummy="{file_root}.paired.trimmed.dummy.fastq",
         singles="{file_root}.solo.paired.noadaptp.trimmed.fastq",
         unpaired1="{file_root}.R1.unpaired.trimmed.fastq",

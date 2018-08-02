@@ -3,7 +3,6 @@ BWA_VERSION = \
                     version_flag="", 
                     regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
 
-
 rule map_genes_to_bwadb:
     """
     map genes to BWA db. 
@@ -34,9 +33,9 @@ rule index_bwadb:
     output:
         "{bwadb_name}/bwadb.bwt"
     log:
-        "logs/bwadb_index.log"
+        "logs/bwadb.{bwadb_name}.index.log"
     benchmark:
-        "benchmarks/bwadb_index.time"
+        "benchmarks/bwadb.{bwadb_name}.index.time"
     version: BWA_VERSION
     shell:
         "bwa index -p {wildcards.bwadb_name}/bwadb {input} > {log} 2>&1 "
@@ -47,6 +46,3 @@ rule bwa_index_file:
     output: "{file_root}/bwadb.ids"
     shell:
         "cat {input} | sed -r 's/^>(\\S+)\\s+(\\S.*)$/\\1\\t\\2/' > {output}"
-
-    
-

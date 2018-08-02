@@ -63,8 +63,8 @@ rule run_spades_metagenomic:
     output: "spades/{product}.fasta"
     wildcard_constraints:
         product=r'(contigs|transcripts)',
-    log: "logs/spades.log"
-    benchmark: "benchmarks/spades.time"
+    log: "logs/spades.{product}.log"
+    benchmark: "benchmarks/spades.{product}.time"
     version: get_version('spades.py')
     threads: int(config['spades']['threads'])
     params:

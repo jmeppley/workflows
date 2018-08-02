@@ -31,9 +31,9 @@ rule compile_counts:
     output:
         "{prefix}.annot.{taxdb}.{taxalg}.{rank}.vs.{db}.{dbfmt}.tsv"
     benchmark:
-        "benchmarks/compile_counts.{rank}.{db}"
+        "benchmarks/compile_counts.{prefix}.{taxdb}.{taxalg}.{rank}.{db}.{dbfmt}"
     log:
-        "logs/compile_counts.{rank}.{db}"
+        "logs/compile_counts.{prefix}.{taxdb}.{taxalg}.{rank}.{db}.{dbfmt}"
     version:
         get_version('compile_hit_counts.py')
     params:

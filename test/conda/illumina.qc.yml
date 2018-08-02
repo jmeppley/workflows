@@ -5,6 +5,7 @@ channels:
 dependencies:
 - python=3
 - snakemake
+- coreutils
 - pandas
 - biopython
 - flash
@@ -18,3 +19,4 @@ dependencies:
 - last
 - py-metagenomics
 - batch_launcher
+- coreutils

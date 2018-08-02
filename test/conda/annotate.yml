@@ -4,7 +4,8 @@ channels:
  - jmeppley
 dependencies:
  - python=3
- - snakemake
+ - snakemake<4
+ - coreutils
  - samtools
  - last
  - hmmer
@@ -17,3 +18,4 @@ dependencies:
  - prodigal
  - py-metagenomics
  - batch_launcher
+ - coreutils

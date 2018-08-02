@@ -58,8 +58,8 @@ def get_lca(hits, translate=lambda x: [x]):
     return lca
 
 # Simplify the list of ranks 
-printed_ranks=[edltaxon.ranks[i] for i in [3,7,12,17,21,24]] + ['domain']
-major_ranks=[edltaxon.ranks[i] for i in [2,3,7,12,17,21,24,27,28]]
+printed_ranks=[edltaxon.ranks[i] for i in [3,7,11,17,21,24]] + ['domain']
+major_ranks=[edltaxon.ranks[i] for i in [2,3,7,11,17,21,24,27,28]]
 def get_major_rank(rank):
     " return the highest major rank below or equal to the given rank "
     rank_index = edltaxon.ranks.index(rank)
@@ -224,7 +224,8 @@ class KeggGeneAnnotator():
     def __init__(self, db_location=kegg20160201):
         self.keggdb=db_location
         self.parse_db_metadata()
-        self.m8_params = edlhits.FilterParams(format=blastm8.BLASTPLUS, top_pct=5., sort='score')
+        self.m8_params = edlhits.FilterParams(format=blastm8.BLASTPLUS,
+                                              top_pct=5., sort='score')
     
     def parse_db_metadata(self):
         """
@@ -353,6 +354,46 @@ def main():
         annotator.annotate_genes_rs_prot(arguments.hit_table,
                                          arguments.output_table)
 
+def process_for_mcl(input_file, fasta_file, output_file, 
+                    format='last',
+                    pctid=.95,
+                    minbit=.5):
+    """ generates a table of graph edges from an all v all """
+    params = blastm8.FilterParams(format=format, pctid=pctid)
+    inputm8 = blastm8.M8Stream(input_file)
+    # fake all self bits
+    self_bits = {r.id: 2*len(r) for r in SeqIO.parse(fasta_file, 'fasta')}
+    with open(output_file, 'wt') as OUTPUT:
+        for seq, hits in blastm8.filterM8Stream(inputm8, params, returnLines=False):
+            for hit in hits:
+                if hit.hit == seq:
+                    # we've faked the self bits for now
+                    continue
+
+                process_hit(hit, OUTPUT, self_bits, minbit)
+
+
+def process_hit(hit, output_handle, self_bits, minbit):
+    bitratio = hit.score / min(self_bits[hit.hit],
+                               self_bits[hit.read])
+    if bitratio < minbit:
+        return
+    output_handle.write("{}\t{}\t{}\n".format(hit.hit, hit.read, hit.pctid))
+                
+
+def get_longest_seq(clusters, genes, format='fasta'):
+    """
+    Given a clsuter file from mcl where each line is a cluster with
+    tab separated gene ids.
+    And given a fasta file of gene sequences.
+    return the ID of the longest gene in each cluster
+    """
+    gene_lengths = {g.id:len(g) for g in SeqIO.parse(genes, format)}
+    with open(clusters) as CLUSTERS:
+        for line in CLUSTERS:
+            member_genes = line.rstrip().split('\t')
+            yield sorted(member_genes, reverse=True,
+                         key=lambda g: gene_lengths[g])[0]
+
 if __name__ == '__main__':
     main()
-

@@ -95,7 +95,10 @@ rule quant_reads_salmon:
     input:
         index="salmon/{contigs}.index/header.json",
         reads=get_sample_reads,
-    output: "salmon/{sample}.vs.{contigs}.quant/quant.sf"
+    output:
+        quant="salmon/{sample}.vs.{contigs}.quant/quant.sf",
+        samfile=temp("mapping/{sample}.reads.vs.{contigs}.sam") \
+            if config['produce_bam'] else [],
     log: "logs/salmon.{sample}.vs.{contigs}.quant.log"
     benchmark: "benchmarks/salmon.{sample}.vs.{contigs}.time"
     version: config['salmon_version']
@@ -105,11 +108,13 @@ rule quant_reads_salmon:
                                 sample=w.sample,
                                 contigs=w.contigs),
         indir=lambda w: "salmon/{contigs}.index".format(contigs=w.contigs),
+        sam="-z=mapping/{sample}.reads.vs.{contigs}.sam" \
+            if config['produce_bam'] else "",
     shell:
         """
         {config[salmon_prefix]}
         rm -rf {params.outdir}
-        salmon quant -i {params.indir} -p {threads} \
+        salmon quant -i {params.indir} -p {threads} --meta \
          -l {config[salmon][lib_type]} {config[salmon][quant_options]} \
          {params.reads} -o {params.outdir} \
          > {log} 2>&1

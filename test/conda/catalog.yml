@@ -1,11 +1,11 @@
 channels:
  - bioconda
  - conda-forge
- - brwnj
  - jmeppley
 dependencies:
  - python=3
- - snakemake
+ - snakemake<5
+ - coreutils
  - pandas
  - biopython
  - bbmap
@@ -24,4 +24,7 @@ dependencies:
  - samtools
  - hmmer
  - cd-hit
+ - vsearch
+ - mcl
+ - mmseqs2
  - py-metagenomics

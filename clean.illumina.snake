@@ -22,9 +22,9 @@ include: 'common/stats.snake'
 outputs = config.setdefault('outputs',set())
 outputs.update(setup_qc_outputs(config))
 
-include: "common/transitions.snake"
 include: "qc/setup.snake"
 
+include: "common/transitions.snake"
 
 logger.debug("Snakefile config:\n" + yaml.dump(config))
 

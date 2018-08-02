@@ -84,6 +84,7 @@ def get_coverage_stats(contig_depth_file,
     """
     Generate table of read counts and mapped coverage from samtools output
     """
+    print("getting coverage stats")
     # add other files if requested
     # read counts
     logger.info("Parsing read count file: {}"

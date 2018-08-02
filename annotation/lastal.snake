@@ -1,3 +1,5 @@
+DROP_COMMENTS = "perl -ne 'if (m/^[^#]/) { print; }'"
+
 rule compile_lastdb:
     """
     Compile fasta file into lastb
@@ -34,9 +36,9 @@ rule lastal:
     output:
         "{file_root}.vs.{db}.last{alg,[xpn]}"
     benchmark:
-        "benchmarks/lastal.{db}.time"
+        "benchmarks/lastal.{file_root}.vs.{db}.{alg}.time"
     log:
-        "logs/lastal.{db}.log"
+        "logs/lastal.{file_root}.vs.{db}.{alg}.log"
     version:
         get_version('lastal')
     threads:
@@ -52,7 +54,7 @@ rule lastal:
     shell:
         "{params.lastal} -P {threads} {params.fshift} -f BlastTab \
          {params.opts} {params.db_path} {input[0]} \
-         | grep -v '^#'  \
+         | {DROP_COMMENTS} \
          | filter_blast_m8.py -f blast {params.keep} \
          > {output}"
 

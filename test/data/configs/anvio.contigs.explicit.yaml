@@ -1,11 +1,17 @@
 sample_data:
   name: "explicit"
   ALOHA_XVII_1_04_DNA: 
-    clean: reads/ALOHA_XVII_1_04_DNA/reads.renamed.R12.fastq
+    clean:
+        - ../../data/raw_reads/2014_ALOHA_XVII_1-04_DNA_S2_R1_001.fastq
+        - ../../data/raw_reads/2014_ALOHA_XVII_1-04_DNA_S2_R2_001.fastq
   ALOHA_XVII_1_15_DNA: 
-    clean: reads/ALOHA_XVII_1_15_DNA/reads.renamed.R12.fastq
+    clean:
+        - ../../data/raw_reads/2014_ALOHA_XVII_1-15_DNA_S3_R1_001.fastq
+        - ../../data/raw_reads/2014_ALOHA_XVII_1-15_DNA_S3_R2_001.fastq
   ALOHA_XVII_1_21_DNA: 
-    clean: reads/ALOHA_XVII_1_21_DNA/reads.renamed.R12.fastq
+    clean:
+        - ../../data/raw_reads/2014_ALOHA_XVII_1-21_DNA_S1_R1_001.fastq
+        - ../../data/raw_reads/2014_ALOHA_XVII_1-21_DNA_S1_R2_001.fastq
 contigs_fasta: contigs.raw.fasta
 min_contig_length: 500
 run_cogs: False

@@ -40,10 +40,13 @@ QC_PROTOCOLS = {
                                 'dropse',
                                ]),
     "joining": '.'.join(['trim_adapt', 'joined', 'nophix']),
+    "join_and_standards": '.'.join(['trim_adapt', 'joined', 'nophix',
+                                    'nospikes']),
 }
 
 # list of protocols with no error correction
-NON_EC_PROTOCOLS = ['joining', 'assembly_no_ec']
+NON_EC_PROTOCOLS = ['joining', 'assembly_no_ec', 'join_and_standards']
+JOINING_PROTOCOLS = ['joining', 'join_and_standards']
 
 READ_DIRECTIONS = ['R1', 'R2']
 
@@ -180,7 +183,8 @@ def setup_qc_outputs(config):
             # The reads are probably split up into lanes, merge into one pair
             for direction, file_list in setup_merge_by_lanes(raw_files,
                                                              sample).items():
-                merged_file = '{sample}.{direction}.{extension}'.format(**vars())
+                merged_file = '{sample}.{direction}.{extension}'\
+                                                        .format(**vars())
                 transitions[merged_file] = file_list
                 new_raw_files.append(merged_file)
         elif len(raw_files) == 2:
@@ -190,30 +194,17 @@ def setup_qc_outputs(config):
                 transitions[new_raw_file] = source_file
                 new_raw_files.append(new_raw_file)
         else:
-            new_raw_files.append('{sample}.{extension}'.format(**vars()))
-            transitions[new_raw_files[0]] = raw_files[0]
+            local_raw_file = '{sample}.{extension}'.format(**vars())
+            transitions[local_raw_file] = raw_files[0]
+            new_raw_files.append(local_raw_file)
 
         # everything else should work from the linked files
-        raw_files = new_raw_files
+        #raw_files = new_raw_files
         sample_data[sample]['raw'] = new_raw_files
 
         # cleaned suffix
-        cleaned_suffix = QC_PROTOCOLS.get(cleaning_protocol, '')
-
-        # special cases
-        if cleaning_protocol != 'joining' and len(raw_files) == 1:
-            # if cleaning one file for assembly, drop interleave
-            cleaned_suffix = re.sub(r'\.interleaved', '', cleaned_suffix)
-        if cleaning_protocol == 'None' and len(raw_files) == 2:
-            # if not cleaning, but two files given, interleave them
-            cleaned_suffix = 'interleaved'
-        if cleaning_protocol == 'joining':
-            # prepend trimmomatic params
-            chemistry, barcodes = get_chemistry_barcodes(sample, config)
-            barcodes = ".".join(barcodes)
-            cleaned_suffix = '.'.join([chemistry, barcodes]) + \
-                                '.' + cleaned_suffix
-
+        cleaned_suffix = get_cleaned_suffix(cleaning_protocol,
+                                            sample, config)
 
         # result of QC
         cleaned_raw_reads = '{sample}.{cleaned_suffix}.fastq'\
@@ -234,6 +225,27 @@ def setup_qc_outputs(config):
             outputs.append(cleaned_reads)
 
     return outputs
+
+def get_cleaned_suffix(cleaning_protocol, sample, config):
+    """ determine what the final output file name suffix is """
+    cleaned_suffix = QC_PROTOCOLS.get(cleaning_protocol, '')
+    num_raw_files = len(config['sample_data'][sample]['raw'])
+
+    # special cases
+    if cleaning_protocol not in JOINING_PROTOCOLS and num_raw_files == 1:
+        # if cleaning one file for assembly, drop interleave
+        cleaned_suffix = re.sub(r'\.interleaved', '', cleaned_suffix)
+    if cleaning_protocol == 'None' and num_raw_files == 2:
+        # if not cleaning, but two files given, interleave them
+        cleaned_suffix = 'interleaved'
+    if cleaning_protocol in JOINING_PROTOCOLS:
+        # prepend trimmomatic params
+        chemistry, barcodes = get_chemistry_barcodes(sample, config)
+        barcodes = ".".join(barcodes)
+        cleaned_suffix = '.'.join([chemistry, barcodes]) + \
+                            '.' + cleaned_suffix
+    
+    return cleaned_suffix
 
 def setup_merge_by_lanes(raw_files, sample):
     """

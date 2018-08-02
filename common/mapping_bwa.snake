@@ -21,9 +21,9 @@ rule index_contigs:
     output:
         "mapping/{contigs}.index.bwa.bwt"
     log:
-        "logs/bwa_index.log"
+        "logs/bwa_index.{contigs}.log"
     benchmark:
-        "benchmarks/bwa_pre_index.time"
+        "benchmarks/bwa_pre_index.{contigs}.time"
     version: BWA_VERSION
     shell:
         "bwa index -p mapping/{wildcards.contigs}.index.bwa {input} > {log} 2>&1 "
@@ -81,7 +81,7 @@ rule mapped_read_counts:
     output:
         "mapping/{sample}.vs.{contigs}.read_counts"
     benchmark:
-        "benchmarks/bwa_count_reads.{sample}.time"
+        "benchmarks/bwa_count_reads.{sample}.{contigs}.time"
     version:
         get_version('samtools', lines=0)
     params:
@@ -102,7 +102,7 @@ rule mapped_read_depths:
     output:
         "mapping/{sample}.vs.{contigs}.depths"
     benchmark:
-        "benchmarks/bwa_get_depths.{sample}.time"
+        "benchmarks/bwa_get_depths.{sample}.{contigs}.time"
     version:
         get_version('samtools', lines=0)
     params:
@@ -120,7 +120,8 @@ rule contig_coverage_table:
     output:
         temp("{contigs}.coverages.{sample}.txt"),
     benchmark:
-        "benchmarks/contig.stats.{sample}.time"
+        "benchmarks/contig.stats.{sample}.{contigs}.time"
     run:
-        get_coverage_stats(*input, get_file_name(output))
+        print("getting_coverage_stats:")
+        get_coverage_stats(*list(input), get_file_name(output))
 

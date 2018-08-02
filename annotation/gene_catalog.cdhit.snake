@@ -1,0 +1,25 @@
+
+
+# software parameters
+defaults = {
+    'cdhit': {
+        'threads': 20,
+        'options': '-c 0.95 -M 1000000 -G 0 -aS 0.9 -g 1 -d 0',
+        'output_str': 'c.95.aS.9.g1.r1.G0',
+    },
+}
+apply_defaults(config, defaults)
+cluster_suffix = config['cdhit']['output_str']
+config['cluster_type'] = 'faa'
+
+rule cluster_faa:
+    input: "all_genes.faa"
+    output: "all_genes.faa.{}".format(cluster_suffix)
+    benchmark: 'benchmarks/all_genes.faa.{}.time' \
+                        .format(cluster_suffix)
+    threads: config['cdhit']['threads']
+    params:
+        cd_hit_options=config['cdhit']['options']
+    shell:
+        "cd-hit -T {threads} {params.cd_hit_options} \
+         -i {input} -o {output}"

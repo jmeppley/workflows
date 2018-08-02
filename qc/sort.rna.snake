@@ -33,9 +33,9 @@ rule filter_nonrrna_or_rrna:
     output:
         "{file_root}.{seq_type}.{ext,fast[aq]}"
     benchmark:
-        "benchmarks/{file_root}.{seq_type}.time"
+        "benchmarks/{file_root}.{seq_type}.{ext}.time"
     log:
-        "logs/{file_root}.{seq_type}.log"
+        "logs/{file_root}.{seq_type}.{ext}.log"
     version:
         get_version("screen_list.py")
     params:

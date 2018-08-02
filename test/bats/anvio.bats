@@ -33,7 +33,7 @@ setup() {
 
     run bash -c "snakemake -s ../../../anvio.metagenomic.snake --configfile ../../data/configs/anvio.megahit.all.yaml -p -j 20 > anvio.megahit.all.log 2>&1"
     [ "$status" -eq 0 ]
-    run bash -c "snakemake -s ../../../anvio.metagenomic.snake --configfile ../../data/configs/anvio.megahit.all.yaml -p -j 20 -n 2>&1 | grep '^Nothing to be done'"
+    run bash -c "snakemake -s ../../../anvio.metagenomic.snake --configfile ../../data/configs/anvio.megahit.all.yaml -p -j 20 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" == "Nothing to be done." ]
 }
@@ -45,29 +45,32 @@ setup() {
 
     run bash -c "snakemake -s ../../../anvio.metagenomic.snake --configfile ../../data/configs/anvio.contigs.all.yaml -p -j 20 --verbose > anvio.contigs.all.log 2>&1"
     [ "$status" -eq 0 ]
-    run bash -c "snakemake -s ../../../anvio.metagenomic.snake --configfile ../../data/configs/anvio.contigs.all.yaml -p -j 20 -n 2>&1 | grep '^Nothing to be done'"
+    run bash -c "snakemake -s ../../../anvio.metagenomic.snake --configfile ../../data/configs/anvio.contigs.all.yaml -p -j 20 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" == "Nothing to be done." ]
 }
 
 @test "From subset of reads and contigs into anvio" {
-    cd test/scratch/anvio.contig
+    rm -rf test/scratch/anvio.teens
+    mkdir -p test/scratch/anvio.teens
+    cd test/scratch/anvio.teens
 
     run bash -c "snakemake -s ../../../anvio.metagenomic.snake --configfile ../../data/configs/anvio.contigs.teens.yaml -p -j 20 --verbose > anvio.contigs.teens.log 2>&1"
     [ "$status" -eq 0 ]
-    run bash -c "snakemake -s ../../../anvio.metagenomic.snake --configfile ../../data/configs/anvio.contigs.teens.yaml -p -j 20 -n 2>&1 | grep '^Nothing to be done'"
+    run bash -c "snakemake -s ../../../anvio.metagenomic.snake --configfile ../../data/configs/anvio.contigs.teens.yaml -p -j 20 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" == "Nothing to be done." ]
 }
 
-@test "From explicit list of and contigs into anvio" {
-    cd test/scratch/anvio.contig
-    rm contigs.raw.fasta
+@test "From explicit list of reads and contigs into anvio" {
+    rm -rf test/scratch/anvio.list
+    mkdir -p test/scratch/anvio.list
+    cd test/scratch/anvio.list
     cp ../../data/contigs/contigs.aloha.fa contigs.raw.fasta
 
     run bash -c "snakemake -s ../../../anvio.metagenomic.snake --configfile ../../data/configs/anvio.contigs.explicit.yaml -p -j 20 --verbose > anvio.contigs.explicit.log 2>&1"
     [ "$status" -eq 0 ]
-    run bash -c "snakemake -s ../../../anvio.metagenomic.snake --configfile ../../data/configs/anvio.contigs.explicit.yaml -p -j 20 -n 2>&1 | grep '^Nothing to be done'"
+    run bash -c "snakemake -s ../../../anvio.metagenomic.snake --configfile ../../data/configs/anvio.contigs.explicit.yaml -p -j 20 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" == "Nothing to be done." ]
 }
@@ -79,7 +82,7 @@ setup() {
 
     run bash -c "snakemake -s ../../../anvio.pangenome.snake --configfile ../../data/configs/anvio.pangenome.yaml -p -j 20 --verbose > anvio.pangenome.log 2>&1"
     [ "$status" -eq 0 ]
-    run bash -c "snakemake -s ../../../anvio.pangenome.snake --configfile ../../data/configs/anvio.pangenome.yaml -p -j 20 -n 2>&1 | grep '^Nothing to be done'"
+    run bash -c "snakemake -s ../../../anvio.pangenome.snake --configfile ../../data/configs/anvio.pangenome.yaml -p -j 20 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" == "Nothing to be done." ]
 }

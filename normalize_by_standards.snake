@@ -1,0 +1,122 @@
+"""
+normalize_by_standards.snake
+
+maps reads against a fasta database of sequencing standards and calculates a
+normalization factor.
+
+samples and reads are specified in config[sample_data] (see
+pypthon.qc.setup_qc_outputsthe usual manner (see clean.illumina.snake
+or assemble.*.snake) inf config[sample_data]. They may be already cleaned or
+strait from illumina.
+
+You need:
+  1.) a set of reads (config[sample_data])
+  2.) a fasta file of the spiked standard sequences
+  3.) a table (tab separated text) of spiked standard quantities. EG:
+
+  s10_hyp1806_v1_969_Frag 700
+  s11_tynA_v1_996_Frag    35000
+  s13_therm_v1_613_Frag   600
+  s14_virB_v1_301_Frag    500
+  s15_alpha_v1_1504_Frag  37000
+  s1_arsB_v1_1068_frag    200
+  s2_huyA_v1_1077_Frag    150
+  s3_pdhD_v1_1000_Frag    60000
+  s4_mcrB_v1_1028_Frag    1000
+
+NB: The standards' names in the first column must match the sequence IDs in the fasta file.
+
+Uses bwa or lastal to find standards in your reads. Compares counts to the spiked quantities to get a scaling factor for normalizing each sample's counts.
+
+"""
+import re, yaml, os
+from python.common import get_version
+from python.qc import setup_qc_outputs, get_cleaned_suffix
+from python.standards import get_best_fit, calculate_factors
+from snakemake.logging import logger
+
+##
+# where to find the data
+# You can set these to something differnt on the command line by adding, EG:
+#   --config spike_amounts_table=spikes.txt
+spike_amounts_table = config.setdefault('spike_amounts_table',
+                                        "spike_amounts.tsv")
+standards_fasta = config.setdefault("standards_fasta",
+                                    "standards.fasta")
+
+# parses config to setup input reads
+outputs = config.setdefault('outputs',set())
+outputs.update(setup_qc_outputs(config))
+
+# must use a cleaning protocol that removes standards
+cleaning_protocol = config.setdefault('cleaning_protocol', 'join_and_standards')
+
+# includes rules needed for joining, cleaning, and finding standards in reads
+include: "qc/setup.snake"
+
+# check that the spiked standards fasta exists and has data:
+if not os.path.exists(standards_fasta) or os.stat(standards_fasta).st_size == 0:
+    raise Exception("The 'standards_fasta' database must be a text file with "
+                    "sequences in fasta format. The file is empty or missing:\n{}" \
+                    .format(standards_fasta))
+
+# check that the spiked amounts table exists and has data:
+if not os.path.exists(spike_amounts_table) or os.stat(spike_amounts_table).st_size == 0:
+    raise Exception("The 'spike_amounts_table' must be a text table of counts. The file is empty or missing:\n{}" \
+                    .format(spike_amounts_table))
+
+## get the list of factor file names to be produced
+final_factor_files = expand("{sample}.spike_counts.factor", 
+                            sample=config['sample_data'])
+
+# get sample specific counts
+def get_counts_file(wildcards):
+    sample = wildcards.sample
+    cleaned_suffix = get_cleaned_suffix(cleaning_protocol, sample, config)
+    spike_counts_suffix = re.sub(r'nospikes.*$',
+                                 'spikes.counts.txt',
+                                 cleaned_suffix)
+    return "{sample}.{spike_counts_suffix}".format(**locals())
+
+
+if len(final_factor_files) == 0:
+    raise Exception("No samples configured!")
+
+# finally pull in some utility rules
+include: 'common/stats.snake'
+include: "common/transitions.snake"
+
+logger.debug("Snakefile config:\n" + yaml.dump(config))
+
+## The first rule is run by default
+rule collate_factors:
+    """
+    Collect all the factors into one table
+    """
+    input: final_factor_files
+    output: "normalization.factors.txt"
+    shell: "cat {input} > {output}"
+
+rule calculate_factors:
+    """
+    generate a normalization factor for each sample
+
+    use the bbduk stats file (see qc/bbduk.snake).
+    """
+    input: 
+        counts=get_counts_file,
+        spiked=spike_amounts_table
+    output: "{sample}.spike_counts.factor"
+    run:
+        scale_factor = calculate_factors(input.counts, input.spiked,
+                                         format='bbduk')
+        with open(output[0], 'w') as OUT:
+            OUT.write("{0}\t{1:0.2f}\n".format(wildcards.sample, scale_factor))
+
+"""
+rule assign_top_hit:
+    Resolve cases where one read matches equally well to two standards
+    input: all_filtered_hits
+    output: all_top_hits
+    shell: "assign_top_hit.py ..."
+"""

@@ -5,18 +5,22 @@ channels:
 dependencies:
  - python=3
  - snakemake
+ - coreutils
  - pandas
  - biopython
  - bbmap
  - bfc
  - trimmomatic
+ - prodigal
  - bwa 
  - samtools
  - infernal
  - prinseq
  - seqtk
  - sed
+ - coreutils
  - spades
  - salmon
+ - kallisto
  - py-metagenomics
  - batch_launcher

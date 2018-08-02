@@ -1,7 +1,7 @@
 assembly_list:
- - ALOHA_04
- - ALOHA_15
- - ALOHA_21
+ - ../ALOHA_04
+ - ../ALOHA_15
+ - ../ALOHA_21
 cross_tab: True
 clade_ranks: 
  - order
@@ -16,15 +16,15 @@ prodigal:
 aa_conversion: prodigal
 dbs:
     RefSeq: 
-        path: ../../data/seqdbs/RefSeq/lastdb
+        path: ../../../data/seqdbs/RefSeq/lastdb
         format: lastp
         type: tax
     KEGG: 
-        path: ../../data/seqdbs/KEGG/lastdb
+        path: ../../../data/seqdbs/KEGG/lastdb
         format: lastp
         assign_type: kegg
     COG:
-        path: ../../data/seqdbs/COG/frag-8/COG.1.hmm
+        path: ../../../data/seqdbs/COG/frag-8/COG.1.hmm
     COGfrg:
-        path: ../../data/seqdbs/COG/frag-8/COG.{N}.hmm
+        path: ../../../data/seqdbs/COG/frag-8/COG.{N}.hmm
         frags: 8

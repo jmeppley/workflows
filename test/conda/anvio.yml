@@ -4,9 +4,11 @@ channels:
  - brwnj
  - jmeppley
 dependencies:
- - python=3
- - snakemake
- - anvio
+ - python>=3
+ - snakemake<5
+ - coreutils
+ - gsl
+ - anvio=3
  - pandas
  - biopython
  - bbmap
@@ -24,4 +26,5 @@ dependencies:
  - last
  - py-metagenomics
  - batch_launcher
- - hmmer
+ - hmmer<3.2
+ - coreutils

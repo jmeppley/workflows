@@ -6,6 +6,8 @@ defaults={'bbduk':{'ram':'1g',
                    'phix_flags': (
                         'k=27 hdist=1 qtrim=rl trimq=17 cardinality=t '
                         'mingc=0.05 maxgc=0.95'),
+                   'spike_flags':
+                        'k=27 hdist=1 cardinality=t',
                    'threads': 20,
                    },
          }
@@ -32,9 +34,9 @@ rule trim_bbduk_adapters_paired:
     wildcard_constraints:
         suffix=r'\..*(?<=\.)'
     benchmark:
-        "benchmarks/{prefix}.noadapt_paired.fastq.time"
+        "benchmarks/{prefix}.{suffix}.noadapt_paired.fastq.time"
     log:
-        "logs/{prefix}.noadapt_paired.log"
+        "logs/{prefix}.{suffix}.noadapt_paired.log"
     version:
         bbduk_version
     threads:
@@ -103,4 +105,29 @@ rule trim_bbduk_phix:
           in={input} out={output[0]} gchist={output[1]} \
           interleaved overwrite {config[bbduk][phix_flags]} \
           ref={params.phiX_file} 2> {log}"
+
+rule trim_bbduk_standards:
+    """
+    remove standards with bbduk
+    """
+    input:
+        "{prefix}.fastq"
+    output:
+        fastq="{prefix}.nospikes.fastq",
+        counts="{prefix}.spikes.counts.txt",
+    benchmark:
+        "benchmarks/{prefix}.nospikes.fastq.time"
+    log:
+        "logs/{prefix}.nospikes.log"
+    version:
+        bbduk_version
+    params:
+        spikes_file = config.get('standards_fasta','standards.fasta')
+    threads:
+        config['bbduk']['threads']
+    shell:
+        "bbduk.sh -Xmx{config[bbduk][ram]} threads={threads} \
+          in={input} out={output.fastq} stats={output.counts}\
+          interleaved overwrite {config[bbduk][spike_flags]} \
+          ref={params.spikes_file} 2> {log}"
 
