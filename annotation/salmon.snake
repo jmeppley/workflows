@@ -13,6 +13,8 @@ apply_defaults(config, {'salmon': {'threads': 4,
                                   'quant_options': '',
                                   'lib_type': 'A'}})
 config['cov_col'] = 'TPM'
+config['read_col'] = 'NumReads'
+config['contig_col'] = 'Name'
 
 def get_sample_reads(w):
     sample_reads = get_sample_reads_for_mapping(w, config)
