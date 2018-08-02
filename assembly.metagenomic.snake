@@ -28,13 +28,6 @@ from python.common import get_version, parse_stats
 from python.qc import setup_qc_outputs
 from python.assembly import get_contig_length_summary_stats
 
-
-"""
-Testing removal:
-snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))
-from snakemake.logging import logger
-"""
-
 # Initialize transitions
 config.setdefault('transitions', {})
 
