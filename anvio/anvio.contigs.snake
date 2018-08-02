@@ -99,6 +99,7 @@ rule contig_db:
         """{config[anvio_prefix]}
            rm -f anvio/{wildcards.contigs}.db anvio/{wildcards.contigs}.h5
            anvi-gen-contigs-database -f {input} \
+             -n {wildcards.contigs} \
              -o anvio/{wildcards.contigs}.db \
              > {log} 2>&1 
            touch {output} """
