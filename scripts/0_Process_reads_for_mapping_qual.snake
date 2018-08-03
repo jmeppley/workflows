@@ -50,7 +50,7 @@ rule illlumina_prep:
     shell:
         """
         source activate illumina-prep
-        python /slipstream/opt/scripts/illuminaPrep.py -m 40 -g 6 -p primers -f {input.fwd} -r {input.rev} -o {output} > IlluminaPrep.log 2> IlluminaPrep.err
+        python /slipstream/opt/scripts/illuminaPrep.py -m 40 -g 6 -p primers -f {input.fwd} -r {input.rev} -o {output} > {output}.log 2> {output}.err
         """
 
 #####################################################
@@ -60,7 +60,7 @@ rule cutadapt:
     input: "{prefix}.fastq"
     output: "{prefix}.cut.fastq"
     shell:
-        'cutadapt -n 3 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -g AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC {input} > {output} 2> cutadapt.err'
+        'cutadapt -n 3 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -g AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC {input} > {output} 2> {output}.err'
 
 #####################################
 # Quality trim sequences with Sickle
