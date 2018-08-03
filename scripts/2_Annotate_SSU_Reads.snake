@@ -1,0 +1,116 @@
+"""
+# This workflow maps reads against a modified Silva database and assigns them to 'miTags'
+# using the LCA method
+
+use the conda environment in test/conda/mitags.yaml
+"""
+###
+# functions
+def get_project_name():
+    """ TODO: use the cuurent working dir name as the project """
+    return "MiTags"
+
+def string_from_opts(options):
+    """ turn a series of command line options into a naming string
+        drops whitespace and turns dashes into dots """
+    return re.sub(' ', '',
+                  re.sub('-', '.',
+                         options))
+
+#####
+## get config from user or use defaults
+
+# ranks to count on
+ranks = config.get('ranks', ['domain', 'phylum', 'class', 'genus'])
+# ranks in printed lineages
+display_ranks = config.get('display_ranks',
+                       ['domain', 'phylum', 'class', 'order','family', 'genus'])
+
+# input files (can be fastq)
+fasta_template = config.get(
+                    'fasta_template',
+                    'fastq/sorted_rna/{sample}.cut.sickle.non_rRNA.masked.fasta'
+                 )
+samples, = glob_wildcards(fasta_template)
+logger.debug("TEMPLATE: {}\nSAMPLES: {}".format(fasta_template, samples))
+
+# search options
+filter_opts = config.get('filter_opts', '-F 0 -L 70 -I 97')
+filter_string = config.get('fitler_string', string_from_opts(filter_opts))
+db_name = config.get('db_name', 'Silva_123.miTags')
+db_path = config.get('db_path', '')
+
+# output name
+project = config.get('project', get_project_name())
+
+###
+# build output files
+search_suffix = '.vs.{db_name}{filter_string}'.format(**locals())
+count_template = '{project}/{project}_16S.fasta{search_suffix}.P.{rank}.count'
+logger.debug("SUFFIX: {}\nOUTPUT: {}".format(search_suffix, count_template))
+output_tables = expand(count_template,
+                       project=project,
+                       search_suffix=search_suffix,
+                       rank=ranks + ['hitid',]
+                      )
+
+###
+# rules
+rule count_hitids:
+    """ assign top hit based on hit id and count hit ids across samples """
+    input: expand("{project}/{sample}" + search_suffix, sample=samples, \
+                  project=project)
+    output: count_template.format(rank='hitid', **locals())
+    params:
+        inputs=" ".join(expand("{sample}={project}/{sample}" + search_suffix, \
+                               project=project, \
+                               sample=samples)),
+    shell: "count_taxa.py {params.inputs} -o {output} \
+            -c 0.0 -f sam "
+
+rule count_ranks:
+    """ assign top hit based on organism abundance and use LCA to assign taxa"""
+    input: expand("{project}/{sample}" + search_suffix, sample=samples, \
+                    project=project)
+    output: count_template.format(rank=ranks, **locals())
+    params:
+        inputs=" ".join(expand("{sample}={project}/{sample}" + search_suffix, \
+                               project=project, \
+                               sample=samples)),
+        ranks=" ".join("-r " + r for r in ranks),
+        lineage=" ".join("-R " + r for r in display_ranks),
+    shell: "count_taxa.py {params.inputs} -o {output} \
+            -m {params.taxmap} -n {params.taxdir} \
+            {params.ranks} {params.lineage} \
+            -c 0.0001 -f sam"
+
+rule filter_hits:
+    """ filter LAST FILES so min length of overlap is 70 bps (-L 70) and only retain reads within 1% of blast-like score (-F 1). """
+    input: "{sam_root}.sam"
+    output: "{sam_root}" + filter_string
+    params:
+        opts=filter_opts,
+    shell: "filter_blast_m8.py -f sam {params.opts} {input} > {output}"
+
+rule bowtie:
+    """ searches SSU database iwth bowtie 2. The options:
+        # -x target database (reference )
+        #  -f = fasta  (or -q for fastq)
+        #  --un = what you name non-hits
+        #  --gbar = limit of gaps that will be allowed
+        # -S output
+    """
+    input: fasta_template
+    output:
+        sam="{project}/{sample}.vs.{db_name}.sam",
+        un="{project}/{sample}.vs.{db_name}.unaligned.fasta"
+    params:
+        db="/slipstream/galaxy-data/tool-data/sequencedbs/bowtie2/Silva/123/Silva_123_SSURef_NR99_tax_silva_trunc",
+        in_fmt="-q" if fasta_template.endswith('.fastq') else "-f",
+        opts="--local --sensitive --gbar 4",
+    threads: config.get('bowtie_threads', 8)
+    shell: "bowtie2 -p {threads} -x {params.db} \
+            {params.in_fmt} {input} --un {output.un} \
+            {params.opts} -S {output.sam}"
+
+
