@@ -1,0 +1,247 @@
+"""
+Calculate gene abundances by mapping reads to a gene catalog
+
+ * Map reads to catalog with BWA or similar
+ * count abundances
+
+There are two key configuration values:
+
+  genes_file: location of the gene database
+  sample_glob: snakemake wildcard glob string to locate read files and name samples
+
+The sample glob should look like:
+
+    /path/to/read/files/{sample}.reads.fastq
+
+Or even:
+
+    SFTP://server.provider.com/remote_path/{project}/{sample}/reads.fastq
+
+Just make sure that one of the wildcards is called 'sample'.
+
+
+Files (including the glob) can be local or remote. Remote files should be formatted for the snakemake remote provider. EG
+
+   SFTP://server.domain.edu/path/to/file.ext
+
+Supported protocols are SFTP, HTTP, and FTP
+
+login credentials should be passed in the configuration EG:
+
+config = {'remote': {'SFTP': {'server.domain.edu': {
+    'username': 
+    'password':
+}
+
+(private keys can be used, too. See snakemake remote file docs)
+
+"""
+url_rexp = re.compile(r'^([A-Za-z]+)://(.+)$')
+mnt_rexp = re.compile(r'^(/mnt/([a-z]+ine)/.+)$')
+
+def apply_defaults(config, defaults):
+    """ recursively appy defaults to nested dicts """
+    for param, pdefaults in defaults.items():
+        if isinstance(pdefaults, dict):
+            apply_defaults(config.setdefault(param, {}), pdefaults)
+        else:
+            config.setdefault(param, pdefaults)
+
+providers = {}
+def get_provider(protocol, host):
+    """
+    Creates a unique RemoteProvider object for each (protocol, host) pair.
+
+    Connection options taken from:
+    config['remote'][protocol][host]
+
+    With defaults from:
+    config['remote'][protocol]['defaults']
+
+    protocol must be one of SFTP, SCP, HTTP, HTTPS, FTP, but case can be
+    different. Case is used when keying options, though, so be consistent in
+    your configuration
+    """
+   
+    provider_key = (protocol, host)
+    protocol = protocol.upper()
+    if provider_key not in providers:
+        remote_defaults = config.get('remote', {}) \
+                                .get(protocol, {}) \
+                                .get('defaults', {})
+        remote_defaults.setdefault('keep_local', True)
+        remote_options = config.get('remote', {}) \
+                                .get(protocol, {}) \
+                                .get(host, {})
+        apply_defaults(remote_options, remote_defaults)
+        logger.debug("Creating RemoteProvider for {protocol} "
+                     "using:\n{remote_options}".format(**vars()))
+        if protocol in ['SFTP', 'SCP']:
+            from snakemake.remote.SFTP import RemoteProvider as sftp_rp
+            providers[provider_key] = sftp_rp(**remote_options)
+        elif protocol in ['HTTP', 'HTTPS']:
+            from snakemake.remote.HTTP import RemoteProvider as http_rp
+            providers[provider_key] = http_rp(**remote_options)
+        elif protocol == 'FTP':
+            from snakemake.remote.FTP import RemoteProvider as ftp_rp
+            providers[provider_key] = ftp_rp(**remote_options)
+        else:
+            raise Exception("Remote protocol {} not yet supported"
+                            .format(provider_key[0]))
+    return providers[provider_key]
+
+def path_up_to_wildcard(full_path):
+    """ If a given path has a wildcard placeholder ( eg {sample} ), 
+    return the last directory before that point """
+    path_fragment = full_path.split('{')[0]
+    if path_fragment.endswith(os.path.pathsep):
+        return path_fragment[:-1]
+    return os.path.dirname(path_fragment)
+
+def infer_provider(source, glob=False):
+    """
+    Checks the file path to see if we need a remote provider
+    """
+    try:
+        # is it an explicit url
+        # (EG: SFTP://lys.soest.hawaii.edu/mnt/lysine/...)
+        m = url_rexp.search(source)
+        if m is not None:
+            logger.debug("EXPLICIT URL")
+            # replace source file with a remote object
+            protocol, source_path = m.groups()
+            host = re.search(r'^([^/]+)/', source_path).group(1)
+            return get_provider(protocol, host), source
+
+        # special case: delong lab remote mounts
+        m = mnt_rexp.search(source)
+        if m is not None and not os.path.exists(path_up_to_wildcard(source) if glob else source):
+            logger.debug("INFERRED URL")
+            protocol = 'SFTP'
+            config.setdefault('remote', {}) \
+                  .setdefault(protocol, {}) \
+                  .setdefault('defaults', {'username': 'readonly',
+                                           'keep_local': True,
+                                          })
+            source_path, server_name = m.groups()
+            host = server_name + config.get('remote', {}) \
+                                       .get('domain', '.soest.hawaii.edu')
+            source_path = host + source_path
+            return get_provider(protocol, host), "".join([host, source])
+
+    except Exception as e:
+        print("Error in remote check: " + repr(e))
+        raise e
+
+    return None, source
+
+download_map = {}
+def remote_wrapper(source, glob=False):
+    """
+    if file is a remote url 
+         ( or a missing netowrk mount )
+    return remote provider object for downloading
+    """
+    provider, source = infer_provider(source, glob=glob)
+    logger.debug("provider: {}\nsource: {}".format(provider, source))
+    if glob:
+        if provider is None:
+            return glob_wildcards(source)
+        else:
+            return provider.glob_wildcards(source)
+    else:
+        if provider is None:
+            return source
+        else:
+            # return provider.remote(source)
+            # Hack to bypass bug in SFTP
+            host, path = source.split("/", 1)
+            full_path = "/" + path
+            local_path = "downloads/" + source
+            download_map[source] = (host, full_path)
+            return local_path
+
+def reads_file_for_sample(wildcards):
+    return config['sample_data'][wildcards.sample]
+
+def pairing_for_sample(wildcards):
+    reads_file = config['sample_data'][wildcards.sample]
+    if isinstance(reads_file, str) or len(reads_file)==1:
+        return "-p"
+    else:
+        return ""
+
+def check_sample_data(config):
+    if "sample_data" not in config:
+        if "sample_glob" not in config:
+            raise Exception("Please supply read files explicitly in "
+                            "config[sample_data] or with config[sample_glob]")
+        # string like "/path/to/files/{sample}.fastq"
+        sample_glob = config['sample_glob']
+        wildcard_values = remote_wrapper(sample_glob, glob=True)
+        sample_data = config.setdefault('sample_data', {})
+        wildcard_names = list(wildcard_values._fields)
+        sample_index = wildcard_names.index('sample')
+        for wildcard_tuple in zip(*list(wildcard_values)):
+            for value in wildcard_tuple:
+                # skip if wildcard spans folders
+                if re.search(os.path.sep, value):
+                    break
+            else:
+                # add sample
+                sample = wildcard_tuple[sample_index]
+                sample_data[sample] = remote_wrapper(
+                                        sample_glob.format(
+                                            **dict(zip(wildcard_names,
+                                                       wildcard_tuple))))
+genes_file = remote_wrapper(config['genes_file'])
+logger.debug("genes_file: " + repr(genes_file))
+
+search_result_template = "{sample}.vs.genes.sam"
+
+check_sample_data(config)
+
+search_results = {s:search_result_template.format(sample=s) \
+                  for s in config['sample_data']}
+
+
+rule count_table:
+    input: search_results.values()
+    output: 'gene.hit_counts.tsv'
+    params:
+        hit_tables=' '.join(["=".join(kv) for kv in search_results.items()])
+    shell: "count_taxa.py {params.hit_tables} -p hitid -a portion -F 0 -f sam \
+            -o {output}"
+
+rule search_reads:
+    input: 
+        reads=reads_file_for_sample,
+        db='genes.bwadb.bwt'
+    output: search_result_template
+    threads: 10
+    params:
+        db='genes.bwadb',
+        pairing=pairing_for_sample
+    shell: "bwa mem {params.pairing} -t {threads} {params.db} {input.reads} \
+            > {output}"
+
+rule index_contigs:
+    """ prepare contigs for mapping with BWA """
+    input: genes_file
+    output: 'genes.bwadb.bwt'
+    log: "logs/bwa_index.log"
+    benchmark: "benchmarks/bwa_pre_index.time"
+    params:
+        db='genes.bwadb'
+    shell: "bwa index -p {params.db} {input} > {log} 2>&1 "
+
+rule download:
+    output: "downloads/{remote_path}"
+    params:
+        host=lambda w: download_map[w.remote_path][0],
+        remote_path=lambda w: download_map[w.remote_path][1],
+        dl_path=lambda w: os.path.dirname("downloads/" + w.remote_path)
+    shell: """
+            mkdir -p {params.dl_path}
+            rsync -a readonly@{params.host}:{params.remote_path} {params.dl_path}
+           """
