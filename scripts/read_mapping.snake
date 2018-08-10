@@ -236,7 +236,7 @@ rule index_contigs:
     shell: "bwa index -p {params.db} {input} > {log} 2>&1 "
 
 rule download:
-    output: "downloads/{remote_path}"
+    output: temp("downloads/{remote_path}")
     params:
         host=lambda w: download_map[w.remote_path][0],
         remote_path=lambda w: download_map[w.remote_path][1],
