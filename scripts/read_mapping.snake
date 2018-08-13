@@ -209,9 +209,10 @@ rule count_table:
     input: search_results.values()
     output: 'gene.hit_counts.tsv'
     params:
-        hit_tables=' '.join(["=".join(kv) for kv in search_results.items()])
+        hit_tables=' '.join(["=".join(kv) for kv in search_results.items()]),
+        cutoff=config.get('cutoff', 0)
     shell: "count_taxa.py {params.hit_tables} -p hitid -a portion -F 0 -f sam \
-            -o {output}"
+            -o {output} -c {params.cutoff}"
 
 rule search_reads:
     input: 
