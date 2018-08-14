@@ -198,33 +198,56 @@ genes_file = remote_wrapper(config['genes_file'])
 logger.debug("genes_file: " + repr(genes_file))
 
 search_result_template = "{sample}.vs.genes.sam"
+filtered_result_template = "{sample}.vs.genes.F0.sam"
 
 check_sample_data(config)
 
-search_results = {s:search_result_template.format(sample=s) \
+search_results = {s:filtered_result_template.format(sample=s) \
                   for s in config['sample_data']}
 
+rule outputs:
+    input:
+        "gene.hit_counts.tsv",
+        "example.sam.header"
 
 rule count_table:
     input: search_results.values()
     output: 'gene.hit_counts.tsv'
+    benchmark: "benchmarks/count_table.time"
+    log: "logs/count_table.log"
     params:
         hit_tables=' '.join(["=".join(kv) for kv in search_results.items()]),
         cutoff=config.get('cutoff', 0)
     shell: "count_taxa.py {params.hit_tables} -p hitid -a portion -F 0 -f sam \
-            -o {output} -c {params.cutoff}"
+            -o {output} -c {params.cutoff} -v 22> {log}"
+
+rule save_header:
+    " grabs the header of a single sam file "
+    input: search_result_template.format(sample=next(iter(config['sample_data'])))
+    output: "example.sam.header"
+    shell: 'grep "^@" {input} > {output}'
+
+rule filter_hits:
+    input: search_result_template
+    output: filtered_result_template
+    benchmark: "benchmarks/{sample}.filter_blast_m8.time"
+    log: "logs/{sample}.filter.log"
+    threads: 1
+    shell: "filter_blast_m8.py -v -f sam -F 0 {input} > {output} 2> {log}"
 
 rule search_reads:
     input: 
         reads=reads_file_for_sample,
         db='genes.bwadb.bwt'
-    output: search_result_template
+    output: temp(search_result_template)
     threads: 10
+    benchmark: "benchmarks/{sample}.bwa.mem.time"
+    log: "logs/{sample}.bwa.mem.log"
     params:
         db='genes.bwadb',
         pairing=pairing_for_sample
     shell: "bwa mem {params.pairing} -t {threads} {params.db} {input.reads} \
-            > {output}"
+            > {output} 2> {log}"
 
 rule index_contigs:
     """ prepare contigs for mapping with BWA """
