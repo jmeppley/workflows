@@ -7,11 +7,13 @@ rule compile_lastdb:
     input:
         '{db_path}.faa',
     output: "{db_path}.prj"
+    threads:
+        lambda wildcards: config.get('lastal',{}).get('threads',10)
     params:
         lastdb=lambda w: 'lastdb8' \
                     if os.path.dirname(w.db_path)[-1]=='8' \
                     else 'lastdb'
-    shell: "{params.lastdb} -v -p {wildcards.db_path} {input}"
+    shell: "{params.lastdb} -P {threads} -v -p {wildcards.db_path} {input}"
 
 rule get_db_id_map:
     """
