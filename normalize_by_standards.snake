@@ -109,7 +109,7 @@ rule calculate_factors:
     output: "{sample}.spike_counts.factor"
     run:
         scale_factor = calculate_factors(input.counts, input.spiked,
-                                         format='bbduk')
+                                         table_format='bbduk')
         with open(output[0], 'w') as OUT:
             OUT.write("{0}\t{1:0.2f}\n".format(wildcards.sample, scale_factor))
 

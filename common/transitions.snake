@@ -150,3 +150,13 @@ rule transition_link_or_cat:
         command = get_link_or_cat_command,
     shell: "rm -f {output} && {params.command} {output}"
 
+#rule download:
+#    output: temp("downloads/{remote_path}")
+#    params:
+#        host=lambda w: download_map[w.remote_path][0],
+#        remote_path=lambda w: download_map[w.remote_path][1],
+#        dl_path=lambda w: os.path.dirname("downloads/" + w.remote_path)
+#    shell: """
+#            mkdir -p {params.dl_path}
+#            rsync -a readonly@{params.host}:{params.remote_path} {params.dl_path}
+#           """
