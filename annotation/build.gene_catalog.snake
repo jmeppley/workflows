@@ -66,8 +66,20 @@ config['outputs'] = set(catalog_stats_files)
 
 #########
 # Helper functions
+def get_unique_local_file(file_name, local_dir):
+    " return a unique local file name and set up transition "
+    name_string = os.path.basename(file_name)
+    config['file_count'][name_string] = config.setdefault('file_count', {})\
+                                                .get(name_string, 0) + 1
+    local_name = local_dir + "/sample_" + \
+        str(config['file_count'][name_string]) + "_" + \
+        name_string
+
+    config['transitions'][local_name] = file_name
+    return local_name
                                                    
-def get_all_gene_call_files(wildcards):
+def get_all_gene_call_files(ext, config,
+                            local_dir='gene_files'):
     """
     Find the contig.annotations.{wildcards.ext} for each assembly
 
@@ -75,8 +87,9 @@ def get_all_gene_call_files(wildcards):
     renaming
 
     Defaults to using unfiltered gene calls
+
+    Uses transitions{} to make a link from the source file to a local alias
     """
-    ext = wildcards.ext
     # hack for sliding in fixed gene calls
     path_prefix = config.setdefault('gene_path_prefix', '')
     gene_file_root = config.get('gene_file_root', 'contigs.all.annotations')
@@ -90,9 +103,9 @@ def get_all_gene_call_files(wildcards):
         if assembly_path in assembly_renaming_map:
             file_name = "renamed_dir" + file_name
 
-        yield file_name
+        yield get_unique_local_file(file_name, local_dir)
 
-def get_assembly_coverage_files(wildcards):
+def get_assembly_coverage_files(wildcards=None):
     """
     Find all the contig.coverages.{sample}.txt for each assembly
     """
@@ -101,9 +114,10 @@ def get_assembly_coverage_files(wildcards):
                                 'contigs.final.stats.txt')):
             if assembly_path in assembly_renaming_map:
                 file_name = "renamed_dir" + file_name
+
             yield file_name
 
-def get_assembly_read_stats(wildcards):
+def get_assembly_read_stats(wildcards=None):
     """
     Find all the cleaned reads stats files for each assembly
     """
@@ -112,6 +126,14 @@ def get_assembly_read_stats(wildcards):
                                 'stats',
                                 '*.clean.fastq.stats')):
             yield file_name
+
+
+## Collect file names now, so we can set up transitions for remote files
+collect_exts = ['faa', 'fna']
+gene_call_files = {e:list(get_all_gene_call_files(e, config)) for e in collect_exts}
+
+# TODO: as of now, the workflow cant get coverage info from remote servers, so
+# the gene counting part of the workflow will fail.
 
 ##########
 # RULES:
@@ -135,7 +157,7 @@ rule rename_contigs_and_genes:
             > {output}"
 
 rule collect_gene_calls:
-    input: get_all_gene_call_files
+    input: lambda w: gene_call_files[w.ext]
     output: "all_genes.{ext}"
     benchmark: 'benchmarks/all_genes.{ext}.time'
     wildcard_constraints:

@@ -1,27 +1,32 @@
+"""
+Helper functions for the calculation of normalization factors from spiked
+sequences
+"""
 import numpy
 import pandas
 
-def calculate_factors(counts_table, spiked_amounts, format=None):
-    """ calculate a scaling factor from two input tables """ 
+def calculate_factors(counts_table, spiked_amounts, table_format=None):
+    """ calculate a scaling factor from two input tables """
     # load counts of recovered standards from this sample
     pandas_args = {'header': None, 'index_col': None, 'skiprows':1,
                    'names':['Ref', 'Counts']}
-    if format == 'bbduk':
+    if table_format == 'bbduk':
         pandas_args.update({'skiprows':4,
                             'names':['Ref', 'Counts', 'Pct']})
+
     count_table = pandas.read_table(counts_table, **pandas_args)
-    count_table['Ref'] = [r.split()[0] for r in count_table.Ref]
-    count_table.set_index('Ref')
+    count_table['Ref'] = [r.split()[0] for r in count_table['Ref']]
+    count_table.set_index('Ref', inplace=True)
 
     # load spiked in amounts
-    spike_table = pandas.read_table(spiked_amounts, header=None, index_col=0)
-    spike_table.columns = ['Spiked']
-    
+    spike_table = pandas.read_table(spiked_amounts, header=None, index_col=0,
+                                   names=['Ref', 'Spiked'])
+
     # get data as lists in same order
     standard_list = sorted(list(spike_table.index))
     counts = [count_table.Counts.get(s,0) for s in standard_list]
     spikes = [spike_table.Spiked[s] for s in standard_list]
-    
+
     # calculate the scale factor and save
     scale_factor = get_best_fit(counts, spikes, force_intercept=True)[0]
     return scale_factor
