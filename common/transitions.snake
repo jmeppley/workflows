@@ -15,7 +15,6 @@ We can also concat multiple files into one here by giving list of files
 """
 logger.debug("BUILDING TRANSITIONS")
 from paramiko.ssh_exception import AuthenticationException
-from snakemake.remote import AbstractRemoteProvider
 
 url_rexp = re.compile(r'^([A-Za-z]+)://(.+)$')
 mnt_rexp = re.compile(r'^(/mnt/([a-z]+ine)/.+)$')
@@ -34,6 +33,10 @@ def get_provider(protocol, host):
     protocol must be one of SFTP, SCP, HTTP, HTTPS, FTP, but case can be
     different. Case is used when keying options, though, so be consistent in
     your configuration
+
+    protocol can also be RSYNC. There is no official snakemake remote provider
+    for rsync, but I've set up a rule below to handle it. It does NOT support
+        password authentication. Only ssh key based access.
     """
    
     provider_key = (protocol, host)
@@ -58,6 +61,9 @@ def get_provider(protocol, host):
         elif protocol == 'FTP':
             from snakemake.remote.FTP import RemoteProvider as ftp_rp
             providers[provider_key] = ftp_rp(**remote_options)
+        elif protocol == 'RSYNC':
+            from snakemake.common import RsyncProviderHack
+            providers[provider_key] = RsyncProviderHack(**remote_optoins)
         else:
             raise Exception("Remote protocol {} not yet supported"
                             .format(provider_key[0]))
@@ -118,9 +124,7 @@ config['transitions'] = transitions
 def get_link_or_cat_command(wildcards):
     """ choose 'ln -s' for single files, cat for multiple. Also use abs paths """
     input_files = transitions[wildcards.transition_file_name]
-    if isinstance(input_files, AbstractRemoteProvider):
-        logger.debug("Linnking to remote file: " + input_files)
-        input_files = str(input_files)
+    # TODO (figure out how to catch remote files here for linking)
     if isinstance(input_files, str):
         # Single input file, just link it
         #return "ln -s {}".format(os.path.abspath(input_files))
@@ -129,6 +133,11 @@ def get_link_or_cat_command(wildcards):
             wildcards.transition_file_name,
             os.path.abspath(input_file)
         )
+    else:
+        logger.debug("input files:\n - repr: {}\n - str :{}".format(
+                        repr(input_files),
+                        str(intput_files)
+                    )
     # otherwise, we have a list of files to concatenate
     return "cat {} >".format(" ".join(os.path.abspath(f) for f in input_files))
 
@@ -150,13 +159,15 @@ rule transition_link_or_cat:
         command = get_link_or_cat_command,
     shell: "rm -f {output} && {params.command} {output}"
 
-#rule download:
-#    output: temp("downloads/{remote_path}")
-#    params:
-#        host=lambda w: download_map[w.remote_path][0],
-#        remote_path=lambda w: download_map[w.remote_path][1],
-#        dl_path=lambda w: os.path.dirname("downloads/" + w.remote_path)
-#    shell: """
-#            mkdir -p {params.dl_path}
-#            rsync -a readonly@{params.host}:{params.remote_path} {params.dl_path}
-#           """
+rule download_with_rsync:
+    output: temp("{host}/{remote_path}")
+    params:
+        user=lambda w: providers[('RSYNC', w.host)].user,
+        key=lambda w: "" if providers[('RSYNC', w.host)].key is None \
+                         else '"-e ssh -i {}"'\
+                            .format(providers[('RSYNC', [w.host]).key),
+        dl_path=lambda w: os.path.join(w.host os.path.dirname(w.remote_path))
+    shell: """
+            mkdir -p {params.dl_path}
+            rsync -a {params.key} {params.user}@{host}:/{remote_path} {params.dl_path}
+           """

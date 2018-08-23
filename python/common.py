@@ -243,3 +243,12 @@ def get_file_name(list_or_string):
     if isinstance(list_or_string, str):
         return list_or_string
     return next(iter(list_or_string))
+
+class RsyncProviderHack():
+    def __init__(self, user=None, host=None, key=None):
+        self.user=user
+        self.host=host
+        self.key=key
+    
+    def remote(self, file_name):
+        return file_name
