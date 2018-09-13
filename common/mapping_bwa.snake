@@ -87,7 +87,7 @@ rule mapped_read_counts:
     params:
         input="mapping/{sample}.vs.{contigs}.bam"
     shell:
-        "samtools view {params.input} \
+        "samtools view -F 2304 {params.input} \
          | cut -f 3 \
          | uniq -c \
          > {output}"
