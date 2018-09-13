@@ -11,7 +11,6 @@ the assembly
 """
 
 include: "../common/mapping_bwa.snake"
-
 from python.common import get_file_name
 from python.assembly import get_contig_stats, \
                             generate_histogram
@@ -28,11 +27,11 @@ include: "contig.genes.snake"
 include: "rrna.annotation.snake"
 include: "../annotation/lastal.snake"
 
-config.setdefault('outputs', set()).add("contigs.annotations.gff")
+config.setdefault('outputs', set()).add("contigs.filter.annotations.gff")
 for sample in config['sample_data']:
     if 'clean' in config['sample_data'][sample] or \
             'raw' in config['sample_data'][sample]:
-        config['outputs'].add("contigs.annotations.coverage.{sample}.tsv"\
+        config['outputs'].add("contigs.all.annotations.coverage.{sample}.tsv"\
                                         .format(sample=sample))
 
 rule contig_stats_table:
@@ -87,7 +86,11 @@ rule contig_master_stats_table:
 
 rule contigs_filter:
     """
-    Get list of contigs that have at least config[mapped_read_cutoff]  reads mapped
+    Get list of contigs that pass provided filter:
+
+    Filter defaults to:
+        ReadCount>=5
+        Length>=2000
     """
     input: "contigs.all.stats.txt"
     output: 
@@ -95,18 +98,20 @@ rule contigs_filter:
         table="contigs.final.stats.txt"
     benchmark: 'benchmarks/contig.filter.list.time'
     params:
-        cutoff=str(config.get('mapped_read_cutoff', '5'))
+        cutoffs=config.get('contig_cutoffs', ['ReadCount>=5',
+                                              'Length>=2000']),
     run:
         contig_table = pandas.read_table(get_file_name(input), index_col=0)
-        good_contig_table = contig_table.query('ReadCount>=' + params.cutoff)
-        good_contig_table.to_csv(get_file_name(output.table), sep='\t')
+        for filter_string in params.cutoffs:
+            contig_table = contig_table.query(filter_string)
+        contig_table.to_csv(get_file_name(output.table), sep='\t')
         with open(get_file_name(output.list), 'wt') as OUT:
-            OUT.write('\n'.join(iter(good_contig_table.index)))
+            OUT.write('\n'.join(iter(contig_table.index)))
             OUT.write('\n')
 
 rule contig_histogram:
     input:
-        "contigs.final.stats.txt"
+        "contigs.all.stats.txt"
     output:
         "histograms/contigs_gt_{length_cutoff}/{metric}.hist"
     params:
@@ -138,10 +143,10 @@ rule annotation_coverage:
     into a simple two column table
     """
     input:
-        gff="contigs.annotations.gff",
-        stats="contigs.final.stats.txt"
+        gff="contigs.all.annotations.gff",
+        stats="contigs.all.stats.txt"
     output:
-        table="contigs.annotations.coverage.{sample}.tsv"
+        table="contigs.all.annotations.coverage.{sample}.tsv"
     run:
         # Read stats table, but just keep median coverage
         cov_dict = pandas.read_table(get_file_name(input.stats),

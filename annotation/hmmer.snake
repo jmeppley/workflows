@@ -1,23 +1,10 @@
-rule hmmer_db_press:
-    """
-    Press an hmm file for searching
-    """
-    input:
-        "{db_path}"
-    output:
-        "{db_path,.+\.[Hh][Mm][Mm](\.[Aa][Ss][Cc][Ii][Ii])?}.h3i"
-    version:
-        get_version('hmmpress','-h',lines=[1,])
-    shell:
-        "rm -f {input}.h3? && hmmpress {input}"
-
 rule hmmer:
     """
     Look for profile matches
     """
     input:
         fasta="{file_root}.faa",
-        db_file=lambda wildcards: config['dbs'][wildcards.db]['path'] + ".h3i"
+        db=lambda wildcards: config['dbs'][wildcards.db]['path']
     output:
         "{file_root}.vs.{db}.tbl"
     benchmark:
@@ -32,15 +19,14 @@ rule hmmer:
         db_path=lambda wildcards: config['dbs'][wildcards.db]['path']
     shell:
         "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
-        {params.db_path} {input.fasta}"
+        {input.db} {input.fasta}"
 
 rule hmmer_dbfrag:
     """
     Look for profile matches in the Nth fragment of a DB
     """
     input:
-        db_file=lambda w: config['dbs'][w.db]['path'].format(N=int(w.N)) \
-                                                                    + ".h3i",
+        db=lambda w: config['dbs'][w.db]['path'].format(N=int(w.N)),
         fasta="{file_root}.faa"
     output:
         temp("{file_root}.vs.{db}.{N}.tbl.dfrag")
@@ -52,11 +38,9 @@ rule hmmer_dbfrag:
         get_version('hmmsearch','-h',lines=[1,])
     threads:
         config['hmmer'].get('threads',default_threads)
-    params:
-        db_path=lambda w: config['dbs'][w.db]['path'].format(N=int(w.N))
     shell:
         "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
-        {params.db_path} {input.fasta}"
+        {input.db} {input.fasta}"
 
 rule hmmer_fragdb:
     """
