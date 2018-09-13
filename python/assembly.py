@@ -86,7 +86,7 @@ def get_coverage_stats(contig_depth_file,
     logger.info("Parsing read depth file: {}"
                 .format(contig_depth_file))
     mapping_depth_table = get_samtool_depth_table(contig_depth_file)
-    contig_stats = mapping_depth_table.join(read_count_table, how='left')
+    contig_stats = mapping_depth_table.join(read_count_table, how='left').fillna(0)
 
     for col in ['Length', 'ReadCount', 'MaxCov', 'MinCov', 'CumuLength']:
         if col in contig_stats.columns:
