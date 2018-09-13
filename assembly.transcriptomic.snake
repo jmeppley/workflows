@@ -62,6 +62,7 @@ else:
     raise Excption("Unknown assembler: " + config['assembler'])
 #
 # Did they ask for non rRNA reads?
+#  TODO: use contig annotations to speed this up
 if config['produce_nonrrna_reads']:
     for stats_file in expand("stats/{sample}.raw.non-rRNA.fastq.{extension}",
                              extension=['stats', 'hist'],
