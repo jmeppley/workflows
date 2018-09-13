@@ -290,6 +290,9 @@ def normalize_coverages(input):
 
     last_assembly = None
     coverages = None
+    if len(input.contig_covs) == 0:
+        raise Exception("Missing contig coverage files!")
+
     for cov_file in sorted(input.contig_covs):
         assembly = os.path.dirname(cov_file)
         assembly = re.sub(r'^renamed_dir', '', assembly)

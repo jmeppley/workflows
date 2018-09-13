@@ -7,6 +7,8 @@ BWA_VERSION = \
 from snakemake.utils import update_config
 update_config(config, {'bwa': {'threads': 15}})
 config['cov_col'] = 'MeanCov'
+config['read_col'] = 'ReadCount'
+config['contig_col'] = 'Contig'
 from python.assembly import get_coverage_stats
 from python.samples import get_sample_reads_for_mapping
 
@@ -87,7 +89,7 @@ rule mapped_read_counts:
     params:
         input="mapping/{sample}.vs.{contigs}.bam"
     shell:
-        "samtools view {params.input} \
+        "samtools view -F 2304 {params.input} \
          | cut -f 3 \
          | uniq -c \
          > {output}"

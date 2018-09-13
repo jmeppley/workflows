@@ -58,6 +58,7 @@ rule hmmer_dbfrag:
     input:
         db_file=lambda wildcards: get_db_frag(config, wildcards.db, \
                                               wildcards.N),
+        #db=lambda w: config['dbs'][w.db]['path'].format(N=int(w.N)),
         fasta="{file_root}.faa"
     output:
         temp("{file_root}.vs.{db}.{N}.tbl.dfrag")
@@ -72,6 +73,7 @@ rule hmmer_dbfrag:
     shell:
         "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
         {input.db_file} {input.fasta}"
+        #{input.db} {input.fasta}"
 
 rule hmmer_fragdb:
     """

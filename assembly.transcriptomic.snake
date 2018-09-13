@@ -25,7 +25,6 @@ import os, re, sys, glob, yaml, pandas, subprocess, tempfile, numpy
 from Bio import SeqIO, __version__ as BIOPYTHON_VERSION
 from python.common import get_version, parse_stats, get_file_name
 from python.qc import setup_qc_outputs
-snakefile_path = os.path.dirname(os.path.abspath(workflow.snakefile))
 
 # Initialize transitions
 config.setdefault('transitions', {})
@@ -63,6 +62,7 @@ else:
     raise Excption("Unknown assembler: " + config['assembler'])
 #
 # Did they ask for non rRNA reads?
+#  TODO: use contig annotations to speed this up
 if config['produce_nonrrna_reads']:
     for stats_file in expand("stats/{sample}.raw.non-rRNA.fastq.{extension}",
                              extension=['stats', 'hist'],

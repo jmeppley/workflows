@@ -4,7 +4,7 @@ Methods for setting up top hit workflow
 get_top_hit_outputs: populates the outputs and transitions config dicts based
 on the values in 'reads', 'dbs', 'filter', and 'top_alg'
 """
-import os
+import os, re
 from snakemake.logging import logger
 from python.samples import process_sample_data
 from python.qc import setup_qc_outputs
@@ -96,10 +96,10 @@ def get_top_hit_outputs(config):
                 'vs.{dbase}.{search_alg}.{hit_filter}'.format(**vars())
         topalg = config.get('top_alg', 'tophit')
         config['outputs'].add('counts.{dbase}.{topalg}.hitids'.format(**vars()))
-
-
-
-
+        if config.get('remove_rna'):
+            # also do counts without rRNA reads
+            config['outputs'].add('counts.{dbase}.{topalg}.non-rRNA.hitids'.format(**vars()))
+        logger.debug('added counts.{dbase}.{topalg}.hitids to outputs'.format(**vars()))
 
     return needs_qc
 
@@ -109,4 +109,18 @@ def get_filter_string(filter_dict):
     """
     return "".join("_{}{}".format(k, filter_dict[k]) \
                    for k in sorted(filter_dict.keys()))
+
+def get_non_rna_reads(wildcards, config):
+    cleaned_reads = config['sample_data'][wildcards.sample]['clean']
+    return re.sub(r'\.(fast[aq])$', r'.non-rRNA.\1', cleaned_reads)
+
+def get_get_ids_cmd(wildcards, config):
+    nonrna = get_non_rna_reads(wildcards, config)
+    if nonrna.endswith('fasta'):
+        return "grep '^>' {nonrna} | \
+                 perl -pe 's/^>(\\S+).*/\\1/'".format(nonrna=nonrna)
+    else:
+        return "gawk '(NR+3) % 4 == 0' {nonrna} | \
+                 perl -pe 's/^@(\\S+).*/\\1/'".format(nonrna=nonrna)
+
 

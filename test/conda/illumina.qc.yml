@@ -1,7 +1,7 @@
 channels: 
 - bioconda
 - conda-forge
-- jmepple
+- jmeppley
 dependencies:
 - python=3.5
 - snakemake<4
@@ -18,3 +18,4 @@ dependencies:
 - last
 - py-metagenomics
 - batch_launcher
+- coreutils
