@@ -19,7 +19,12 @@ def get_transition_command(wildcards):
     input_files = config['transitions'][wildcards.transition_file_name]
     if isinstance(input_files, str):
         # Single input file, just link it
-        return "ln -s {}".format(os.path.abspath(input_files))
+        #return "ln -s {}".format(os.path.abspath(input_files))
+        input_file = input_files
+        return "ln -s $(realpath --relative-to=$(dirname {}) {})".format(
+            wildcards.transition_file_name,
+            os.path.abspath(input_file)
+        )
     # otherwise, we have a list of files to concatenate
     return "cat {} >".format(" ".join(os.path.abspath(f) for f in input_files))
 
