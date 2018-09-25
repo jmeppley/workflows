@@ -3,7 +3,7 @@ channels:
  - conda-forge
  - jmeppley
 dependencies:
- - python=3.5
+ - python=3
  - snakemake
  - coreutils
  - pandas

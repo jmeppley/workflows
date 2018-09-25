@@ -10,7 +10,6 @@ Methods used across all or most workflows including:
 
 import os
 import re
-import logging
 import subprocess
 import tempfile
 import pandas
@@ -119,6 +118,9 @@ def add_stats_outputs(snakefile, config):
         #  - don't lock the directory
         #  - just do a dry run
         #  - just print the summary table
+        logger.debug("getting fasta and fastq files for stats")
+        logger.debug("creating copy of config")
+        logger.debug(repr(config))
 
         # create a new config file with the stats option turned off
         config_copy = dict(config)

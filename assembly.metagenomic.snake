@@ -34,6 +34,9 @@ config.setdefault('transitions', {})
 ##
 # Bring in components
 #
+# for counting reads in fasta files
+include: "common/stats.snake"
+#
 # for mapping reads back to contigs
 include: "common/mapping_bwa.snake"
 #
@@ -68,7 +71,6 @@ include: "assembly/contig.annotation.snake"
 #
 # rule to create links
 include: "common/transitions.snake"
-include: "common/stats.snake"
 
 # 
 # Make sure assembly has name
