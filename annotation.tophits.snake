@@ -33,8 +33,6 @@ include: "common/fastq.snake"
 include: "common/transitions.snake"
 
 if config.get('remove_rna', True) in ['True', True]:
-    print(rules)
-    print(dir(rules))
     include: "qc/sort.rna.snake"
     ruleorder: filter_nonrrna_or_rrna > fastq_to_fasta
 
