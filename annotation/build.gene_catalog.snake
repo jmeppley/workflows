@@ -129,7 +129,7 @@ def get_assembly_read_stats(wildcards=None):
 
 
 ## Collect file names now, so we can set up transitions for remote files
-collect_exts = ['faa', 'fna']
+collect_exts = ['faa', 'ffn']
 gene_call_files = {e:list(get_all_gene_call_files(e, config)) for e in collect_exts}
 
 # TODO: as of now, the workflow cant get coverage info from remote servers, so
