@@ -81,15 +81,26 @@ rule assign_top_hits:
         -o .{wildcards.top} {input}"
 
 rule count_hits:
-    """ take a hit table and count hits to each hitid """
+    """ take a hit table and count hits to each hitid 
+    
+    if {rna} in the output file is non-rRNA,
+        use the ".non-rRNA" version of the top hits
+    if {rna} in the output file is "all":
+        use the full top hits file (no suffix)
+    """
     input:
-        '{sample}.{search}.{top}{rna}'
+        lambda w: '{sample}.{search}.{top}{rna}'.format(
+            sample=w.sample,
+            search=w.search,
+            top=w.top,
+            rna="" if w.rna == 'all' else '.' + w.rna,
+        )
     output:
-        '{sample}.{search}.{top}{rna}.hitid.counts'
+        '{sample}.{search}.{top}.{rna}.hitid.counts'
     benchmark:
         "benchmarks/{sample}.{search}.{top}.count.time"
     log:
-        "logs/{sample}.{search}.{top}{rna}.count.log"
+        "logs/{sample}.{search}.{top}.{rna}.count.log"
     version:
         get_version("count_hits.py")
     shell:
@@ -111,37 +122,24 @@ rule filter_hits:
 
 rule compile_hit_counts:
     """
-    Uses join utility to merge hit count tables
-
-    We use some magice to get an "outer" join:
-
-    * the -a options force joint to output all lines of all files
-    * the -o option fills in columsn from other files in unjoined lines
+    Uses pandas to outer join hit counts. The {rna} wildcard is 
+    expected to be "non-rRNA" or "all".
     """
     input:
-        lambda w: expand('{sample}.{filter}.{top}.{rna}hitid.counts',
+        lambda w: expand('{sample}.{filter}.{top}.{rna}.hitid.counts',
                          filter=config['db_strings'][w.db],
                          top=w.top,
                          rna=w.rna,
-                         #rna="non-rRNA." \
-                         #    if config.get('remove_rna', True) in ['True', True] \
-                         #    else "",
                          sample=config['sample_data'])
     output:
-        'counts.{db}.{top}.{rna}hitids'
+        'counts.{db}.{top}.{rna}.hitids'
     params:
-        input_map=lambda w: {s:'{sample}.{filter}.{top}.hitid.counts'.format(
-         
-         sample=s,
-                                top=w.top,
-                                filter=config['db_strings'][w.db]) \
+        input_map=lambda w: {s:'{sample}.{filter}.{top}.{rna}.hitid.counts'\
+                                .format(sample=s,
+                                        top=w.top,
+                                        rna=w.rna,
+                                        filter=config['db_strings'][w.db]) \
                              for s in config['sample_data']},
-        #dash_as=' '.join('-a {}'.format(i) \
-        #                 for i in range(len(config['sample_data']))),
-        #fields=','.join("{}.1".format(i) \
-        #                for i in range(len(config['sample_data']))),
-        #keys=' '.join("-{} 2".format(i) \
-        #              for i in range(len(config['sample_data']))),
     benchmark:
         'benchmarks/counts.{db}.{top}.hitidis.time'
     run:

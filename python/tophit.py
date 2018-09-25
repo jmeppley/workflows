@@ -95,7 +95,7 @@ def get_top_hit_outputs(config):
         db_strings[dbase] = \
                 'vs.{dbase}.{search_alg}.{hit_filter}'.format(**vars())
         topalg = config.get('top_alg', 'tophit')
-        config['outputs'].add('counts.{dbase}.{topalg}.hitids'.format(**vars()))
+        config['outputs'].add('counts.{dbase}.{topalg}.all.hitids'.format(**vars()))
         if config.get('remove_rna'):
             # also do counts without rRNA reads
             config['outputs'].add('counts.{dbase}.{topalg}.non-rRNA.hitids'.format(**vars()))
