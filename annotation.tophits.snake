@@ -16,7 +16,7 @@ Finally
 """
 import re
 from python.common import get_version
-from python.tophit import get_top_hit_outputs
+from python.tophit import get_top_hit_outputs, get_non_rna_reads, get_get_ids_cmd
 from snakemake.logging import logger
 
 needs_qc = get_top_hit_outputs(config)
@@ -32,6 +32,16 @@ include: "annotation/lastal.snake"
 include: "common/fastq.snake"
 include: "common/transitions.snake"
 
+if config.get('remove_rna', True) in ['True', True]:
+    print(rules)
+    print(dir(rules))
+    include: "qc/sort.rna.snake"
+    ruleorder: filter_nonrrna_or_rrna > fastq_to_fasta
+
+wildcard_constraints:
+    search=r'vs\..+',
+    alg=r'(last[xnp]|blast[xnp]|sam)',
+    top=r'(tophit|toporg)'
 
 rule all:
     input: outputs
@@ -42,7 +52,6 @@ rule filter_m8:
     input: '{file_root}.{alg}'
     output: '{file_root}.{alg}.{params}'
     wildcard_constraints:
-        alg=r'(last[xnp]|blast[xnp]|sam)',
         params=filter_params_patt + r'+'
     params:
         opts=lambda w: \
@@ -63,9 +72,6 @@ rule assign_top_hits:
     output:
         expand('{sample}.vs.{{db}}.{{alg}}.{{filter}}.{{top}}',
                sample=config['sample_data'])
-    wildcard_constraints:
-        alg=r'(last[xnp]|blast[xnp]|sam)',
-        top=r'(tophit|toporg)'
     benchmark:
         'benchmarks/assign_top_hits.{db}.{alg}.{filter}.{top}.time'
     version:
@@ -79,18 +85,31 @@ rule assign_top_hits:
 rule count_hits:
     """ take a hit table and count hits to each hitid """
     input:
-        '{sample}.{search}.{top}'
+        '{sample}.{search}.{top}{rna}'
     output:
-        '{sample}.{search}.{top}.hitid.counts'
+        '{sample}.{search}.{top}{rna}.hitid.counts'
     benchmark:
         "benchmarks/{sample}.{search}.{top}.count.time"
     log:
-        "logs/{sample}.{search}.{top}.count.log"
+        "logs/{sample}.{search}.{top}{rna}.count.log"
     version:
         get_version("count_hits.py")
     shell:
         "count_hits.py -v -i {input} -H 1 \
         > {output} 2> {log}"
+
+rule filter_hits:
+    """ remove rRNA reads from count table (only works for fastq input)"""
+    input:
+        hits='{sample}.{search}.{top}',
+        nonrna=lambda w: get_non_rna_reads(w, config)
+    output: '{sample}.{search}.{top}.non-rRNA'
+    threads: 2
+    benchmark: 'benchmarks/{sample}.{search}.{top}.non-rRNA.time'
+    params:
+        get_ids_cmd=lambda w: get_get_ids_cmd(w, config)
+    shell: "screen_table.py {input.hits} -k \
+             -l <({params.get_ids_cmd}) > {output}"
 
 rule compile_hit_counts:
     """
@@ -102,24 +121,29 @@ rule compile_hit_counts:
     * the -o option fills in columsn from other files in unjoined lines
     """
     input:
-        lambda w: expand('{sample}.{filter}.{top}.hitid.counts',
+        lambda w: expand('{sample}.{filter}.{top}.{rna}hitid.counts',
                          filter=config['db_strings'][w.db],
                          top=w.top,
+                         rna=w.rna,
+                         #rna="non-rRNA." \
+                         #    if config.get('remove_rna', True) in ['True', True] \
+                         #    else "",
                          sample=config['sample_data'])
     output:
-        'counts.{db}.{top}.hitids'
+        'counts.{db}.{top}.{rna}hitids'
     params:
         input_map=lambda w: {s:'{sample}.{filter}.{top}.hitid.counts'.format(
-                                sample=s,
+         
+         sample=s,
                                 top=w.top,
                                 filter=config['db_strings'][w.db]) \
                              for s in config['sample_data']},
-        dash_as=' '.join('-a {}'.format(i) \
-                         for i in range(len(config['sample_data']))),
-        fields=','.join("{}.1".format(i) \
-                        for i in range(len(config['sample_data']))),
-        keys=' '.join("-{} 2".format(i) \
-                      for i in range(len(config['sample_data']))),
+        #dash_as=' '.join('-a {}'.format(i) \
+        #                 for i in range(len(config['sample_data']))),
+        #fields=','.join("{}.1".format(i) \
+        #                for i in range(len(config['sample_data']))),
+        #keys=' '.join("-{} 2".format(i) \
+        #              for i in range(len(config['sample_data']))),
     benchmark:
         'benchmarks/counts.{db}.{top}.hitidis.time'
     run:

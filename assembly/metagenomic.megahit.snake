@@ -2,7 +2,7 @@
 Python Makefile to assemble reads from multiple samples into a single assembly
 with megahit.
 """
-#include: "../common/common.snake"
+from python.common import apply_defaults
 
 ####
 # Required conda packages:
@@ -15,8 +15,12 @@ with megahit.
 #
 # Default to "meta-sensitive" preset for megahit
 #  (I also often use meta-large)
-config.setdefault('megahit',{}).setdefault('preset','meta-sensitive')
-config['megahit'].setdefault('threads', 40)
+defaults = {"megahit": {
+    'preset': 'meta-sensitive',
+    'threads': 40,
+    'params': ''
+}}
+apply_defaults(config, defaults)
 # 
 ######################
 
@@ -48,12 +52,15 @@ rule megahit:
         preset=lambda w: w.preset,
         continue_flags=lambda w: "--continue" \
             if os.path.isdir('megahit-{}'.format(w.preset)) else "",
-        inputs=','.join(config['cleaned_read_list'])
+        #inputs=','.join(config['cleaned_read_list'])
+        inputs=','.join(cleaned_reads),
+        user_opts=config['megahit']['params']
     threads:
         config['megahit']['threads']
     shell:
         "megahit --12 {params.inputs} --presets {params.preset} -t {threads}\
          --continue -o megahit-{params.preset} --out-prefix megahit --verbose\
+         {params.user_opts} \
          > {log} 2>&1"
 
 

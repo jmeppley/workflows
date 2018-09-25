@@ -16,6 +16,7 @@ We can also concat multiple files into one here by giving list of files
 logger.debug("BUILDING TRANSITIONS")
 from paramiko.ssh_exception import AuthenticationException
 from snakemake.remote import AbstractRemoteProvider
+from python.common import apply_defaults
 
 url_rexp = re.compile(r'^([A-Za-z]+)://(.+)$')
 mnt_rexp = re.compile(r'^(/mnt/([a-z]+ine)/.+)$')
