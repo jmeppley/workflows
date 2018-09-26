@@ -2,8 +2,8 @@
 Python Makefile to create an anntotated gene catalog
 
 Starting point is either:
-    1) faa file of gene sequences (already clustered)
-    2) multiple assembled metagenomes (configured in configfile) 
+    1) existing gene catalog: faa file of protein gene sequences (already clustered)
+    2) multiple assembled metagenomes (identified via the configfile) 
 
 Workflow:
 
@@ -13,12 +13,15 @@ If starting from assemblies:
  * cluster all nucl CDS at 95%
  * pull out faa version of cluster reps
 
- Annotations:
+Annotations:
  * query genes in configured databases: usu RefSeq, KEGG, COG, PFAM, and EGGnog
  * tabulate tax v gene_families counts
  * generate db specific annotations and merge into final table
 
 The initial annoation steps are the same as the annotation.genes.snake workflow.
+
+Example config:
+
 """
 import os
 import glob

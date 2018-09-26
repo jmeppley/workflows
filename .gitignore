@@ -5,7 +5,7 @@ test/conda/envs
 test/data/seqdbs/RefSeq/lastdb*
 !test/data/seqdbs/RefSeq/lastdb.faa
 !test/data/seqdbs/RefSeq/lastdb.tax
-test/data/seqdbs/COG/frag-8/COG.?.hmm.h3?
+test/data/seqdbs/COG/frag_8
 test/data/seqdbs/KEGG/lastdb*
 !test/data/seqdbs/KEGG/lastdb.faa
 !test/data/seqdbs/KEGG/lastdb.kos

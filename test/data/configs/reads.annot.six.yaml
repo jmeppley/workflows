@@ -19,7 +19,7 @@ dbs:
         format: lastp
         assign_type: kegg
     COG:
-        path: ../../data/seqdbs/COG/frag-8/COG.1.hmm
+        path: ../../data/seqdbs/COG/COG.partial.hmm
     COGfrg:
-        path: ../../data/seqdbs/COG/frag-8/COG.{N}.hmm
+        path: ../../data/seqdbs/COG/COG.partial.hmm
         frags: 8

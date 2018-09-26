@@ -19,6 +19,8 @@ setup() {
 @test "catalog: create empty folders" {
     rm -rf test/scratch/catalog
 
+    mkdir -p test/scratch/catalog/faa
+
     mkdir -p test/scratch/catalog/ALOHA_04
     mkdir -p test/scratch/catalog/ALOHA_15
     mkdir -p test/scratch/catalog/ALOHA_21
@@ -30,6 +32,15 @@ setup() {
     mkdir -p test/scratch/catalog/mcl-ffn
     mkdir -p test/scratch/catalog/vsearch
 
+}
+
+@test "annotate existing faa catalog" {
+    cd test/scratch/catalog/faa
+    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config genes_file=../../../data/other/all_genes.clustered.faa -p -k -j 20 --notemp > gene_catalog.log 2>&1"
+    [ "$status" -eq 0 ]
+    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config genes_file=../../../data/other/all_genes.clustered.faa -p -k -j 20 -n 2>&1 | grep Nothing"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" == "Nothing to be done." ]
 }
 
 @test "assemble sample ALOHA_04" {

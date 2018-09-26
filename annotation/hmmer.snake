@@ -1,33 +1,6 @@
 from python.annotate import get_db_frag, get_db_frags
 DROP_COMMENTS = "perl -ne 'if (m/^[^#]/) { print; }'"
 
-#####
-# Fragmented HMM dbs:
-#
-#  The following two rules use a bit of a hack to get around
-#  a limitation of snakemake
-rule frag_hmm_db:
-    """
-    create a fragmented hmm file
-    """
-    input: "{path}/{hmm_file}.{ext}"
-    output: "{path}/frag_{frags}/{hmm_file}.0001.{ext}"
-    params:
-        outname="{path}/frag_{frags}/{hmm_file}.{ext}"
-    shell: "fragment_records.py -N {wildcards.frags} \
-             -P '^HMMER' -E -Z 4 -i {input} -o {params.outname}"
-    
-rule frag_hmm_db_others:
-    """
-    make snakemake aware of db fragments by creating shadow symlinks to the
-    pieces
-    """
-    input: "{path}/frag_{frags}/{hmm_file}.0001.{ext}"
-    output: "{path}/frag_{frags}/{hmm_file}.{N}.{ext}"
-    params:
-        input="{path}/frag_{frags}/{hmm_file}.0{N}.{ext}"
-    shell: "ln -s $(realpath --relative-to=$(dirname {output}) {params.input}) {output}"
-
 rule hmmer:
     """
     Look for profile matches
@@ -51,6 +24,61 @@ rule hmmer:
         "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
         {input.db} {input.fasta}"
 
+#####
+# Fragmented HMM dbs:
+#
+# If config['dbs'][db_name]['frags'] is greater than 1, then
+#  the parent workflow will be looking for {pref}.vs.{db}.tbl.dbatch
+#  instead of {pref}.vs.{db}.tbl
+#  (This is set in python/annotate.py get_db_dot_fmt_strings())
+
+rule hmmer_fragdb:
+    """
+    Look for profile matches in N fragments of a larger db. This rule just merges the N outputs of hmmer_dbfrag.
+    """
+    input:
+        lambda w: expand("{file_root}.vs.{db}.{{N}}.tbl.dfrag"\
+                                             .format(db=w.db,
+                                                     file_root=w.file_root), 
+                         N=range(1,1+config['dbs'][w.db]['frags']))
+    output:
+        "{file_root}.vs.{db}.tbl.dbatch"
+    benchmark:
+        "benchmarks/hmmer.{file_root}.vs.{db}.dbatch.time"
+    log:
+        "logs/hmmer.{file_root}.vs.{db}.dbatch.log"
+    version:
+        get_version('sort',lines=[1,])
+    shell:
+        "cat {input} | {DROP_COMMENTS} | sort -k 1,1 > {output}"
+
+#  The following two rules use a bit of a hack to get around
+#   a limitation of snakemake
+#  It's unclear how to have a rule generate an unknown number of outputs
+rule frag_hmm_db:
+    """
+    create a fragmented hmm file
+    """
+    input: "{path}/{hmm_file}.{ext}"
+    output: "{path}/frag_{frags}/{hmm_file}.0001.{ext}"
+    params:
+        outname="{path}/frag_{frags}/{hmm_file}.{ext}"
+    shell: "fragment_records.py -N {wildcards.frags} \
+             -P '^HMMER' -E -Z 4 -i {input} -o {params.outname}"
+    
+# This second rule uses the first db fragment as the stated input,
+#  but it creates a link to fragment N
+rule frag_hmm_db_others:
+    """
+    make snakemake aware of db fragments by creating shadow symlinks to the
+    pieces
+    """
+    input: "{path}/frag_{frags}/{hmm_file}.0001.{ext}"
+    output: "{path}/frag_{frags}/{hmm_file}.{N}.{ext}"
+    params:
+        input="{path}/frag_{frags}/{hmm_file}.0{N}.{ext}"
+    shell: "ln -s $(realpath --relative-to=$(dirname {output}) {params.input}) {output}"
+
 rule hmmer_dbfrag:
     """
     Look for profile matches in the Nth fragment of a DB
@@ -72,24 +100,4 @@ rule hmmer_dbfrag:
     shell:
         "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
         {input.db_file} {input.fasta}"
-
-rule hmmer_fragdb:
-    """
-    Look for profile matches in N fragments of a larger db. This rule just merges the N outputs of hmmer_dbfrag.
-    """
-    input:
-        lambda w: expand("{file_root}.vs.{db}.{{N}}.tbl.dfrag"\
-                                             .format(db=w.db,
-                                                     file_root=w.file_root), 
-                         N=range(1,1+config['dbs'][w.db]['frags']))
-    output:
-        "{file_root}.vs.{db}.tbl.dbatch"
-    benchmark:
-        "benchmarks/hmmer.{file_root}.vs.{db}.dbatch.time"
-    log:
-        "logs/hmmer.{file_root}.vs.{db}.dbatch.log"
-    version:
-        get_version('sort',lines=[1,])
-    shell:
-        "cat {input} | {DROP_COMMENTS} | sort -k 1,1 > {output}"
 
