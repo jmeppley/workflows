@@ -87,6 +87,7 @@ def get_transition_input(transition_file_name):
         # special case: delong lab remote mounts
         m = mnt_rexp.search(source)
         if m is not None and not os.path.exists(source):
+            logger.debug('cannot find {} locally, trying SFTP'.format(source))
             protocol = 'SFTP'
             config.setdefault('remote', {}) \
                   .setdefault(protocol, {}) \
