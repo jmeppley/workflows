@@ -49,8 +49,9 @@ standards_fasta = config.get("standards_fasta",
 
 # check that the spiked amounts table exists and has data:
 if not os.path.exists(spike_amounts_table) or os.stat(spike_amounts_table).st_size == 0:
-    raise Exception("The 'spike_amounts_table' must be a text table of counts. The file is empty or missing:\n{}" \
-                    .format(spike_amounts_table))
+    if not config['fake_spikes']:
+        raise Exception("The 'spike_amounts_table' must be a text table of counts. The file is empty or missing:\n{} \n\nSet config['fake_spikes'] to True to normalize based on average counts if you don't know the spiked amounts." \
+                        .format(spike_amounts_table))
 
 ## get the list of factor file names to be produced
 # this looks for all the lastout files in the give dir
@@ -96,6 +97,25 @@ rule count_hits:
         sample=r'[^/]+'
     shell: "count_taxa.py -c 0 -f blast {wildcards.sample}={input} > {output}"
 
+rule fake_spike_amounts:
+    """ Use the average abundance as the spiked amount """
+    input: [re.sub(r'\.factor$', '.counts', f) for f in final_factor_files]
+    output: spike_amounts_table
+    run:
+        all_counts = None
+        sample_count = len(input)
+        for count_file in input:
+            # load counts of recovered standards from this sample
+            count_table = pandas.read_table(count_file, header=0, index_col=0)
+
+            if all_counts is None:
+                all_counts = count_table
+            else:
+                all_counts = all_counts.join(count_table, how='outer')
+
+        (all_counts.sum(axis=1)/sample_count).to_csv(output[0], sep='\t')
+
+
 rule calculate_factors:
     """
     generate a normalization factor for each sample
@@ -116,7 +136,8 @@ rule calculate_factors:
         spike_table.columns = ['Spiked']
         
         # get data as lists in same order
-        standard_list = sorted(list(count_table.index))
+        standard_list = sorted(list(set(count_table.index) \
+                                     .intersection(spike_table.index)))
         counts = [count_table.Counts[s] for s in standard_list]
         spikes = [spike_table.Spiked[s] for s in standard_list]
         
