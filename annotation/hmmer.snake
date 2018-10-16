@@ -31,7 +31,6 @@ rule hmmer:
 #  the parent workflow will be looking for {pref}.vs.{db}.tbl.dbatch
 #  instead of {pref}.vs.{db}.tbl
 #  (This is set in python/annotate.py get_db_dot_fmt_strings())
-
 rule hmmer_fragdb:
     """
     Look for profile matches in N fragments of a larger db. This rule just merges the N outputs of hmmer_dbfrag.
@@ -51,6 +50,29 @@ rule hmmer_fragdb:
         get_version('sort',lines=[1,])
     shell:
         "cat {input} | {DROP_COMMENTS} | sort -k 1,1 > {output}"
+
+rule hmmer_dbfrag:
+    """
+    Look for profile matches in the Nth fragment of a DB
+    """
+    input:
+        db_file=lambda wildcards: get_db_frag(config, wildcards.db, \
+                                              wildcards.N),
+        #db=lambda w: config['dbs'][w.db]['path'].format(N=int(w.N)),
+        fasta="{file_root}.faa"
+    output:
+        temp("{file_root}.vs.{db}.{N}.tbl.dfrag")
+    benchmark:
+        "benchmarks/hmmer.{file_root}.vs.{db}.{N}.time"
+    log:
+        "logs/hmmer.{file_root}.vs.{db}.{N}.log"
+    version:
+        get_version('hmmsearch','-h',lines=[1,])
+    threads:
+        config['hmmer'].get('threads',default_threads)
+    shell:
+        "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
+        {input.db_file} {input.fasta}"
 
 #  The following two rules use a bit of a hack to get around
 #   a limitation of snakemake
@@ -78,26 +100,4 @@ rule frag_hmm_db_others:
     params:
         input="{path}/frag_{frags}/{hmm_file}.0{N}.{ext}"
     shell: "ln -s $(realpath --relative-to=$(dirname {output}) {params.input}) {output}"
-
-rule hmmer_dbfrag:
-    """
-    Look for profile matches in the Nth fragment of a DB
-    """
-    input:
-        db_file=lambda wildcards: get_db_frag(config, wildcards.db, \
-                                              wildcards.N),
-        fasta="{file_root}.faa"
-    output:
-        temp("{file_root}.vs.{db}.{N}.tbl.dfrag")
-    benchmark:
-        "benchmarks/hmmer.{file_root}.vs.{db}.{N}.time"
-    log:
-        "logs/hmmer.{file_root}.vs.{db}.{N}.log"
-    version:
-        get_version('hmmsearch','-h',lines=[1,])
-    threads:
-        config['hmmer'].get('threads',default_threads)
-    shell:
-        "hmmsearch --cpu {threads} --domtblout {output} -o /dev/null \
-        {input.db_file} {input.fasta}"
 
