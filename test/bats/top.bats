@@ -1,11 +1,19 @@
 setup() {
+    which conda
+    if [ "$?" -eq "1" ]; then
+        unset conda
+	export PATH=$_CONDA_ROOT:$PATH
+    fi
+
     mkdir -p test/conda/envs
     ENV=illumina.qc
     ENV_DIR=`pwd`/test/conda/envs/$ENV
     ENV_FILE=test/conda/${ENV}.yml
     if [ "$ENV_FILE" -nt "$ENV_DIR" ]; then
-        conda env create -f $ENV_FILE -p $ENV_DIR --force --quiet
+        rm -rf $ENV_DIR
+        conda env create -f $ENV_FILE -p $ENV_DIR --force --quiet > test/conda/envs/.create.$ENV 2>&1
     fi
+    
     source activate $ENV_DIR
 }
 
