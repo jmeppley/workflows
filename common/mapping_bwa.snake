@@ -53,13 +53,17 @@ rule map_sample_reads:
             > {output}"
 
 rule sam_to_bam:
+    """ convert to BAM and:
+     * sort by contig
+     * keep only the primary alignments
+    """
     input: "{root}.sam"
     output: "{root}.bam"
     benchmark: "benchmarks/{root}.bwa_sam_bam.time"
     threads: 1
     version: SAMTOOLS_VERSION
     shell:
-        "samtools view -b {input} \
+        "samtools view -F 2304 -b {input} \
         | samtools sort -l 5 -@ {threads} -m 10G - \
         > {output}"
 
