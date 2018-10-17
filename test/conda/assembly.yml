@@ -5,7 +5,8 @@ channels:
  - jmeppley
 dependencies:
  - python=3
- - snakemake
+ - snakemake-minimal
+ - psutil`
  - pandas
  - biopython
  - bbmap
