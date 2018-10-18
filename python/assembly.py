@@ -2,9 +2,9 @@
 Functions used in the assembly workflows
 """
 import re
+from collections import defaultdict
 import numpy
 import pandas
-from collections import defaultdict
 from Bio import SeqIO, SeqUtils
 from edl.util import ascii_histogram
 from edl.blastm8 import GFF, generate_hits
@@ -280,7 +280,7 @@ def get_contig_length_summary_stats(contig_stats, N_levels=[50, 75, 90]):
     uses "length" and "cumulength" columns in contig_stats table
     to quickly get N50 and others for given N_levels (def: 50,75,90)
     """
-    if len(contig_stats.index) == 0:
+    if contig_stats.index.empty:
         return {'contig count': 0}
 
     # tota length is last cumulative length value
