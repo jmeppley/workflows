@@ -98,7 +98,7 @@ rule count_hits:
     output:
         '{sample}.{search}.{top}.{rna}.hitid.counts'
     benchmark:
-        "benchmarks/{sample}.{search}.{top}.count.time"
+        "benchmarks/{sample}.{search}.{top}.{rna}.count.time"
     log:
         "logs/{sample}.{search}.{top}.{rna}.count.log"
     version:
@@ -141,7 +141,7 @@ rule compile_hit_counts:
                                         filter=config['db_strings'][w.db]) \
                              for s in config['sample_data']},
     benchmark:
-        'benchmarks/counts.{db}.{top}.hitidis.time'
+        'benchmarks/counts.{db}.{top}.{rna}.hitidis.time'
     run:
         import pandas, re
         for sample, input_file in params.input_map.items():
