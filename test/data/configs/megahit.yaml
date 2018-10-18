@@ -14,6 +14,9 @@ trimmomatic:
     leading: 10
     trailing: 10
     sliding_window: "4:20"
+samtools:
+    ram: 1G
+    threads: 2
 bbduk:
     threads: 5
 cmsearch:

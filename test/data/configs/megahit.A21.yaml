@@ -7,6 +7,8 @@ sample_data:
      - "../../../data/raw_reads/2014_ALOHA_XVII_1-21_DNA_S1_R2_001.fastq"
 cmsearch:
     threads: 10
+samtools:
+    ram: 1G
 megahit:
     preset: meta-sensitive
     threads: 40

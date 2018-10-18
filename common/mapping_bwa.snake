@@ -4,8 +4,11 @@ BWA_VERSION = \
         get_version('bwa', 
                     version_flag="", 
                     regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
-from snakemake.utils import update_config
-update_config(config, {'bwa': {'threads': 15}})
+from python.common import apply_defaults
+#from snakemake.utils import update_config
+apply_defaults(config, {'bwa': {'threads': 15},
+                       'samtools': {'threads': 10, 'ram': '10G'},
+                      })
 config['cov_col'] = 'MeanCov'
 config['read_col'] = 'ReadCount'
 config['contig_col'] = 'Contig'
@@ -60,11 +63,13 @@ rule sam_to_bam:
     input: "{root}.sam"
     output: "{root}.bam"
     benchmark: "benchmarks/{root}.bwa_sam_bam.time"
-    threads: 1
+    threads: config['samtools']['threads']
+    params:
+        ram=config['samtools']['ram']
     version: SAMTOOLS_VERSION
     shell:
         "samtools view -F 2304 -b {input} \
-        | samtools sort -l 5 -@ {threads} -m 10G - \
+        | samtools sort -l 5 -@ {threads} -m {params.ram} - \
         > {output}"
 
 rule index_bam:

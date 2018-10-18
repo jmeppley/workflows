@@ -24,3 +24,6 @@ cmsearch:
     threads: 10
 spades:
     ram: 10
+samtools:
+    ram: 1G
+    threads: 2
