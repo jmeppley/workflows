@@ -23,7 +23,7 @@ cmsearch:
     threads: 10
 megahit:
     preset: meta-sensitive
-    threads: 40
+    threads: 2
 dbs:
     SilvaSSU:
         path: ../../data/seqdbs/Silva/SSU/bwadb
