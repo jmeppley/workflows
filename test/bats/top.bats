@@ -23,6 +23,22 @@ setup() {
     cd test/scratch/top
     run bash -c "snakemake -s ../../../annotation.tophits.snake --configfile ../../data/configs/reads.top.RS.yaml -p -k -j 20 > top.annot.log 2>&1"
     [ "$status" -eq 0 ]
+    run bash -c "snakemake -s ../../../annotation.tophits.snake --configfile ../../data/configs/reads.top.RS.yaml -p -k -n 2>&1 | grep '^Nothing'"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" == "Nothing to be done." ]
+}
+
+@test "Check tophit outputs" {
+    run bash -c "diff <(sort test/scratch/top/ALOHA_XVII_1_04.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts) test/bats/outputs/ALOHA_XVII_1_04.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts.sort"
+    [ "$status" -eq 0 ]
+    run bash -c "diff <(sort test/scratch/top/ALOHA_XVII_1_15.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts) test/bats/outputs/ALOHA_XVII_1_15.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts.sort"
+    [ "$status" -eq 0 ]
+    run bash -c "diff <(sort test/scratch/top/ALOHA_XVII_1_16.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts) test/bats/outputs/ALOHA_XVII_1_16.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts.sort"
+    [ "$status" -eq 0 ]
+    run bash -c "diff <(sort test/scratch/top/ALOHA_XVII_1_18.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts) test/bats/outputs/ALOHA_XVII_1_18.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts.sort"
+    [ "$status" -eq 0 ]
+    run bash -c "diff <(sort test/scratch/top/ALOHA_XVII_1_21.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts) test/bats/outputs/ALOHA_XVII_1_21.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts.sort"
+    [ "$status" -eq 0 ]
 }
 
 @test "Find top hits in a database with QC" {
