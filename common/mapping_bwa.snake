@@ -122,6 +122,7 @@ rule contig_coverage_table:
     """
     input:
         "mapping/{sample}.reads.vs.{contigs}.depths",
+        "{contigs}.fasta",
         "mapping/{sample}.reads.vs.{contigs}.read_counts",
     output:
         temp("{contigs}.coverages.{sample}.txt"),

@@ -1,12 +1,13 @@
 """
 Functions used in the assembly workflows
 """
+import re
+import numpy
+import pandas
+from collections import defaultdict
 from Bio import SeqIO, SeqUtils
 from edl.util import ascii_histogram
 from edl.blastm8 import GFF, generate_hits
-import numpy
-import pandas
-import re
 from snakemake import logger
 
 
@@ -48,7 +49,7 @@ def generate_histogram(contig_stats_file,
                 [metric] \
                 .fillna(0)
     with open(histogram_file, 'wt') as hist_handle:
-        if len(values) == 0:
+        if values.empty:
             hist_handle.write("There are no contigs longer than "
                               "{length_cutoff}bp".format(**vars()))
         else:
@@ -79,6 +80,7 @@ def generate_histogram(contig_stats_file,
 
 
 def get_coverage_stats(contig_depth_file,
+                       contig_fasta,
                        contig_read_counts_file,
                        contig_stats_out):
     """
@@ -98,7 +100,9 @@ def get_coverage_stats(contig_depth_file,
     # convert base by base depth data into coverage
     logger.info("Parsing read depth file: {}"
                 .format(contig_depth_file))
-    mapping_depth_table = get_samtool_depth_table(contig_depth_file)
+    mapping_depth_table = get_samtool_depth_table(contig_depth_file,
+                                                  contig_fasta,
+                                                 )
     contig_stats = mapping_depth_table.join(read_count_table, how='left').fillna(0)
 
     for col in ['Length', 'ReadCount', 'MaxCov', 'MinCov', 'CumuLength']:
@@ -136,7 +140,7 @@ def get_sequence_stats_from_contigs(contigs_fasta):
                              'Length': lengths,
                              'GC': gcs}).set_index('Contig')
 
-def get_samtool_depth_table(depth_file):
+def get_samtool_depth_table(depth_file, fasta_file):
     """
     Calculate coverage stats for each contig in an assembly
 
@@ -146,86 +150,130 @@ def get_samtool_depth_table(depth_file):
                  this is a 3 column file with one line per base.
                  columns are:
                      'contig_id base_index base_depth'
+    fasta_file: fasta of contigs, used to get length (optional)
 
     Returns:
-     pandas.DataFrame with one row per contig and the three following columns:
+     pandas.DataFrame with one row per contig and the following columns:
             Contig, MeanCov, MedCov, MaxCov, MinCov, StdCov
             """
-    with open(depth_file, 'r') as depths_handle:
-        return get_samtool_depth_table_from_handle(depths_handle)
+    contig_lengths = {r.id:len(r) for r in
+                      SeqIO.parse(fasta_file, 'fasta')}
 
+    with open(depth_file) as depth_handle:
+        return DepthParser(depth_handle).get_data_frame(contig_lengths)
 
-def get_samtool_depth_table_from_handle(depth_stream):
+class DepthParser():
     """
     Calculate coverage stats for each contig in an assembly
 
-    Params:
-     depth_stream: output file from the command:
-                    `samtools depth reads.v.contigs.bam`
-
-                    passed as an open file-like object (aka a file handle)
+    Requires open file-like handle to `samtools depths` output
                  this is a 3 column file with one line per base.
                  columns are:
                      'contig_id base_index base_depth'
+    contg_lengths: (optional) dict from contig to length
+                This is un-needed if depths includes bases with 0 depth
 
-    Returns:
-     pandas.DataFrame with one row per contig and the three following columns:
-            Contig, MeanCov, MedCov, MaxCov, MinCov, StdCov
-            """
+    """
 
-    # reading into lists is a fast way to build a big DataFrame
-    contigs, av_covs, mn_covs, mx_covs, md_covs, std_covs = \
-            [], [], [], [], [], []
+    def __init__(self, depth_file_handle):
+        """ initialze parser with open file handle on depths """
+        self.handle = depth_file_handle
 
-    # loop over contig bases
-    current_contig = None
-    depths = []
-    for line in depth_stream:
-        contig, base, depth = line.split()
-        depth = int(depth)
-        if contig != current_contig:
-            if current_contig is not None:
-                # end of contig, save numbers
-                contigs.append(current_contig)
-                depth_array = numpy.array(depths)
-                av_covs.append(depth_array.mean())
-                mn_covs.append(depth_array.min())
-                mx_covs.append(depth_array.max())
-                md_covs.append(numpy.median(depth_array))
-                std_covs.append(depth_array.std())
-            depths = []
-            current_contig = contig
+    # always look ahead to see if contig changes
+    next_entry = None
 
-        # update contig numbers with current base
-        depths.append(depth)
+    def __iter__(self):
+        """ return an iterator over contigs"""
+        try:
+            self.next_entry = _parse_depth_line(next(self.handle))
+        except StopIteration as e:
+            pass
+        return self
 
-    # end of final contig, save numbers
-    contigs.append(current_contig)
-    depth_array = numpy.array(depths)
-    av_covs.append(depth_array.mean())
-    mn_covs.append(depth_array.min())
-    mx_covs.append(depth_array.max())
-    md_covs.append(numpy.median(depth_array))
-    std_covs.append(depth_array.std())
+    def __next__(self):
+        """ if there is a next line, return an iterator over depths """
+        if self.next_entry is not None:
+            return self.next_entry[0], self._generate_depths_for_next_contig()
+        else:
+            raise StopIteration
 
-    #return pandas.DataFrame(
-    #    [contigs, av_covs, mx_covs, mn_covs, std_covs, md_covs],
-    #    columns=['Contig', 'MeanCov', 'MaxCov', 'MinCov', 'StdCov', 'MedCov'],
-    #                       ).set_index('Contig')
-    table = pandas.DataFrame([contigs,
-                              av_covs,
-                              mx_covs,
-                              mn_covs,
-                              std_covs,
-                              md_covs]).T
-    table.columns = ['Contig',
-                     'MeanCov',
-                     'MaxCov',
-                     'MinCov',
-                     'StdCov',
-                     'MedCov']
-    return table.set_index('Contig')
+    def _generate_depths_for_next_contig(self):
+        """ yield lines until the contig changes """
+        # remember which contig we're on
+        this_contig = self.next_entry[0]
+        yield self.next_entry[1]
 
+        # yield lines until we see a new contig
+        for line in self.handle:
+            self.next_entry = _parse_depth_line(line)
+            contig = self.next_entry[0]
+            if contig == this_contig:
+                yield self.next_entry[1]
+            else:
+                break
+        else:
+            # we reached the end
+            self.next_entry = None
+
+    columns = ['Contig',
+               'MedCov',
+               'MeanCov',
+               'StdCov',
+               'MinCov',
+               'MaxCov',
+              ]
+
+    def get_data_frame(self, contig_lengths=None):
+        """
+        Uses this parser to generate a DataFrame of coverage stats by contig
+        Pass in dict of contig legths if 0 depths are excluded from depth file
+        """
+        if contig_lengths is None:
+            contig_lengths = defaultdict(lambda: 0)
+        return pandas.DataFrame(self._contig_data_generator(contig_lengths),
+                                columns=self.columns) \
+                .set_index('Contig')
+
+    def _contig_data_generator(self, contig_lengths):
+        for contig, depths in self:
+            coverage = numpy.array(list(_insert_zeros(depths, contig_lengths[contig])))
+            yield (contig,
+                   numpy.median(coverage),
+                   coverage.mean(),
+                   coverage.std(),
+                   coverage.min(),
+                   coverage.max())
+
+
+def _parse_depth_line(depth_line):
+    """ return contig, (base, depth) nested tuples with base & depth as
+    integers """
+    data = depth_line.rstrip().split('\t')
+    return data[0], tuple(int(d) for d in data[1:])
+
+def _insert_zeros(contig_depths, contig_length=0):
+    """
+    The depths file only lists bases with non-zero depths
+
+    return only depth values (not bases), but insert zeros where needed
+    """
+
+    # keep track of the last base with a >0 depth
+    last_base = 0
+
+    # loop over depth values
+    for base, depth in contig_depths:
+        last_base += 1
+        while base > last_base:
+            # insert 0's until we catch up
+            yield 0
+            last_base += 1
+        yield depth
+
+    # insert 0's until we reach the end
+    while last_base < contig_length:
+        last_base += 1
+        yield 0
 
 def get_contig_length_summary_stats(contig_stats, N_levels=[50, 75, 90]):
     """
@@ -328,7 +376,7 @@ def filter_annotations(good_contig_file, input_file, output_file):
     the supplied list of good contigs """
     good_contigs = get_good_contig_list(good_contig_file)
     iterator, record_parser, formatter = get_file_handlers(input_file)
-    
+
     # Only keep genes in good contigs
     in_genes = 0
     out_genes = 0
@@ -347,7 +395,7 @@ def drop_rna_overlaps(input_file, output_file,
                       rna_locations, buffer=0):
     """
     For gene in input file (fasta or gff), print out genes that
-    do not overlap rna_locations to output_file 
+    do not overlap rna_locations to output_file
     """
     iterator, record_parser, formatter = get_file_handlers(input_file)
 
@@ -386,7 +434,7 @@ def filter_and_extract_rRNA(raw_gff, contigs_fasta,
         with open(output_rna_gff, 'wt') as GFF_OUT:
             # loop over contigs
             for contig in SeqIO.parse(contigs_fasta, 'fasta'):
-                # get naming informatoion from gff line and contig 
+                # get naming informatoion from gff line and contig
                 # from spades:
                 m = re.search(r'length_(\d+)_cov_([0-9.]+)',
                               contig.description)
