@@ -206,23 +206,29 @@ def setup_qc_outputs(config):
         cleaned_suffix = get_cleaned_suffix(cleaning_protocol,
                                             sample, config)
 
-        # result of QC
-        cleaned_raw_reads = '{sample}.{cleaned_suffix}.fastq'\
+        ## result of QC
+        # the actual QC output depends on the remove_rna flag
+        if config.get('remove_rna', True) in ['True', True]:
+            # if rrna separation requested . . .
+            logger.debug("adding separated rrna reads to output")
+            # add rRNA reads to output
+            for rrna_split in ['SSU', 'LSU']:
+                outputs.append("{sample}.{cleaned_suffix}.{rrna_split}.fastq" \
+                                .format(**vars()))
+            # set non-rRNA as cleaned target
+            cleaned_raw_reads = '{sample}.{cleaned_suffix}.non-rRNA.fastq'\
                                                     .format(**vars())
+        else:
+            # otherwise, QC ends at cleaned_suffix
+            cleaned_raw_reads = '{sample}.{cleaned_suffix}.fastq'\
+                                                    .format(**vars())
+
+        # this is the alias that will point to the actual QC output
         cleaned_reads = '{sample}.clean.fastq'.format(**vars())
+        cleaned_read_list.append(cleaned_reads)
+        outputs.append(cleaned_reads)
         transitions[cleaned_reads] = cleaned_raw_reads
         sample_data[sample]['clean'] = cleaned_reads
-
-        if config.get('remove_rna', True) in ['True', True]:
-            # if rrna separation requested, add rRNA-only and non-rRNA to names
-            logger.debug("adding separated rrna reads to output")
-            for rrna_split in ['non-rRNA', 'SSU', 'LSU']:
-                outputs.append(re.sub(r'\.fastq$',
-                                      '.{}.fastq'.format(rrna_split),
-                                      cleaned_reads))
-        else:
-            cleaned_read_list.append(cleaned_reads)
-            outputs.append(cleaned_reads)
 
     return outputs
 
@@ -244,7 +250,7 @@ def get_cleaned_suffix(cleaning_protocol, sample, config):
         barcodes = ".".join(barcodes)
         cleaned_suffix = '.'.join([chemistry, barcodes]) + \
                             '.' + cleaned_suffix
-    
+
     return cleaned_suffix
 
 def setup_merge_by_lanes(raw_files, sample):
