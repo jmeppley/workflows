@@ -11,21 +11,9 @@ sample_data:
           - ../../data/raw_reads/2014_ALOHA_XVII_1-15_DNA_S3_R2_001.fastq
         chemistry: scripseq
         barcode: ACTGAT
-    ALOHA_XVII_1_16_DNA: 
-        raw: 
-          - ../../data/raw_reads/2014_ALOHA_XVII_1-16_DNA_S4_R1_001.fastq
-          - ../../data/raw_reads/2014_ALOHA_XVII_1-16_DNA_S4_R2_001.fastq
-        chemistry: scripseq
-        barcode: GGCTAC
-    ALOHA_XVII_1_18_DNA: 
-        raw: 
-          - ../../data/raw_reads/2014_ALOHA_XVII_1-18_DNA_S5_R1_001.fastq
-          - ../../data/raw_reads/2014_ALOHA_XVII_1-18_DNA_S5_R2_001.fastq
-        chemistry: scripseq
-        barcode: GTCCGC
 cleaning_protocol: joining
 trimmomatic:
-    threads: 10
+    threads: 5
     illumina_clip: "2:30:10"
     minlen: 100
     leading: 10
@@ -34,9 +22,9 @@ trimmomatic:
 bbduk:
     threads: 5
 cmsearch:
-    threads: 10
+    threads: 5
 lastal:
-    threads:   10
+    threads:   5
 dbs:
     RefSeq: 
         path: ../../data/seqdbs/RefSeq/lastdb

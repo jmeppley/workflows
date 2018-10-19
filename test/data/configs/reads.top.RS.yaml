@@ -9,7 +9,7 @@ filter:
     E: .01
 top_alg: tophit
 lastal:
-    threads:   10
+    threads:   5
 dbs:
     RefSeq: 
         path: ../../data/seqdbs/RefSeq/lastdb

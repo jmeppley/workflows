@@ -21,7 +21,7 @@ setup() {
     rm -rf test/scratch/top
     mkdir -p test/scratch/top
     cd test/scratch/top
-    run bash -c "snakemake -s ../../../annotation.tophits.snake --configfile ../../data/configs/reads.top.RS.yaml -p -k -j 20 > top.annot.log 2>&1"
+    run bash -c "snakemake -s ../../../annotation.tophits.snake --configfile ../../data/configs/reads.top.RS.yaml -p -k -j 5 > top.annot.log 2>&1"
     [ "$status" -eq 0 ]
     run bash -c "snakemake -s ../../../annotation.tophits.snake --configfile ../../data/configs/reads.top.RS.yaml -p -k -n 2>&1 | grep '^Nothing'"
     [ "$status" -eq 0 ]
@@ -29,15 +29,15 @@ setup() {
 }
 
 @test "Check tophit outputs" {
-    run bash -c "diff <(sort test/scratch/top/ALOHA_XVII_1_04.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts) test/bats/outputs/ALOHA_XVII_1_04.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts.sort"
+    run bash -c "diff <(sort test/scratch/top/ALOHA_XVII_1_04.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts) test/bats/outputs/top/ALOHA_XVII_1_04.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts.sort"
     [ "$status" -eq 0 ]
-    run bash -c "diff <(sort test/scratch/top/ALOHA_XVII_1_15.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts) test/bats/outputs/ALOHA_XVII_1_15.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts.sort"
+    run bash -c "diff <(sort test/scratch/top/ALOHA_XVII_1_15.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts) test/bats/outputs/top/ALOHA_XVII_1_15.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts.sort"
     [ "$status" -eq 0 ]
-    run bash -c "diff <(sort test/scratch/top/ALOHA_XVII_1_16.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts) test/bats/outputs/ALOHA_XVII_1_16.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts.sort"
+    run bash -c "diff <(sort test/scratch/top/ALOHA_XVII_1_16.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts) test/bats/outputs/top/ALOHA_XVII_1_16.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts.sort"
     [ "$status" -eq 0 ]
-    run bash -c "diff <(sort test/scratch/top/ALOHA_XVII_1_18.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts) test/bats/outputs/ALOHA_XVII_1_18.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts.sort"
+    run bash -c "diff <(sort test/scratch/top/ALOHA_XVII_1_18.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts) test/bats/outputs/top/ALOHA_XVII_1_18.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts.sort"
     [ "$status" -eq 0 ]
-    run bash -c "diff <(sort test/scratch/top/ALOHA_XVII_1_21.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts) test/bats/outputs/ALOHA_XVII_1_21.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts.sort"
+    run bash -c "diff <(sort test/scratch/top/ALOHA_XVII_1_21.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts) test/bats/outputs/top/ALOHA_XVII_1_21.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts.sort"
     [ "$status" -eq 0 ]
 }
 
@@ -45,7 +45,18 @@ setup() {
     rm -rf test/scratch/topqc
     mkdir -p test/scratch/topqc
     cd test/scratch/topqc
-    run bash -c "snakemake -s ../../../annotation.tophits.snake --configfile ../../data/configs/reads.top.QC.RS.yaml -p -k -j 20 > top.annot.log 2>&1"
+    run bash -c "snakemake -s ../../../annotation.tophits.snake --configfile ../../data/configs/reads.top.QC.RS.yaml -p -k -j 5 > top.annot.log 2>&1"
+    [ "$status" -eq 0 ]
+    run bash -c "snakemake -s ../../../annotation.tophits.snake --configfile ../../data/configs/reads.top.QC.RS.yaml -p -k -n 2>&1 | grep '^Nothing'"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" == "Nothing to be done." ]
+}
+
+@test "Check tophit QC outputs" {
+    run bash -c "diff <(sort test/scratch/topqc/ALOHA_XVII_1_04.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts) test/bats/outputs/topqc/ALOHA_XVII_1_04.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts.sort"
+    [ "$status" -eq 0 ]
+    run bash -c "diff <(sort test/scratch/topqc/ALOHA_XVII_1_15.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts) test/bats/outputs/topqc/ALOHA_XVII_1_15.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts.sort"
     [ "$status" -eq 0 ]
 }
+
 
