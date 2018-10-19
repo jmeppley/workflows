@@ -4,7 +4,9 @@ channels:
  - jmeppley
 dependencies:
  - python=3
- - snakemake<4
+ - snakemake-minimal
+ - psutil
+ - paramiko
  - samtools
  - last
  - hmmer
