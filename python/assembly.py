@@ -217,6 +217,7 @@ class DepthParser():
 
     columns = ['Contig',
                'MedCov',
+               'Q2Q3Cov',
                'MeanCov',
                'StdCov',
                'MinCov',
@@ -239,6 +240,7 @@ class DepthParser():
             coverage = numpy.array(list(_insert_zeros(depths, contig_lengths[contig])))
             yield (contig,
                    numpy.median(coverage),
+                   q2q3_mean(coverage),
                    coverage.mean(),
                    coverage.std(),
                    coverage.min(),
@@ -274,6 +276,14 @@ def _insert_zeros(contig_depths, contig_length=0):
     while last_base < contig_length:
         last_base += 1
         yield 0
+
+def q2q3_mean(coverage):
+    """ Calculate the mean of the 2nd and 3rd quartiles """
+    if len(coverage) < 4:
+        return coverage.mean()
+    coverage.sort()
+    q = int(len(coverage) / 4)
+    return coverage[q:-q].mean()
 
 def get_contig_length_summary_stats(contig_stats, N_levels=[50, 75, 90]):
     """
