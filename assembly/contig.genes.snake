@@ -105,7 +105,7 @@ rule merge_annotations:
     This assumes:
      * ovelapping genes already removed from ffn
      * annots are sorted by contig number and start pos
-     * contigs named: {assembler}_c{num}
+     * contigs named: {assembly_name}_c{num}
     """
     input:
         genes='contigs.all.annotations.ffn',

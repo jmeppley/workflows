@@ -156,18 +156,32 @@ rule annotation_coverage:
                                                              [config['cov_col']]
         with open(get_file_name(output.table),'w') as OUT:
             with open(get_file_name(input.gff)) as GFF:
-                feature_count = 0
                 current_contig = 0
                 for line in GFF:
-                    contig = line.split()[0].strip()
+                    contig, program, model = [bit.strip() \
+                                              for bit in line.split(None, 3)[:3]]
                     if contig != current_contig:
-                        feature_count=1
+                        # reseet counts
+                        gene_count, rrna_count, trna_count = 0, 0, 0
                         current_contig = contig
+
+                    # is it a CDS or RNA
+                    if program.lower().startswith('prodigal') and model == 'CDS':
+                        gene_count += 1
+                        suffix = "_{}".format(gene_count)
+                    elif program == 'cmsearch' and re.search('rRNA', model) is not None:
+                        rrna_count += 1
+                        suffix = "_rRNA_{}".format(gene_count)
+                    elif program == 'cmsearch' and re.search('tRNA', model) is not None:
+                        trna_count += 1
+                        suffix = "_tRNA_{}".format(gene_count)
                     else:
-                        feature_count+=1
-                    OUT.write("{contig}_{feature_count}\t{coverage}\n"\
+                        raise Exception("Can't classify GFF line:\n" + line)
+
+                    # Write fasta to OUT
+                    OUT.write("{contig}{suffix}\t{coverage}\n"\
                                .format(contig=contig,
-                                       feature_count=feature_count,
+                                       suffix=suffix,
                                        coverage=cov_dict[contig]))
 
 
