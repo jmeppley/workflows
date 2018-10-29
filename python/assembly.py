@@ -340,10 +340,15 @@ def gff_hit_iterator(gff_file, nonoverlapping=False):
 def fna_hit_iterator(fasta_file):
     return SeqIO.parse(fasta_file, 'fasta')
 
-gene_rexp = re.compile(r'^>?(\S+)_\d+\s+#\s+(\d+)\s+#\s+(\d+)\s+#')
+gene_rexp = re.compile(r'^>?((?<!>)\S+)_\d+\s+#\s+(\d+)\s+#\s+(\d+)\s+#')
+rna_gene_rexp = \
+        re.compile(r'^>?((?<!>)\S+)_\d+\s.+start=(\d+);end=(\d+);')
 def fna_rec_parser(record):
     """ parse start/end from prodigal fasta header """
-    return gene_rexp.search(record.description).groups()
+    try:
+        return gene_rexp.search(record.description).groups()
+    except AttributeError:
+        return rna_gene_rexp.search(record.description).groups()
 
 def get_annotation_locations(gff_files):
     """ Given some gff files, build dict of hit locations """
