@@ -28,6 +28,7 @@ include: "rrna.annotation.snake"
 include: "../annotation/lastal.snake"
 
 config.setdefault('outputs', set()).add("contigs.filter.annotations.gff")
+config.setdefault('outputs', set()).add("contigs.filter.annotations.fna")
 for sample in config['sample_data']:
     if 'clean' in config['sample_data'][sample] or \
             'raw' in config['sample_data'][sample]:
@@ -139,7 +140,7 @@ rule contigs_filtered:
 
 rule annotation_coverage:
     """
-    For each anntation, pull out the median coverage for its contig
+    For each annotation, pull out the median coverage for its contig
     into a simple two column table
     """
     input:

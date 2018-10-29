@@ -49,7 +49,7 @@ rule rna_annotation:
                                 buffer=params.buffer)
 
 rule drop_rna_overlaps:
-    """ 
+    """
     Drop genes that overlap RNA predictions.
     """
     input:
@@ -93,44 +93,70 @@ rule filter_annotations:
         filter_annotations(get_file_name(input.filter),
                            get_file_name(input.annots),
                            get_file_name(output))
-        
+
 
 
 rule merge_annotations:
+    """
+    combine protein coding genes (.ffn)
+    with rRNA genes
+    into .fna file
+
+    This assumes:
+     * ovelapping genes already removed from ffn
+     * annots are sorted by contig number and start pos
+     * contigs named: {assembler}_c{num}
+    """
     input:
         genes='contigs.all.annotations.ffn',
-        rna=expand('contigs.all.annotations.{mol}.fna', mol=['rRNA', 'tRNA'])
+        rna=expand('contigs.all.annotations.{mol}.fna', \
+                   mol=['rRNA', 'tRNA'])
     output:
         faa='contigs.all.annotations.fna',
     benchmark: 'benchmarks/contigs.all.merged.fna.time'
     run:
-        rna_genes = {}
+        # Load all rRNA genes as giant list
+        rna_genes = []
         for gf in input.rna:
-            for rna in SeqIO.parse(gf, 'fasta'):
-                contig = re.sub(r'_.RNA_\d+$', '', rna.id)
-                if contig==rna.id:
-                    raise Exception("Cound not get contig from " + contig)
-                rna_genes.setdefault(contig, []).append(rna)
+            rna_genes.extend(rna for rna in SeqIO.parse(gf, 'fasta'))
 
+        def get_next_rna():
+            # Queue up next RNA to insert
+            try:
+                next_rna = rna_genes.pop(0)
+            except IndexError:
+                return None
+            contig_num, start = \
+                re.search(r'^\S+_c(\d+)_[rt]RNA_\d+\s.+start=(\d+);',
+                          next_rna.description).groups()
+            return (int(contig_num), int(start), next_rna)
+
+        next_rna = get_next_rna()
+
+        # loop over potein coding genes
         with open(get_file_name(output), 'wt') as OUT:
-            last_contig = None
             for gene in SeqIO.parse(get_file_name(input.genes), 'fasta'):
-                contig = re.sub(r'_\d+$', '', gene.id)
-                if contig==gene.id:
-                    raise Exception("Cound not get contig from " + contig)
-                if contig != last_contig:
-                    for rna in rna_genes.pop(contig, []):
-                        OUT.write(rna.format('fasta'))
-                    last_contig = contig
-                OUT.write(gene.format('fasta'))
-            
-            for leftover_rna in rna_genes.values():
-                for rna in leftover_rna:
-                    OUT.write(rna.format('fasta'))
+                # get start pos of next gene
+                contig_num, start = \
+                    re.search(r'^\S+_(c\d+)_\d+\s+#\s*(\d+)\s*#',
+                              gene.id).groups()
+                gene_pos = (int(contig_num), int(start))
 
+                # write out andy RNA that come before it
+                while next_rna is not None and next_rna[:2] < gene_pos:
+                    OUT.write(next_rna[-1].format('fasta'))
+                    next_rna = get_next_rna()
+
+                # write out gene
+                OUT.write(gene.format('fasta'))
+
+            # write out any remaining RNA
+            while next_rna is not None:
+                OUT.write(next_rna[-1].format('fasta'))
+                next_rna = get_next_rna()
 
 rule merge_annotation_gff:
-    """ put filtered RNA and genes into one file """
+    """ put filtered RNA and protein coding genes into one GFF file """
     input:
         genes='contigs.all.annotations.CDS.gff',
         rna=expand('contigs.all.annotations.{mol}.gff', mol=['rRNA', 'tRNA'])
