@@ -138,8 +138,8 @@ rule merge_annotations:
             for gene in SeqIO.parse(get_file_name(input.genes), 'fasta'):
                 # get start pos of next gene
                 contig_num, start = \
-                    re.search(r'^\S+_(c\d+)_\d+\s+#\s*(\d+)\s*#',
-                              gene.id).groups()
+                    re.search(r'^\S+_c(\d+)_\d+\s+#\s*(\d+)\s*#',
+                              gene.description).groups()
                 gene_pos = (int(contig_num), int(start))
 
                 # write out andy RNA that come before it
