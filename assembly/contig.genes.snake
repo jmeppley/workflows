@@ -64,7 +64,7 @@ rule drop_rna_overlaps:
     params:
         buffer=config.get('max_annot_overlap', 0)
     run:
-        drop_rna_overlaps(input.genes, input.rna, output, params.buffer)
+        drop_all_rna_overlaps(input.genes, input.rna, output, params.buffer)
 
 rule filter_annotations:
     """
