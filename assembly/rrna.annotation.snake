@@ -38,12 +38,8 @@ def get_rna_id_names_file(w):
     logger.debug ("returing blank file")
     return blank_file_name
 
-sample_coverages = \
-        {s:"contigs.all.coverages.{sample}.txt".format(sample=s) \
-                     for s in config['sample_data'] \
-                     if 'clean' in config['sample_data'][s]}
-
-logger.debug("SAMPLE COVERAGES:\n" + repr(sample_coverages))
+# this should be set in the wf: assembly/contig.annotation.snake
+logger.debug("SAMPLE COVERAGES:\n" + repr(contig_coverage_files))
 
 wildcard_constraints:
     rmol=r'[LS]SU',
@@ -93,7 +89,7 @@ rule rrna_report:
     """
     input:
         gff="contigs.all.vs.rRNA.cmsearch.{rmol}.gt{length}.gff",
-        stats=sample_coverages.values(),
+        stats=contig_coverage_files.values(),
         hits=get_rna_search_hits,
         id_names=get_rna_id_names_file,
     output:
@@ -101,7 +97,7 @@ rule rrna_report:
     run:
         # get map from contigs to coverage
         coverages = {}
-        for sample, stats_file in sample_coverages.items():
+        for sample, stats_file in contig_coverage_files.items():
             cov_table = pandas.read_table(stats_file,
                                           index_col=0,
                                           header=0,

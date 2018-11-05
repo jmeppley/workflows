@@ -62,7 +62,7 @@ elif assembler == 'megahit':
     include: "assembly/metagenomic.megahit.snake"
     config['transitions']['contigs.raw.fasta'] = \
                     "megahit-{params}/megahit.contigs.fa" \
-                                .format(params=config['megahit']['preset'])
+                            .format(params=config['megahit']['preset'])
 else:
     raise Exception("Unknown assembler: " + config['assembler'])
 #

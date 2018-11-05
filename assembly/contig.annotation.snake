@@ -24,20 +24,28 @@ sys.path.append(config['pymg_dir'])
 from edl import __version__ as PYMG_VERSION
 """
 include: "contig.genes.snake"
-include: "rrna.annotation.snake"
 include: "../annotation/lastal.snake"
 
 config.setdefault('outputs', set()).add("contigs.filter.annotations.gff")
 config.setdefault('outputs', set()).add("contigs.filter.annotations.fna")
-for sample in config['sample_data']:
-    if 'clean' in config['sample_data'][sample] or \
-            'raw' in config['sample_data'][sample]:
-        config['outputs'].add("contigs.all.annotations.coverage.{sample}.tsv"\
-                                        .format(sample=sample))
+config.setdefault('outputs', set()).add("contigs.all.annotations.coverages.tsv")
+
+contig_coverage_files = \
+    {s:'contigs.all.coverages.{sample}.tsv'.format(sample=s) \
+     for s in config['sample_data'] \
+     if 'clean' in config['sample_data'][s]}
+
+annot_coverage_files = \
+    {s:'contigs.all.annotations.coverages.{sample}.tsv' \
+       .format(sample=s) \
+     for s in config['sample_data'] \
+     if 'clean' in config['sample_data'][s]}
+
+include: "rrna.annotation.snake"
 
 rule contig_stats_table:
     """
-    Make a table of contig sequence stats (length, gc)
+    Make a table of contig sequence sts (length, gc)
     """
     input:
         "contigs.all.fasta",
@@ -48,43 +56,105 @@ rule contig_stats_table:
     run:
         get_contig_stats(get_file_name(input), get_file_name(output))
 
+rule sample_contig_coverage_table:
+    """
+    Use depths and read counts to build table of coverage stats per contig
+    """
+    input:
+        "mapping/{sample}.reads.vs.{contigs}.depths",
+        "{contigs}.fasta",
+        "mapping/{sample}.reads.vs.{contigs}.read_counts",
+    output:
+        temp("{contigs}.coverages.{sample}.tsv"),
+    benchmark:
+        "benchmarks/contig.stats.{sample}.{contigs}.time"
+    run:
+        print("getting_coverage_stats:")
+        get_coverage_stats(*list(input), get_file_name(output))
+
 rule contig_master_stats_table:
     """
     Merge sequence and coverage stats into one table
     """
     input:
         seq="contigs.all.sequence.stats.txt",
-        cov=expand('contigs.all.coverages.{sample}.txt', \
-                   sample=[s for s in config['sample_data'] \
-                             if 'clean' in config['sample_data'][s]])
+        cov=contig_coverage_files.values()
     output:
         'contigs.all.stats.txt'
     benchmark: 'benchmarks/contigs.stats.time'
     run:
         # load sequence stats
-        contig_stats = pandas.read_table(get_file_name(input.seq), index_col=0)
+        contig_stats = \
+            pandas.read_table(get_file_name(input.seq), index_col=0)
 
         if isinstance(input.cov, str):
             input.cov = [input.cov, ]
+
         # merge in coverages from each sample
-        for cov_file in input.cov:
-            sample = re.search(r'coverages.(.+).txt$', cov_file).group(1)
+        for sample, cov_file in contig_coverage_files.items():
             cov_stats = pandas.read_table(cov_file, index_col=0)
-            cov_stats.columns = ["_".join([sample, c]) for c in cov_stats.columns]
+            cov_stats.columns = ["_".join([sample, c]) \
+                                 for c in cov_stats.columns]
             contig_stats = contig_stats.join(cov_stats, how='left')
+
             # add up read count and mean cov from all samples
             if 'ReadCount' not in contig_stats:
-                contig_stats['ReadCount'] = contig_stats[sample + "_ReadCount"]
-                contig_stats['MeanCov'] = contig_stats[sample + "_MeanCov"]
+                contig_stats['ReadCount'] = \
+                    contig_stats[sample + "_ReadCount"]
+                contig_stats['MeanCov'] = \
+                    contig_stats[sample + "_MeanCov"]
             else:
-                contig_stats['ReadCount'] = contig_stats['ReadCount'] + \
-                                            contig_stats[sample + "_ReadCount"]
-                contig_stats['MeanCov'] = contig_stats['MeanCov'] + \
-                                            contig_stats[sample + "_MeanCov"]
+                contig_stats['ReadCount'] = \
+                    (contig_stats['ReadCount'] + 
+                     contig_stats[sample + "_ReadCount"])
+                contig_stats['MeanCov'] = \
+                    (contig_stats['MeanCov'] + 
+                     contig_stats[sample + "_MeanCov"])
 
         # write table to file
         contig_stats.to_csv(get_file_name(output), sep='\t')
 
+rule sample_annotation_coverage_table:
+    """
+    Use depths to build table of coverage per gene per sample
+    """
+    input:
+        "mapping/{sample}.reads.vs.{contigs}.depths",
+        "{contigs}.annotations.gff"
+    output:
+        temp("{contigs}.annotations.coverages.{sample}.tsv"),
+    benchmark:
+        "benchmarks/contig.stats.{sample}.{contigs}.time"
+    run:
+        print("getting_coverage_stats:")
+        get_annot_coverage_stats(*list(input), get_file_name(output))
+
+rule annotation_coverage_table:
+    """
+    combine sample annotation coverage tables into one
+    """
+    input:
+        annot_coverage_files.values()
+    output:
+        "contigs.all.annotations.coverages.tsv"
+    run:
+        # merge in coverages from each sample
+        combined_table = None
+        for sample, cov_file in contig_coverage_files.items():
+            cov_stats = pandas.read_table(cov_file, index_col=0)
+            cov_stats.columns = [sample,]
+
+            combined_table = combined_table.join(cov_stats,
+                                                 how='outer') \
+                             if combined_table else cov_stats
+
+        # add up samples
+        combined_table['total'] = combined_table.sum(axis=1)
+
+        # write table
+        combined_table.to_csv(get_file_name(output), sep='\t')
+
+                                     
 rule contigs_filter:
     """
     Get list of contigs that pass provided filter:
@@ -137,51 +207,4 @@ rule contigs_filtered:
     benchmark: "benchmarks/contigs.fitered.fasta.time"
     shell:
         "screen_list.py -k {input.fasta} -l {input.list} -o {output}"
-
-rule annotation_coverage:
-    """
-    For each annotation, pull out the median coverage for its contig
-    into a simple two column table
-    """
-    input:
-        gff="contigs.all.annotations.gff",
-        stats="contigs.all.stats.txt"
-    output:
-        table="contigs.all.annotations.coverage.{sample}.tsv"
-    run:
-        # Read stats table, but just keep median coverage
-        cov_dict = pandas.read_table(get_file_name(input.stats),
-                                     index_col=0,
-                                     usecols=['Contig', config['cov_col']])\
-                                                             [config['cov_col']]
-        with open(get_file_name(output.table),'w') as OUT:
-            with open(get_file_name(input.gff)) as GFF:
-                current_contig = 0
-                for line in GFF:
-                    contig, program, model = [bit.strip() \
-                                              for bit in line.split(None, 3)[:3]]
-                    if contig != current_contig:
-                        # reseet counts
-                        gene_count, rrna_count, trna_count = 0, 0, 0
-                        current_contig = contig
-
-                    # is it a CDS or RNA
-                    if program.lower().startswith('prodigal') and model == 'CDS':
-                        gene_count += 1
-                        suffix = "_{}".format(gene_count)
-                    elif program == 'cmsearch' and re.search('rRNA', model) is not None:
-                        rrna_count += 1
-                        suffix = "_rRNA_{}".format(gene_count)
-                    elif program == 'cmsearch' and re.search('tRNA', model) is not None:
-                        trna_count += 1
-                        suffix = "_tRNA_{}".format(gene_count)
-                    else:
-                        raise Exception("Can't classify GFF line:\n" + line)
-
-                    # Write fasta to OUT
-                    OUT.write("{contig}{suffix}\t{coverage}\n"\
-                               .format(contig=contig,
-                                       suffix=suffix,
-                                       coverage=cov_dict[contig]))
-
 

@@ -121,19 +121,3 @@ rule mapped_read_depths:
     shell:
         "samtools depth {params.input} > {output}"
 
-rule contig_coverage_table:
-    """
-    Use depths and read counts to build table of coverage stats per contig
-    """
-    input:
-        "mapping/{sample}.reads.vs.{contigs}.depths",
-        "{contigs}.fasta",
-        "mapping/{sample}.reads.vs.{contigs}.read_counts",
-    output:
-        temp("{contigs}.coverages.{sample}.txt"),
-    benchmark:
-        "benchmarks/contig.stats.{sample}.{contigs}.time"
-    run:
-        print("getting_coverage_stats:")
-        get_coverage_stats(*list(input), get_file_name(output))
-

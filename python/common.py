@@ -5,6 +5,8 @@ Methods used across all or most workflows including:
     get_version: figure out the version of a command
     parse_stats: get the read and base counts from prinseq output
     apply_defaults: set dict (usually config) defaults recursively
+    get_file_name: take str or str list of len 1 and return str
+    get_set_from_file: parse lines(stripped) into set
 
 """
 
@@ -243,3 +245,10 @@ def get_file_name(list_or_string):
     if isinstance(list_or_string, str):
         return list_or_string
     return next(iter(list_or_string))
+
+
+def get_set_from_file(list_file):
+    """ read items from file into set """
+    with open(list_file) as contig_handle:
+        items = set(c.strip() for c in contig_handle.readlines())
+    return items

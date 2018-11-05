@@ -2,30 +2,40 @@
 Functions used in the assembly workflows
 """
 from python.assembly.stats import \
-        get_contig_stats \
-        generate_histogram \
-        get_contig_length_summary_stats \
+        get_contig_stats, \
+        generate_histogram, \
+        get_contig_length_summary_stats
 
 from python.assembly.coverage import \
-        get_annot_coverage_stats \
-        get_coverage_stats \
+        get_annot_coverage_stats, \
+        get_coverage_stats
 
-from python.assembly.annotations import \
-        get_annotation_locations \
-        filter_annotations \
-        drop_rna_overlaps \
+from python.assembly.annotation import \
+        filter_annotations, \
+        drop_all_rna_overlaps, \
         filter_and_extract_rRNA
 
 
+"""
 ## I think this is new code that I forgot to finish...
-def orphan_code():
-    """ What was this supposed to do? """
+import pandas, re
+def orphan_code(annot_file):
+    "" What was this supposed to do?
+    It turnd a gff file into a table of gene positions...
 
-    genes = pandas.read_table(annot_file, usecols=[0,1,2,3,4], names=['contig','program','model','start','end'])
+    I think it' been replaced by annotations.get_gene_name
+    ""
+
+    genes = pandas.read_table(annot_file,
+                              usecols=[0, 1, 2, 3, 4],
+                              names=['contig', 'program', 'model',
+                                     'start', 'end'])
 
     gene_col = []
     current_contig = None
-    for contig, program, model in genes[['contig','program','model']].values:
+    for contig, program, model in genes[['contig',
+                                         'program',
+                                         'model']].values:
         if contig != current_contig:
             gene_count, rrna_count, trna_count = 0, 0, 0
             current_contig = contig
@@ -41,10 +51,11 @@ def orphan_code():
             trna_count += 1
             suffix = "_tRNA_{}".format(trna_count)
         else:
-            raise Exception("Can't classify GFF line:\n" + line)
+            raise Exception("Can't classify GFF line:\n" +
+                            repr((contig, program, model)))
 
         gene_col.append(contig + suffix)
 
     genes['gene'] = gene_col
-    return genes[['gene','contig','start','end']]
-
+    return genes[['gene', 'contig', 'start', 'end']]
+"""

@@ -3,8 +3,7 @@ Rules that predict genes on a set of contigs using prodigal
 """
 from python.common import get_file_name, apply_defaults
 from python.assembly import filter_and_extract_rRNA, \
-                            get_annotation_locations, \
-                            drop_rna_overlaps, filter_annotations
+                            drop_all_rna_overlaps, filter_annotations
 # get gff parsing from py-metagenomics
 from snakemake import logger
 
@@ -65,17 +64,7 @@ rule drop_rna_overlaps:
     params:
         buffer=config.get('max_annot_overlap', 0)
     run:
-        # get dict of rRNA locations
-        rna_locations = get_annotation_locations(input.rna)
-
-        # filter files
-        for input_file in input.genes:
-            print("Filtering {}".format(input_file))
-            output_file = [f for f in output \
-                                if f.endswith(input_file[-4:])][0]
-            drop_rna_overlaps(input_file, output_file, rna_locations,
-                              buffer=params.buffer)
-
+        drop_rna_overlaps(input.genes, input.rna, output, params.buffer)
 
 rule filter_annotations:
     """
@@ -93,6 +82,7 @@ rule filter_annotations:
         filter_annotations(get_file_name(input.filter),
                            get_file_name(input.annots),
                            get_file_name(output))
+
 
 
 

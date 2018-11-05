@@ -1,3 +1,10 @@
+"""
+Functions used to process stats in the assembly workflows"
+    get_contig_stats: get GC and length from contigs
+    generate_histogram:Generate ASCII histrogram of the selected data
+    get_contig_length_summary_stats: N50, mean length, etc
+
+"""
 import numpy
 import pandas
 from Bio import SeqIO, SeqUtils
@@ -134,5 +141,3 @@ def get_contig_length_summary_stats(contig_stats, N_levels=[50, 75, 90]):
         N_stats[N_key] = int(length)
 
     return N_stats
-
-

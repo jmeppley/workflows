@@ -1,6 +1,14 @@
+"""
+Functions for calculating coverages in assembly workflows:
+    get_annot_coverage_stats: make table of covs for each annot
+    get_coverage_stats: make table of covs for each contig
+
+Mostly get data from .depths files
+"""
 from collections import defaultdict
 import numpy
 import pandas
+from python.assembly.annotation import get_mixed_annotations
 from Bio import SeqIO
 from snakemake import logger
 
@@ -28,14 +36,19 @@ def get_coverage_stats(contig_depth_file,
     mapping_depth_table = get_samtool_depth_table(contig_depth_file,
                                                   contig_fasta,
                                                  )
-    contig_stats = mapping_depth_table.join(read_count_table, how='left').fillna(0)
+    contig_stats = mapping_depth_table.join(read_count_table,
+                                            how='left').fillna(0)
 
-    for col in ['Length', 'ReadCount', 'MaxCov', 'MinCov', 'CumuLength']:
+    for col in ['Length', 'ReadCount',
+                'MaxCov', 'MinCov', 'CumuLength']:
         if col in contig_stats.columns:
             contig_stats[col] = contig_stats[col].astype(int)
 
-    logger.info("Writing coverage table to: {}".format(contig_stats_out))
-    contig_stats.to_csv(contig_stats_out, sep='\t', float_format="%0.2f")
+    logger.info("Writing coverage table to: %s",
+                contig_stats_out)
+    contig_stats.to_csv(contig_stats_out,
+                        sep='\t',
+                        float_format="%0.2f")
 
 
 def get_annot_coverage_stats(contig_depth_file,
@@ -58,12 +71,13 @@ def get_annot_coverage_stats(contig_depth_file,
                     continue
                 contig_extent = max(max(g[1:]) \
                                     for g in contig_genes)
-                coverage = numpy.array(list(_insert_zeros(depths,
-                                                    contig_extent)))
+                coverage = \
+                        numpy.array(list(_insert_zeros(depths,
+                                                       contig_extent)))
                 for gene, start, end in contig_genes:
                     start, end = sorted([start, end])
-                    gene_cov = coverage[start -1:end].mean()
-                    out_handle.write("{}\{i:0.2d}\n"
+                    gene_cov = coverage[start - 1:end].mean()
+                    out_handle.write("{}\t{:0.2d}\n"
                                      .format(gene, gene_cov))
 
 
@@ -90,7 +104,7 @@ def get_samtool_depth_table(depth_file, fasta_file):
         return get_contig_coverage_table(depth_handle, contig_lengths)
 
 
-contig_coverage_columns = ['Contig',
+CONTIG_COVERAGE_COLUMNS = ['Contig',
                            'MedCov',
                            'Q2Q3Cov',
                            'MeanCov',
@@ -111,7 +125,7 @@ def get_contig_coverage_table(contig_depths_handle,
     table = \
         pandas.DataFrame(_contig_cov_row_generator(contig_depths_handle,
                                                    contig_lengths),
-                         columns=contig_coverage_columns) \
+                         columns=CONTIG_COVERAGE_COLUMNS) \
               .set_index('Contig')
     return table
 
@@ -135,18 +149,18 @@ def contig_depths_generator(depth_file_handle):
     last_contig = None
     for line in depth_file_handle:
         contig, depth_data = _parse_depth_line(line)
-        
+
         # collect lines until we see a new contig
         if last_contig != contig:
             if last_contig is not None:
                 yield contig, contig_depths
             last_contig = contig
             contig_depths = []
-        
+
         contig_depths.append(depth_data)
-    
+
     # yield final contig
-    if last_contig != None:
+    if last_contig is not None:
         yield contig, contig_depths
 
 def _parse_depth_line(depth_line):
@@ -184,7 +198,5 @@ def q2q3_mean(coverage):
     if len(coverage) < 4:
         return coverage.mean()
     coverage.sort()
-    q = int(len(coverage) / 4)
-    return coverage[q:-q].mean()
-
-
+    quartile_size = int(len(coverage) / 4)
+    return coverage[quartile_size:-quartile_size].mean()
