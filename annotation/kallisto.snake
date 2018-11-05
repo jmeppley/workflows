@@ -108,6 +108,6 @@ rule quant_reads_kallisto:
 rule coverages_file:
     " Use quant.sf file as coverages file "
     input: "kallisto/{sample}.vs.{contigs}.quant/abundance.tsv"
-    output: "{contigs}.coverages.{sample}.txt"
+    output: "{contigs}.coverages.{sample}.tsv"
     shell: "ln -s {input} {output}"
 

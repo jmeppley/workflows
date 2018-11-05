@@ -125,6 +125,6 @@ rule quant_reads_salmon:
 rule coverages_file:
     " Use quant.sf file as coverages file "
     input: "salmon/{sample}.vs.{contigs}.quant/quant.sf"
-    output: "{contigs}.coverages.{sample}.txt"
+    output: "{contigs}.coverages.{sample}.tsv"
     shell: "ln -s {input} {output}"
 

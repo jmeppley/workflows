@@ -87,6 +87,10 @@ else:
     raise Exception("Unknown transcript mapping tool: {}! Please check your configuration.".format(transcript_mapper))
 
 config['is_transcriptomic'] = True
+contig_coverage_files = \
+    {s:'contigs.all.coverages.{sample}.tsv'.format(sample=s) \
+     for s in config['sample_data'] \
+     if 'clean' in config['sample_data'][s]}
 include: "assembly/rrna.annotation.snake"
 
 # run prodigal
@@ -223,7 +227,7 @@ rule final_report:
                             .format(length=config.get('long_ssu_length',1200)),
         lsu_rrnas="contigs.all.vs.rRNA.cmsearch.LSU.gt{length}.tsv"\
                             .format(length=config.get('long_lsu_length',2000)),
-        contig_coverages=expand("contigs.all.coverages.{sample}.txt",
+        contig_coverages=expand("contigs.all.coverages.{sample}.tsv",
                                 sample=config['sample_data']),
         rrna_contigs='contigs.all.rRNA-only.fasta',
         contig_stats="stats/contigs.all.fasta.stats",

@@ -53,9 +53,9 @@ setup() {
 }
 
 @test "Check tophit QC outputs" {
-    run bash -c "diff <(sort test/scratch/topqc/ALOHA_XVII_1_04.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts) test/bats/outputs/topqc/ALOHA_XVII_1_04.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts.sort"
+    run bash -c "diff <(sort test/scratch/topqc/ALOHA_XVII_1_15_DNA.vs.RefSeq.lastx._B50_F0.tophit.all.hitid.counts) test/bats/outputs/topqc/ALOHA_XVII_1_15_DNA.vs.RefSeq.lastx._B50_F0.tophit.all.hitid.counts.sort"
     [ "$status" -eq 0 ]
-    run bash -c "diff <(sort test/scratch/topqc/ALOHA_XVII_1_15.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts) test/bats/outputs/topqc/ALOHA_XVII_1_15.vs.RefSeq.lastx._E0.01_F0_I90.tophit.all.hitid.counts.sort"
+    run bash -c "diff <(sort test/scratch/topqc/ALOHA_XVII_1_04_DNA.vs.RefSeq.lastx._B50_F0.tophit.all.hitid.counts) test/bats/outputs/topqc/ALOHA_XVII_1_04_DNA.vs.RefSeq.lastx._B50_F0.tophit.all.hitid.counts.sort"
     [ "$status" -eq 0 ]
 }
 

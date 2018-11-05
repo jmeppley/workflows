@@ -22,7 +22,7 @@ wildcard_constraints:
 rule mcl:
     input: "all_genes.{cluster_type}.v.self.pctid.tab"
     output: "all_genes.{cluster_type}.{cluster_suffix}.raw"
-    benchmark: "benchmarks/genes.{cluster_type}.mcl.time"
+    benchmark: "benchmarks/genes.{cluster_type}.mcl.{cluster_suffix}.time"
     threads: config['mcl']['threads']
     shell: "mcl {input} --abc {config[mcl][options]} \
             -o {output} -te {threads}"
@@ -33,7 +33,7 @@ rule list_reps:
         cluster=rules.mcl.output,
         faa='all_genes.{cluster_type}'
     output: 'all_genes.{cluster_type}.{cluster_suffix}.reps'
-    benchmark: "benchmarks/all_genes.{cluster_type}.mcl.get_reps_list.time"
+    benchmark: "benchmarks/all_genes.{cluster_type}.mcl.{cluster_suffix}.get_reps_list.time"
     run:
         with open(get_file_name(output), 'wt') as LIST:
             for gene_id in get_longest_seq(get_file_name(input.cluster),
@@ -47,7 +47,7 @@ rule get_reps:
         list=rules.list_reps.output,
         faa='all_genes.{cluster_type}'
     output: 'all_genes.{cluster_type}.{cluster_suffix}'
-    benchmark: "benchmarks/all_genes.{cluster_type}.mcl.get_reps.time"
+    benchmark: "benchmarks/all_genes.{cluster_type}.mcl.{cluster_suffix}.get_reps.time"
     shell: "screen_list.py {input.faa} -k -l {input.list} \
             -o {output}"
 
@@ -86,7 +86,7 @@ rule process_for_mcl:
         hits=rules.all_v_all_self.output,
         fasta='all_genes.{cluster_type}',
     output: "all_genes.{cluster_type}.v.self.pctid.tab"
-    benchmark: "benchmarks/process_for_mcl.time"
+    benchmark: "benchmarks/process_for_mcl.{cluster_type}.time"
     run:
         process_for_mcl(get_file_name(input.hits),
                         get_file_name(input.fasta),

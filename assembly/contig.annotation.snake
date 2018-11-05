@@ -56,23 +56,7 @@ rule contig_stats_table:
         "benchmarks/contig.sequence.stats.time"
     run:
         get_contig_stats(get_file_name(input), get_file_name(output))
-
-rule sample_contig_coverage_table:
-    """
-    Use depths and read counts to build table of coverage stats per contig
-    """
-    input:
-        "mapping/{sample}.reads.vs.{contigs}.depths",
-        "{contigs}.fasta",
-        "mapping/{sample}.reads.vs.{contigs}.read_counts",
-    output:
-        temp("{contigs}.coverages.{sample}.tsv"),
-    benchmark:
-        "benchmarks/contig.stats.{sample}.{contigs}.time"
-    run:
-        print("getting_coverage_stats:")
-        get_coverage_stats(*list(input), get_file_name(output))
-
+        
 rule contig_master_stats_table:
     """
     Merge sequence and coverage stats into one table
