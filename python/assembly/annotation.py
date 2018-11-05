@@ -40,14 +40,13 @@ def fna_hit_iterator(fasta_file):
 
 # rexp to get contog/start/end from prodigal gene prediction
 GENE_REXP = re.compile(
-    r"""^>                # Fasta record separator
-        (\S+)_\d+\s # get contig from gene name
+    r"""^(\S+)_\d+\s      # get contig from gene name
         +\#\s+(\d+)\s     # start is first num in #'s
         +\#\s+(\d+)\s     # end is second num in #'s
         +#""", re.X)
 # rexp to get contig/start/end from RNA fasta
 RNA_GENE_REXP = re.compile(
-    r'^>(\S+)_[a-z]+RNA_\d+\s.+start=(\d+);end=(\d+);')
+    r'^(\S+)_[a-z]+RNA_\d+\s.+start=(\d+);end=(\d+);')
 def fna_rec_parser(record):
     """ parse start/end from prodigal or RNA fasta header """
     try:
@@ -66,7 +65,7 @@ def get_mixed_annotations(gff_file):
         contig_annots = annots.setdefault(contig, [])
         for hit in hits:
             gene = get_gene_name(contig, hit, annot_counts)
-            start, end = sorted(hit.qstart, hit.qend)
+            start, end = sorted((hit.qstart, hit.qend))
             contig_annots.append((gene, start, end))
     return annots
 

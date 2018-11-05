@@ -13,7 +13,8 @@ the assembly
 include: "../common/mapping_bwa.snake"
 from python.common import get_file_name
 from python.assembly import get_contig_stats, \
-                            generate_histogram
+                            generate_histogram, \
+                            get_annot_coverage_stats
 
 """
 # Some extra hoops to jump through because the contigs stats aren't a proper 
@@ -140,13 +141,14 @@ rule annotation_coverage_table:
     run:
         # merge in coverages from each sample
         combined_table = None
-        for sample, cov_file in contig_coverage_files.items():
+        for sample, cov_file in annot_coverage_files.items():
             cov_stats = pandas.read_table(cov_file, index_col=0)
             cov_stats.columns = [sample,]
 
             combined_table = combined_table.join(cov_stats,
                                                  how='outer') \
-                             if combined_table else cov_stats
+                             if combined_table is not None \
+                             else cov_stats
 
         # add up samples
         combined_table['total'] = combined_table.sum(axis=1)

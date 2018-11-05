@@ -77,7 +77,7 @@ def get_annot_coverage_stats(contig_depth_file,
                 for gene, start, end in contig_genes:
                     start, end = sorted([start, end])
                     gene_cov = coverage[start - 1:end].mean()
-                    out_handle.write("{}\t{:0.2d}\n"
+                    out_handle.write("{}\t{:0.2f}\n"
                                      .format(gene, gene_cov))
 
 
@@ -153,7 +153,7 @@ def contig_depths_generator(depth_file_handle):
         # collect lines until we see a new contig
         if last_contig != contig:
             if last_contig is not None:
-                yield contig, contig_depths
+                yield last_contig, contig_depths
             last_contig = contig
             contig_depths = []
 
@@ -161,7 +161,7 @@ def contig_depths_generator(depth_file_handle):
 
     # yield final contig
     if last_contig is not None:
-        yield contig, contig_depths
+        yield last_contig, contig_depths
 
 def _parse_depth_line(depth_line):
     """ return contig, (base, depth) nested tuples with base & depth as
