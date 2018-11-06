@@ -64,12 +64,12 @@ def get_mixed_annotations(gff_file):
         annot_counts = {t:0 for t in ['CDS', 'rRNA', 'tRNA']}
         contig_annots = annots.setdefault(contig, [])
         for hit in hits:
-            gene = get_gene_name(contig, hit, annot_counts)
+            gene = get_gene_name(hit, annot_counts)
             start, end = sorted((hit.qstart, hit.qend))
             contig_annots.append((gene, start, end))
     return annots
 
-def get_gene_name(contig, hit, annot_counts):
+def get_gene_name(hit, annot_counts):
     """ name gene with count (separate for CDS and [tr]RNA) """
     # is it a CDS or RNA
     if hit.hit_type == 'CDS':
@@ -83,7 +83,7 @@ def get_gene_name(contig, hit, annot_counts):
         suffix = "_tRNA_{}".format(annot_counts['tRNA'])
     else:
         raise Exception("Can't classify GFF line:\n" + hit.line)
-    return contig + suffix
+    return hit.read + suffix
 
 def get_annotation_locations(gff_files):
     """ Given some gff files, build dict of hit locations """
