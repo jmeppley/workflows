@@ -31,8 +31,7 @@ def test_get_version():
                 .startswith('python')
 
 def test_parse_stats():
-    " use bats output in scratch if available "
-    test_file = "test/scratch/spades/stats/fortyk.R1.fastq.stats"
+    test_file = "test/bats/outputs/nose/fortyk.R1.fastq.stats"
     assert (python.common.parse_stats(test_file) ==
             {'reads': 10000, 'bases': 1510000})
 
