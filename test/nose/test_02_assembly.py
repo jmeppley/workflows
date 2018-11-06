@@ -3,6 +3,7 @@ import os
 import python.assembly.annotation as annot
 import python.assembly.coverage as cov
 import python.assembly.stats as stat
+import logging
 from edl.blastm8 import Hit, GFF
 
 def test_ranges_intersect():
@@ -28,7 +29,7 @@ RNA_GFF_LINE = \
 def test_gff_parser():
     gff_hit = Hit(SPADES_GFF_LINE, GFF)
     assert (annot.gff_location_parser(gff_hit) ==
-            ('spades_c1', 712, 822))
+            ('spades_c1', 721, 822))
     assert (annot.gff_location_parser(Hit(RNA_GFF_LINE, GFF)) ==
             ('spades_c104', 2, 278))
 
@@ -48,13 +49,19 @@ def test_gff_functions():
     rna_gff_file = "test/bats/outputs/nose/contigs.all.annotations.gff"
     hit_locations = annot.get_annotation_locations([rna_gff_file,])
     assert isinstance(hit_locations, dict)
-    assert isinstance(next(iter(hit_locations)), str)
-    assert isinstance(next(iter(hit_locations.values())), tuple)
+    contig, locations = next(iter(hit_locations.items()))
+    assert isinstance(contig, str)
+    logging.debug("%s: %r", contig, locations)
+    location = next(iter(locations))
+    assert len(location) == 2
+    assert isinstance(location[0], int)
+    assert isinstance(location[1], int)
 
 def test_get_gene_name():
     gff_hit = Hit(SPADES_GFF_LINE, GFF)
-    assert (annot.get_gene_name(gff_hit, {'CDS', 2}) ==
+    assert (annot.get_gene_name(gff_hit, {'CDS': 2}) ==
             'spades_c1_3')
     gff_hit = Hit(RNA_GFF_LINE, GFF)
-    assert (annot.get_gene_name(gff_hit, {'rRNA', 1}) ==
+    assert (annot.get_gene_name(gff_hit, {'rRNA': 1}) ==
             'spades_c104_rRNA_2')
+

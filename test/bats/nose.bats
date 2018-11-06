@@ -20,6 +20,6 @@ setup() {
 
 
 @test "run nosetests" {
-    run nosetests
+    run nosetests test/nose
     [ "$status" = 0 ]
 }
