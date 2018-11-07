@@ -81,7 +81,7 @@ def get_annot_coverage_stats(contig_depth_file,
                                      .format(gene, gene_cov))
 
 
-def get_samtool_depth_table(depth_file, fasta_file):
+def get_samtool_depth_table(depth_file, fasta_file=None):
     """
     Calculate coverage stats for each contig in an assembly
 
@@ -98,7 +98,9 @@ def get_samtool_depth_table(depth_file, fasta_file):
             Contig, MeanCov, MedCov, MaxCov, MinCov, StdCov
             """
     contig_lengths = {r.id:len(r) for r in
-                      SeqIO.parse(fasta_file, 'fasta')}
+                      SeqIO.parse(fasta_file, 'fasta')} \
+                     if fasta_file is not None \
+                     else None
 
     with open(depth_file) as depth_handle:
         return get_contig_coverage_table(depth_handle, contig_lengths)
@@ -120,7 +122,7 @@ def get_contig_coverage_table(contig_depths_handle,
     Pass in dict of contig legths if 0 depths are excluded from depth file
     """
     if contig_lengths is None:
-        contig_lengths = defaultdict(lambda: 0)
+        contig_lengths = {}
 
     table = \
         pandas.DataFrame(_contig_cov_row_generator(contig_depths_handle,
@@ -135,7 +137,8 @@ def _contig_cov_row_generator(contig_depths_handle, contig_lengths):
     for contig, depths in depths_iterator:
         coverage = \
             numpy.array(list(_insert_zeros(depths,
-                                           contig_lengths[contig])))
+                                           contig_lengths.pop(contig,
+                                                              0))))
         yield (contig,
                numpy.median(coverage),
                q2q3_mean(coverage),
@@ -143,6 +146,9 @@ def _contig_cov_row_generator(contig_depths_handle, contig_lengths):
                coverage.std(),
                coverage.min(),
                coverage.max())
+
+    for contig in contig_lengths:
+        yield (contig, 0, 0, 0, 0, 0, 0)
 
 def contig_depths_generator(depth_file_handle):
     """ yield a tuple contining contig and list of depth entries """
