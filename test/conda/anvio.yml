@@ -8,7 +8,7 @@ dependencies:
  - snakemake<5
  - coreutils
  - gsl
- - anvio=3
+ - anvio-minimal
  - pandas
  - biopython
  - bbmap
