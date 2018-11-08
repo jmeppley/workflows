@@ -44,8 +44,8 @@ def get_coverage_stats(contig_depth_file,
         if col in contig_stats.columns:
             contig_stats[col] = contig_stats[col].astype(int)
 
-    logger.info("Writing coverage table to: %s"
-                 % (contig_stats_out))
+    logger.info("Writing coverage table to: {}"
+                 .format(contig_stats_out))
     contig_stats.to_csv(contig_stats_out,
                         sep='\t',
                         float_format="%0.2f")
