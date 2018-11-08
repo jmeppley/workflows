@@ -42,6 +42,18 @@ setup() {
     [ "${lines[0]}" == "Nothing to be done." ]
 }
 
+@test "Assemble with megahit and iutils" {
+    rm -rf test/scratch/iu-megahit
+    mkdir -p test/scratch/iu-megahit
+    cd test/scratch/iu-megahit
+
+    run bash -c "snakemake -j 10 -s ../../../assembly.metagenomic.snake -p --configfile ../../data/configs/megahit.yaml --config cleaning_protocol=anvio --verbose > assembly.log 2>&1"
+    [ "$status" -eq 0 ]
+    run bash -c "snakemake -j 10 -s ../../../assembly.metagenomic.snake -p --configfile ../../data/configs/megahit.yaml --config cleaning_protocol=anvio -n 2>&1 | grep '^Nothing'"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" == "Nothing to be done." ]
+}
+
 @test "Prep two pair of files for assembly" {
     rm -rf test/scratch/qc.assembly
     mkdir -p test/scratch/qc.assembly

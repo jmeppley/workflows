@@ -26,6 +26,9 @@ if sum(1 for s in config['sample_data'] \
         include: 'rename.snake'
         include: 'bbduk.snake'
         include: 'tmatic.snake'
+    elif protocol.startswith('anvio'):
+        include: 'rename.snake'
+        include: 'iu.snake'
     elif protocol == 'rename':
         include: 'rename.snake'
     elif protocol not in ['None', None]:
