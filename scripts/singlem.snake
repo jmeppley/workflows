@@ -26,6 +26,14 @@ sample_data = singlem.get_sample_data(config)
 # debug
 logger.debug(yaml.dump(config))
 
+singlem_env_path = config.get('env',
+    "/lus/scratch/jmeppley/assemblies/Aloha_2_0/MAGhunt/singleM/env2")
+singlem_env_prefix = """
+export PREFIX=$CONDA_PREFIX
+export ARCH=x86_64
+source activate {env}""".format(env=singlem_env_path)
+
+
 rule outputs:
     input:
         krona=['{}.singlem.krona.html'.format(s) for s in sample_data],
@@ -44,7 +52,7 @@ rule singlem_pipe:
     benchmark: 'benchmarks/{sample}.singlem.otu.time'
     threads: config.get('threads', {}).get('reads', 5)
     shell: """
-        source activate ./env2
+        {singlem_env_prefix}
         singlem pipe --sequences {input} --otu_table {output} \
                      --threads {threads}
         """
@@ -54,7 +62,7 @@ rule singlem_krona:
     output: "{sample}.singlem.krona.html"
     benchmark: 'benchmarks/{sample}.singlem.krona.time'
     shell: """
-        source activate ./env2
+        {singlem_env_prefix}
         singlem summarise --input_otu_table {input} \
             --krona {output}"""
 
@@ -64,7 +72,7 @@ rule singlem_contigs:
     threads: config.get('threads', {}).get('contigs', 5)
     benchmark: 'benchmarks/{sample}.contigs.singlem.otu.time'
     shell: """
-        source activate ./env2
+        {singlem_env_prefix}
         singlem pipe --sequences {input} --otu_table {output} \
                      --threads {threads}            
         """
@@ -97,7 +105,7 @@ rule assembly_appraisal:
         plot='{sample}.contigs.appraisal.svg',
     benchmark: 'benchmarks/{sample}.contigs.appraisal.time'
     shell: """
-        source activate ./env2
+        {singlem_env_prefix}
         singlem appraise --metagenome_otu_tables {input.reads} \
           --assembly_otu_tables {input.contigs} --plot {output.plot} \
           > {output.text} 2> {output.plot}.log
@@ -108,7 +116,7 @@ rule singlem_cluster:
     output: "{sample}.singlem.cluster.csv"
     benchmark: 'benchmarks/{sample}.singlem.cluster.time'
     shell: """
-        source activate ./env2
+        {singlem_env_prefix}
         singlem summarise --input_otu_table {input} \
             --cluster --clustered_output_otu_table {output}"""
 
@@ -119,7 +127,7 @@ rule rarify_otus:
     benchmark: "benchmarks/rarify.otus.{level}.time"
     threads: config.get('threads', {}).get('rarify', 5)
     shell: """
-        source activate ./env2
+        {singlem_env_prefix}
         singlem summarise --input_otu_tables {input.otus} \
             --rarefied_output_otu_table {output} \
             --number_to_choose {wildcards.level}
