@@ -86,7 +86,6 @@ search_results = {s:filtered_result_template.format(sample=s) \
 rule outputs:
     input:
         "reference.hit_counts.tsv",
-        "example.sam.header"
 
 rule count_table:
     input: search_results.values()
@@ -99,19 +98,67 @@ rule count_table:
     shell: "count_taxa.py {params.hit_tables} -p hitid -a portion -F 0 -f sam \
             -o {output} -c {params.cutoff} -v 22> {log}"
 
-rule save_header:
-    " grabs the header of a single sam file "
-    input: search_result_template.format(sample=next(iter(config['sample_data'])))
-    output: "example.sam.header"
-    shell: 'grep "^@" {input} > {output}'
+rule mapped_read_counts:
+    """ 
+    Count number of reads mapped to each contig from a sample. 
+    
+    This just pulls out the refernce column (3) from the SAM output
+    and uses uniq -c to get a count.
+    """
+    input: "{root}.bam.bai"
+    output: "{root}.read_counts"
+    benchmark: "benchmarks/{root}.read_counts.time"
+    params:
+        input="{root}.bam"
+    shell:
+        "samtools view -F 2304 {params.input} \
+         | cut -f 3 \
+         | uniq -c \
+         > {output}"
 
-rule filter_hits:
-    input: search_result_template
-    output: filtered_result_template
-    benchmark: "benchmarks/{sample}.filter_blast_m8.time"
-    log: "logs/{sample}.filter.log"
-    threads: 1
-    shell: "filter_blast_m8.py -v -f sam -F 0 {input} > {output} 2> {log}"
+rule coverages:
+    """ turn mapping depth into coverage values """
+    input:
+        depths="{root}.depths",
+        references=references_file
+    output: "{root}.coverages"
+    run:
+
+rule mapped_read_depths:
+    """
+    Get read depth at each base in each contig. This is needed for
+    coverage calculation later.
+    """
+    input: "{root}.bam.bai"
+    output: "{root}.depths"
+    benchmark: "benchmarks/{root}.depths.time"
+    params:
+        input="{root}.bam"
+    shell:
+        "samtools depth {params.input} > {output}"
+
+rule index_bam:
+    input: "{root}.bam"
+    output: "{root}.bam.bai"
+    benchmark: "benchmarks/{root}.bwa_index_bam.time"
+    shell:
+        "samtools index {input}"
+
+rule sam_to_bam:
+    """ convert to BAM and:
+     * sort by contig
+     * keep only the primary alignments
+    """
+    input: "{root}.sam"
+    output: "{root}.bam"
+    benchmark: "benchmarks/{root}.bwa_sam_bam.time"
+    threads: config.get('samtools',{'threads':5}['threads']
+    params:
+        ram=config.get('samtools',{'ram':'10G'}['ram']
+    shell:
+        "samtools view -F 2304 -b {input} \
+        | samtools sort -l 5 -@ {threads} -m {params.ram} - \
+        > {output}"
 
 def pairing_for_sample(wildcards):
     """ return appropriate pairing flag for wildcards.sample """

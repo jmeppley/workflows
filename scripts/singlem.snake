@@ -1,0 +1,126 @@
+import yaml
+import pandas
+
+# import python modules from workflows repo
+import os, sys
+workflows_dir = os.path.dirname(os.path.dirname(workflow.snakefile))
+sys.path.append(workflows_dir)
+
+from scripts import singlem
+include: "../common/download.snake"
+
+# samples to process should be in the config in either of two formats:
+#  config:
+#   sample_data:
+#     sample_1: 
+#       reads: reads_file_1
+#       contigs: contigs_file_1
+#     sample_2:
+#       reads: reads_file_2
+# or as a woldcard glob:
+#  config:
+#   reads_glob: /path/to/reads/{sample}/reads.fastq
+#   contigs_glob: /path/to/contigs/{sample}/contigs.fasta
+sample_data = singlem.get_sample_data(config)
+
+# debug
+logger.debug(yaml.dump(config))
+
+rule outputs:
+    input:
+        krona=['{}.singlem.krona.html'.format(s) for s in sample_data],
+        appraisal='assemblies.appraisals.tsv',
+        rarify='otus.rarified.{}.csv'.format(config.get('rarification_level',
+                                                        100))
+
+rule get_r1:
+    input: lambda w: sample_data[w.sample]['reads']
+    output: "{sample}.R1.fastq"
+    shell: "seqtk seq -1 {input} > {output}"
+
+rule singlem_pipe:
+    input: "{sample}.R1.fastq"
+    output: '{sample}.singlem.otu.csv'
+    benchmark: 'benchmarks/{sample}.singlem.otu.time'
+    threads: config.get('threads', {}).get('reads', 5)
+    shell: """
+        source activate ./env2
+        singlem pipe --sequences {input} --otu_table {output} \
+                     --threads {threads}
+        """
+
+rule singlem_krona:
+    input: rules.singlem_pipe.output
+    output: "{sample}.singlem.krona.html"
+    benchmark: 'benchmarks/{sample}.singlem.krona.time'
+    shell: """
+        source activate ./env2
+        singlem summarise --input_otu_table {input} \
+            --krona {output}"""
+
+rule singlem_contigs:
+    input: lambda w: sample_data[w.sample]['contigs']
+    output: "{sample}.contigs.singlem.out.csv"
+    threads: config.get('threads', {}).get('contigs', 5)
+    benchmark: 'benchmarks/{sample}.contigs.singlem.otu.time'
+    shell: """
+        source activate ./env2
+        singlem pipe --sequences {input} --otu_table {output} \
+                     --threads {threads}            
+        """
+
+rule collect_appraisals:
+    input: ['{}.contigs.appraisal.txt'.format(s) \
+                   for s,d in sample_data.items() if 'contigs' in d]
+    output: 'assemblies.appraisals.tsv'
+    benchmark: 'benchmarks/combine.appraisals.time'
+    run:
+        print(repr(input))
+        print(dir(input))
+        out_table = None
+        for appraisal_file in input:
+            table = pandas.read_table(appraisal_file, index_col=0)
+            table.drop(['total', 'average'], inplace=True)
+            if out_table is None:
+                out_table = table
+            else:
+                out_table = out_table.append(table)
+        out_table.to_csv(output[0], sep='\t')
+
+
+rule assembly_appraisal:
+    input:
+        reads=rules.singlem_pipe.output,
+        contigs=rules.singlem_contigs.output
+    output:
+        text='{sample}.contigs.appraisal.txt',
+        plot='{sample}.contigs.appraisal.svg',
+    benchmark: 'benchmarks/{sample}.contigs.appraisal.time'
+    shell: """
+        source activate ./env2
+        singlem appraise --metagenome_otu_tables {input.reads} \
+          --assembly_otu_tables {input.contigs} --plot {output.plot} \
+          > {output.text} 2> {output.plot}.log
+          """
+
+rule singlem_cluster:
+    input: rules.singlem_pipe.output
+    output: "{sample}.singlem.cluster.csv"
+    benchmark: 'benchmarks/{sample}.singlem.cluster.time'
+    shell: """
+        source activate ./env2
+        singlem summarise --input_otu_table {input} \
+            --cluster --clustered_output_otu_table {output}"""
+
+rule rarify_otus:
+    input:
+        otus=['{}.singlem.cluster.csv'.format(s) for s in sample_data],
+    output: "otus.rarified.{level}.csv"
+    benchmark: "benchmarks/rarify.otus.{level}.time"
+    threads: config.get('threads', {}).get('rarify', 5)
+    shell: """
+        source activate ./env2
+        singlem summarise --input_otu_tables {input.otus} \
+            --rarefied_output_otu_table {output} \
+            --number_to_choose {wildcards.level}
+        """
