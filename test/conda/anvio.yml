@@ -28,3 +28,5 @@ dependencies:
  - batch_launcher
  - hmmer<3.2
  - coreutils
+ - pip:
+     - illumina-utils

@@ -1,0 +1,50 @@
+apply_defaults(config,
+              {'iu':{'threads': 5,
+                     'params': '--store-read-fate --ignore-defline'}})
+
+ini_template = \
+"""[general]
+project_name = {sample}.renamed
+researcher_email = {email}
+input_directory = {pwd}
+output_directory = {pwd}
+
+[files]
+pair_1 = {r1}
+pair_2 = {r2}
+"""
+
+def fake_email():
+    return os.environ.get('USER', 'yourname') + "@server.domain.ext"
+
+rule iu_ini:
+    ''' generate a config (ini) file for illumina-utils '''
+    output: "{sample}.ini"
+    run:
+        with open(get_file_name(output), 'wt') as output_handle:
+            r1, r2 = ['{}.renamed.{}.fastq'.format(wildcards.sample, d) \
+                      for d in ['R1', 'R2']]
+            output_handle.write(ini_template.format(sample=wildcards.sample,
+                                                    email=fake_email(),
+                                                    pwd=os.getcwd(),
+                                                    r1=r1, r2=r2))
+
+rule iu_filter_quality_minoche:
+    """ Run QC using iu-filter-quality-minoche """
+    input:
+        ini=ancient("{sample}.ini"),
+        r1="{sample}.renamed.R1.fastq",
+        r2="{sample}.renamed.R2.fastq",
+    output:
+        r1="{sample}.renamed-QUALITY_PASSED_R1.fastq",
+        r2="{sample}.renamed-QUALITY_PASSED_R2.fastq",
+        stats="{sample}.renamed-STATS.txt"
+    log: "logs/{sample}.iu_minoche.log"
+    benchmark: "benchmarks/{sample}.iu_minoche.time"
+    threads: config['iu']['threads']
+    shell:
+        """
+            iu-filter-quality-minoche {input.ini} \
+            {config[iu][params]} >> {log} 2>&1
+        """
+

@@ -1,6 +1,6 @@
 rule uncompress_file:
     input:
-        "{file_root}.gz"
+        ancient("{file_root}.gz")
     output:
         temp("{file_root}")
     wildcard_constraints:

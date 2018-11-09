@@ -26,3 +26,5 @@ dependencies:
  - py-metagenomics
  - batch_launcher
  - coreutils
+ - pip:
+     - illumina-utils

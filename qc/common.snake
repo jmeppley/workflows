@@ -8,11 +8,11 @@ rule interleave:
     Interleave forward and reverse reads while reanaming
     """
     input:
-        "{prefix}.R1.fastq",
-        "{prefix}.R2.fastq",
-    output: "{prefix}.interleaved.fastq",
-    log: "logs/{prefix}_reads.raw.fastq.log"
-    benchmark: "benchmarks/{prefix}/interleave.time"
+        "{prefix}R1.fastq",
+        "{prefix}R2.fastq",
+    output: "{prefix}interleaved.fastq",
+    log: "logs/{prefix}interleaved.fastq.log"
+    benchmark: "benchmarks/{prefix}interleaved.time"
     version: SEQTK_VERSION
     shell: "seqtk mergepe {input} > {output}"
 

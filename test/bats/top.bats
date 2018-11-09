@@ -53,10 +53,14 @@ setup() {
 }
 
 @test "Check tophit QC outputs" {
-    run bash -c "diff <(sort test/scratch/topqc/ALOHA_XVII_1_15_DNA.vs.RefSeq.lastx._B50_F0.tophit.all.hitid.counts) test/bats/outputs/topqc/ALOHA_XVII_1_15_DNA.vs.RefSeq.lastx._B50_F0.tophit.all.hitid.counts.sort"
-    [ "$status" -eq 0 ]
-    run bash -c "diff <(sort test/scratch/topqc/ALOHA_XVII_1_04_DNA.vs.RefSeq.lastx._B50_F0.tophit.all.hitid.counts) test/bats/outputs/topqc/ALOHA_XVII_1_04_DNA.vs.RefSeq.lastx._B50_F0.tophit.all.hitid.counts.sort"
-    [ "$status" -eq 0 ]
+    run bash -c "diff <(sort test/scratch/topqc/ALOHA_XVII_1_04_DNA.vs.RefSeq.lastx._B50_F0.tophit.all.hitid.counts) test/bats/outputs/topqc/ALOHA_XVII_1_04_DNA.vs.RefSeq.lastx._B50_F0.tophit.all.hitid.counts.sort | grep -c '^>'"
+    [ "${lines[0]}" -lt 75 ]
+    run bash -c "diff <(sort test/scratch/topqc/ALOHA_XVII_1_04_DNA.vs.RefSeq.lastx._B50_F0.tophit.all.hitid.counts) test/bats/outputs/topqc/ALOHA_XVII_1_04_DNA.vs.RefSeq.lastx._B50_F0.tophit.all.hitid.counts.sort | grep -c '^<'"
+    [ "${lines[0]}" -lt 75 ]
+    run bash -c "diff <(sort test/scratch/topqc/ALOHA_XVII_1_15_DNA.vs.RefSeq.lastx._B50_F0.tophit.all.hitid.counts) test/bats/outputs/topqc/ALOHA_XVII_1_15_DNA.vs.RefSeq.lastx._B50_F0.tophit.all.hitid.counts.sort | grep -c '^>'"
+    [ "${lines[0]}" -lt 75 ]
+    run bash -c "diff <(sort test/scratch/topqc/ALOHA_XVII_1_15_DNA.vs.RefSeq.lastx._B50_F0.tophit.all.hitid.counts) test/bats/outputs/topqc/ALOHA_XVII_1_15_DNA.vs.RefSeq.lastx._B50_F0.tophit.all.hitid.counts.sort | grep -c '^<'"
+    [ "${lines[0]}" -lt 75 ]
 }
 
 

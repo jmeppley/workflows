@@ -65,3 +65,39 @@ def test_get_gene_name():
     assert (annot.get_gene_name(gff_hit, {'rRNA': 1}) ==
             'spades_c104_rRNA_2')
 
+
+## coverage
+DEPTHS_LINES = ["contig_c1\t5\t1\n",
+                "contig_c1\t6\t1\n",
+                "contig_c1\t7\t2\n",
+                "contig_c1\t8\t2\n",
+                "contig_c1\t9\t2\n",
+                "contig_c1\t10\t2\n",
+                "contig_c2\t4\t1\n",
+                "contig_c2\t5\t1\n",
+                "contig_c2\t6\t1\n"]
+
+CONTIG_LENGTHS = {'contig_c1':20, 'contig_c2':9, 'contig_c3':5}
+
+def test_contig_coverage_table():
+    g = cov.contig_depths_generator(DEPTHS_LINES)
+    contig, depths = next(g)
+    assert contig == 'contig_c1'
+    assert len(depths) == 6
+    contig, depths = next(g)
+    assert len(depths) == 3
+    coverage = list(cov._insert_zeros(depths, 9))
+    assert len(coverage) == 9
+    assert sum(coverage) == 3
+
+    coverages = cov.get_contig_coverage_table(DEPTHS_LINES, None)
+    logging.debug(str(coverages))
+    assert coverages.shape == (2, 6)
+    assert coverages.loc['contig_c1', 'MeanCov'] == 1.0
+    assert coverages.loc['contig_c2', 'Q2Q3Cov'] == 0.5
+
+    coverages = cov.get_contig_coverage_table(DEPTHS_LINES,
+                                              CONTIG_LENGTHS)
+    logging.debug(str(coverages))
+    assert coverages.shape == (3, 6)
+    assert coverages.loc['contig_c2', 'Q2Q3Cov'] == 0.2

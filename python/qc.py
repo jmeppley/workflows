@@ -33,6 +33,8 @@ QC_PROTOCOLS = {
                           'trimmed',
                           'dropse',
                          ]),
+    "anvio": 'renamed-QUALITY_PASSED_interleaved',
+    "anvio_pe": 'renamed-QUALITY_PASSED_interleaved',
     "assembly_no_ec": '.'.join(['renamed',
                                 'interleaved',
                                 'noadapt',

@@ -51,7 +51,7 @@ if not config.get('qc_setup_complete', False):
     config['qc_setup_complete'] = True
 #outputs.update(cleaned_reads)
 include: "qc/setup.snake"
-include: "common/gunzip.snake"
+#include: "common/gunzip.snake"
 #
 # the assembler (add link from assembled contigs to ./contigs.raw.fasta)
 assembler = config.get('assembler', 'spades')
