@@ -24,7 +24,14 @@ from python.download import remote_wrapper
 
 download_map = config.setdefault('download_map', {})
 
+# snakemake remotes don't work with slurm
+localrules: download_remote
+
 rule download_remote:
+    """
+    Uses snakemake remote mechanism to download file 
+    and creates temporary symlink in remote/ to avoid name collisions
+    """
     input: lambda w: download_map[w.dl_path]['remote']
     output: temp("remote/{dl_path}")
     params:
