@@ -24,6 +24,7 @@ from python.common import get_file_name
 # interleaved will be automatically dropped if single file given per sample
 QC_PROTOCOLS = {
     "rename": 'rename.interleaved',
+    "interleave": 'interleaved',
     "assembly": '.'.join(['renamed',
                           'interleaved',
                           'noadapt',
@@ -151,7 +152,9 @@ def setup_qc_outputs(config):
     # loop back over samples and set up cleaning or interleaving if needed
     outputs = []
     for sample in samples_with_raw_reads:
-        raw_files = sorted(sample_data[sample]['raw'])
+        raw_files = [sample_data[sample]['raw'],] \
+                    if isinstance(sample_data[sample]['raw'], str) \
+                    else sorted(sample_data[sample]['raw'])
 
         # get protocol (try sample_Data first, fall back to global)
         cleaning_protocol = \
