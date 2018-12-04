@@ -5,6 +5,7 @@ import re, os
 from python.common import apply_defaults
 from snakemake import logger
 from snakemake.remote.SFTP import RemoteProvider as sftp_rp
+from snakemake.io import ancient
 
 url_rexp = re.compile(r'^([A-Za-z]+)://(.+)$')
 mnt_rexp = re.compile(r'^(/mnt/([a-z]+ine)/.+)$')
@@ -122,7 +123,7 @@ def remote_wrapper(source, config, glob=False):
             full_path = "/" + path
             if isinstance(provider, sftp_rp):
                 # download with rsync
-                local_path = "rsync/" + source
+                local_path = ancient("rsync/" + source)
                 config.setdefault('download_map', {})[source] = \
                         {'host': host, 'remote_path': full_path,
                          'user': provider.kwargs['username']}
