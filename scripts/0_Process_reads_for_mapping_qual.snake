@@ -94,7 +94,7 @@ rule prinseq:
     output: "{prefix}.cut.sickle.non_rRNA.fasta"
     params: 
         fasta="{prefix}.cut.sickle.non_rRNA"
-    shell: "prinseq -out_format 1 -fastq {input} -out_good {params.fasta} > {output}.log 2>&1"
+    shell: "prinseq-lite.pl -out_format 1 -fastq {input} -out_good {params.fasta} > {output}.log 2>&1"
 
 ###################################
 # Mask repeats in fasta with tantan

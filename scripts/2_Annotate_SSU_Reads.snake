@@ -8,7 +8,7 @@ use the conda environment in test/conda/mitags.yaml
 # functions
 def get_project_name():
     """ TODO: use the cuurent working dir name as the project """
-    return "MiTags"
+    return "SSU_counts"
 
 def string_from_opts(options):
     """ turn a series of command line options into a naming string
@@ -21,24 +21,30 @@ def string_from_opts(options):
 ## get config from user or use defaults
 
 # ranks to count on
-ranks = config.get('ranks', ['domain', 'phylum', 'class', 'genus'])
+ranks = config.get('ranks', ['superkingdom', 'phylum', 'class', 'genus'])
+ranks = ['superkingdom' if r == 'domain' else r for r in ranks]
 # ranks in printed lineages
 display_ranks = config.get('display_ranks',
-                       ['domain', 'phylum', 'class', 'order','family', 'genus'])
+                       ['superkingdom', 'phylum', 'class', 'order','family', 'genus'])
 
 # input files (can be fastq)
-fasta_template = config.get(
-                    'fasta_template',
-                    'fastq/sorted_rna/{sample}.cut.sickle.non_rRNA.masked.fasta'
+fastx_template = config.get(
+                    'fastx_template',
+                    'fastq/sorted_rna/{sample}.cut.sickle.rRNA.fastq'
                  )
-samples, = glob_wildcards(fasta_template)
-logger.debug("TEMPLATE: {}\nSAMPLES: {}".format(fasta_template, samples))
+fastx_suff = fastx_template.split(".")[-1] # should be fastq or fasta
+
+samples, = glob_wildcards(fastx_template)
+logger.debug("TEMPLATE: {}\nSAMPLES: {}".format(fastx_template, samples))
 
 # search options
-filter_opts = config.get('filter_opts', '-F 0 -L 70 -I 97')
+# current version of py-metagenommics incorrecly puts SAM pctid values in 0-1 instead of 0-100 (will be fixed soon, so this should change soon)
+filter_opts = config.get('filter_opts', '-L 70 -I .97')
 filter_string = config.get('fitler_string', string_from_opts(filter_opts))
 db_name = config.get('db_name', 'Silva_123.miTags')
-db_path = config.get('db_path', '')
+db_path = config.get('db_path', "/slipstream/galaxy-data/tool-data/sequencedbs/bowtie2/Silva/123/Silva_123_SSURef_NR99_tax_silva_trunc")
+db_taxmap = config.get('db_taxmap', '/mnt/histidine/galaxydata/seqdbs/Silva/123_1/Silva_123_SSURef_NR99/bwadb.tax')
+db_taxdir = config.get('db_taxdir', '/mnt/histidine/galaxydata/seqdbs/Silva/123_1/Silva_123_SSURef_NR99')
 
 # output name
 project = config.get('project', get_project_name())
@@ -46,23 +52,28 @@ project = config.get('project', get_project_name())
 ###
 # build output files
 search_suffix = '.vs.{db_name}{filter_string}'.format(**locals())
-count_template = '{project}/{project}_16S.fasta{search_suffix}.P.{rank}.count'
-logger.debug("SUFFIX: {}\nOUTPUT: {}".format(search_suffix, count_template))
-output_tables = expand(count_template,
-                       project=project,
-                       search_suffix=search_suffix,
-                       rank=ranks + ['hitid',]
-                      )
+count_prefix = '{project}/{project}.SSU{search_suffix}.P.count'.format(
+    project=project,
+    search_suffix=search_suffix,
+)
+hitid_table = count_prefix + ".hitid"
+rank_tables = [count_prefix + "." + r for r in ranks]
+output_tables = rank_tables + [hitid_table,]
+logger.debug(output_tables)
 
 ###
 # rules
+rule outputs:
+    " define the final target list as inputs to the first rule "
+    input: output_tables
+
 rule count_hitids:
     """ assign top hit based on hit id and count hit ids across samples """
-    input: expand("{project}/{sample}" + search_suffix, sample=samples, \
+    input: expand("{project}/{sample}.SSU" + search_suffix, sample=samples, \
                   project=project)
-    output: count_template.format(rank='hitid', **locals())
+    output: hitid_table
     params:
-        inputs=" ".join(expand("{sample}={project}/{sample}" + search_suffix, \
+        inputs=" ".join(expand("{sample}={project}/{sample}.SSU" + search_suffix, \
                                project=project, \
                                sample=samples)),
     shell: "count_taxa.py {params.inputs} -o {output} \
@@ -70,27 +81,27 @@ rule count_hitids:
 
 rule count_ranks:
     """ assign top hit based on organism abundance and use LCA to assign taxa"""
-    input: expand("{project}/{sample}" + search_suffix, sample=samples, \
+    input: expand("{project}/{sample}.SSU" + search_suffix, sample=samples, \
                     project=project)
-    output: count_template.format(rank=ranks, **locals())
+    output: rank_tables
     params:
-        inputs=" ".join(expand("{sample}={project}/{sample}" + search_suffix, \
+        inputs=" ".join(expand("{sample}={project}/{sample}.SSU" + search_suffix, \
                                project=project, \
                                sample=samples)),
         ranks=" ".join("-r " + r for r in ranks),
         lineage=" ".join("-R " + r for r in display_ranks),
-    shell: "count_taxa.py {params.inputs} -o {output} \
-            -m {params.taxmap} -n {params.taxdir} \
+    shell: "count_taxa.py {params.inputs} -o {count_prefix} \
+            -m {db_taxmap} -n {db_taxdir} \
             {params.ranks} {params.lineage} \
             -c 0.0001 -f sam"
 
 rule filter_hits:
-    """ filter LAST FILES so min length of overlap is 70 bps (-L 70) and only retain reads within 1% of blast-like score (-F 1). """
+    """ filter sam files to only keep primary hit, and apply filter rules (usuall length>70 and %ID>97) """
     input: "{sam_root}.sam"
     output: "{sam_root}" + filter_string
     params:
         opts=filter_opts,
-    shell: "filter_blast_m8.py -f sam {params.opts} {input} > {output}"
+    shell: "filter_blast_m8.py -f sam {params.opts} <(samtools view -F 2308 -S {input}) > {output}"
 
 rule bowtie:
     """ searches SSU database iwth bowtie 2. The options:
@@ -100,17 +111,28 @@ rule bowtie:
         #  --gbar = limit of gaps that will be allowed
         # -S output
     """
-    input: fasta_template
+    input: '{project}/{sample}.SSU.' + fastx_suff
     output:
-        sam="{project}/{sample}.vs.{db_name}.sam",
-        un="{project}/{sample}.vs.{db_name}.unaligned.fasta"
+        sam="{project}/{sample}.SSU.vs.{db_name}.sam",
+        un="{project}/{sample}.SSU.vs.{db_name}.unaligned." + fastx_suff,
     params:
-        db="/slipstream/galaxy-data/tool-data/sequencedbs/bowtie2/Silva/123/Silva_123_SSURef_NR99_tax_silva_trunc",
-        in_fmt="-q" if fasta_template.endswith('.fastq') else "-f",
+        db=db_path,
+        in_fmt="-q" if fastx_template.endswith('.fastq') else "-f",
         opts="--local --sensitive --gbar 4",
     threads: config.get('bowtie_threads', 8)
     shell: "bowtie2 -p {threads} -x {params.db} \
             {params.in_fmt} {input} --un {output.un} \
             {params.opts} -S {output.sam}"
 
+rule separate_sus:
+    """ Runs sortmerna again to separate SSU and LSU """
+    input: fastx_template
+    output:
+        ssu='{project}/{sample}.SSU.' + fastx_suff,
+        lsu='{project}/{sample}.LSU.' + fastx_suff,
+    params:
+        pref="{project}/{sample}"
+    shell:
+        'sortmerna --reads {input} -a 16 --fastx --aligned {params.pref}.LSU --other {params.pref}.SSU \
+         --ref "/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/silva-arc-23s-id98.fasta,/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/silva-arc-23s-id98.db:/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/silva-bac-23s-id98.fasta,/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/silva-bac-23s-id98.db:/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/silva-euk-28s-id98.fasta,/slipstream/home/faylward/bin/sortmerna-2.0-linux-64/rRNA_databases/silva-euk-28s-id98.db" > {output.lsu}.log 2>&1'
 
