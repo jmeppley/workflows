@@ -33,7 +33,6 @@ def get_provider(protocol, host, config):
         remote_defaults = config.get('remote', {}) \
                                 .get(protocol, {}) \
                                 .get('defaults', {})
-        remote_defaults.setdefault('keep_local', True)
         remote_options = config.get('remote', {}) \
                                 .get(protocol, {}) \
                                 .get(host, {})
@@ -84,7 +83,6 @@ def infer_provider(source, config, glob=False):
             config.setdefault('remote', {}) \
                   .setdefault(protocol, {}) \
                   .setdefault('defaults', {'username': 'readonly',
-                                           'keep_local': True,
                                           })
             source_path, server_name = m.groups()
             host = server_name + config.get('remote', {}) \

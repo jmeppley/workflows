@@ -42,7 +42,7 @@ import os, sys
 workflows_dir = os.path.dirname(os.path.dirname(workflow.snakefile))
 sys.path.append(workflows_dir)
 
-include "../common/download.snake"
+include: "../common/download.snake"
 from python.download import remote_wrapper
 
 def check_sample_data(config):
@@ -53,7 +53,7 @@ def check_sample_data(config):
                             "config[sample_data] or with config[sample_glob]")
         # string like "/path/to/files/{sample}.fastq"
         sample_glob = config['sample_glob']
-        wildcard_values = remote_wrapper(sample_glob, glob=True)
+        wildcard_values = remote_wrapper(sample_glob, config, glob=True)
         sample_data = config.setdefault('sample_data', {})
         # which wildcard in glob was "sample"
         wildcard_names = list(wildcard_values._fields)
@@ -70,9 +70,10 @@ def check_sample_data(config):
                 sample_data[sample] = remote_wrapper(
                                         sample_glob.format(
                                             **dict(zip(wildcard_names,
-                                                       wildcard_tuple))))
+                                                       wildcard_tuple))),
+                                                       config)
 
-references_file = remote_wrapper(config['references_file'])
+references_file = remote_wrapper(config['references_file'], config)
 logger.debug("references_file: " + repr(references_file))
 
 search_result_template = "{sample}.vs.references.sam"
