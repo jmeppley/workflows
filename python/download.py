@@ -6,6 +6,7 @@ from python.common import apply_defaults
 from snakemake import logger
 from snakemake.remote.SFTP import RemoteProvider as sftp_rp
 from snakemake.io import ancient
+from snakemake.workflow import glob_wildcards
 
 url_rexp = re.compile(r'^([A-Za-z]+)://(.+)$')
 mnt_rexp = re.compile(r'^(/mnt/([a-z]+ine)/.+)$')

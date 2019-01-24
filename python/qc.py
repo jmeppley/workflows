@@ -104,7 +104,7 @@ def setup_qc_outputs(config):
                         "config[sample_data]")
 
     # process any patterns in sample_data[reads_patterns]
-    samples = process_sample_data(sample_data)
+    samples = process_sample_data(sample_data, config)
 
     transitions = config.setdefault('transitions', {})
 

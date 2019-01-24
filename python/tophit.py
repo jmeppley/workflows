@@ -39,7 +39,7 @@ def get_top_hit_outputs(config):
                         "config[sample_data]")
 
     # process any patterns in sample_data[reads_patterns]
-    samples = process_sample_data(sample_data)
+    samples = process_sample_data(sample_data, config)
     if len(samples)==0:
             raise Exception("Please supply a list of samples and reads in "
                             "config[sample_data] or rules for finding them "
