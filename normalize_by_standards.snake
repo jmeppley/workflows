@@ -89,6 +89,7 @@ include: "common/transitions.snake"
 logger.debug("Snakefile config:\n" + yaml.dump(config))
 
 ## The first rule is run by default
+localrules: collate_factors
 rule collate_factors:
     """
     Collect all the factors into one table

@@ -1,6 +1,8 @@
 from python import tmatic
 from python.common import apply_defaults
 
+localrules: trimmomatic_adapters
+
 # some reasonable defaults
 defaults = {
     'trimmomatic': {
