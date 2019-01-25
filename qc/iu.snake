@@ -1,3 +1,5 @@
+from python.common import apply_defaults
+
 apply_defaults(config,
               {'iu':{'threads': 5,
                      'params': '--store-read-fate --ignore-defline'}})
