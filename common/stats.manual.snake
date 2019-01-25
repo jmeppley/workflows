@@ -1,0 +1,17 @@
+include: stats.snake
+
+fastx_glob = config.get(fastx_glob, "{file_root}.{suffix}")
+wildcard_constraints:
+    suffix=r'(fasta|fa|fna|ffn|faa|fastq)'
+
+file_roots, suffixes = wildcard_glob(fastx_glob)
+
+outputs = []
+for stat_suff in ['hist','stats']:
+    for root, suff in zip(file_roots, suffixes):
+        fastx = fastx_glob.format(file_root=root, suffix=suff)
+        stat_file = "stats/" + os.path.relpath(fastx) + "." + stat_suff
+        outputs.append(stat_file)
+
+rule outputs:
+    input: outputs
