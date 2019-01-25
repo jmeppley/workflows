@@ -160,8 +160,8 @@ def setup_qc_outputs(config):
 
         # get protocol (try sample_Data first, fall back to global)
         cleaning_protocol = \
-                sample_data[sample].get('protocol',
-                                        config.get('cleaning_protocol',
+                sample_data[sample].setdefault('protocol',
+                                        config.setdefault('cleaning_protocol',
                                                    'None'))
 
         # check to see if they are compressed (we can handle .gz)

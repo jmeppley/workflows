@@ -31,12 +31,19 @@ def process_sample_data(sample_data, config):
         else:
             reads_patterns = sample_data['reads_patterns']
         for pattern_data in reads_patterns:
-            if pattern_data.get('cleaned', True) in [True, 'True']:
-                read_key = 'clean'
-            else:
-                read_key = 'raw'
+            other_read_data = {}
+            read_key = 'raw'
+            for key in pattern_data.keys():
+                if key == 'cleaned':
+                    read_key = 'clean' if pattern_data[key] else 'raw'
+                elif key in ['glob', 're', 'wildcard_glob']:
+                    continue
+                else:
+                    other_read_data[key] = pattern_data[key]
+
             for sample, reads in collect_sample_reads(pattern_data, config).items():
                 sample_data.setdefault(sample, {})[read_key] = reads
+                sample_data[sample].update(other_read_data)
 
         # Now get rid of any patterns from config
         del sample_data['reads_patterns']
