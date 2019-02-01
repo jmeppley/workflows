@@ -4,8 +4,9 @@
 defaults = {
     'cdhit': {
         'threads': 20,
-        'options': '-c 0.95 -M 1000000 -G 0 -aS 0.9 -g 1 -d 0',
-        'output_str': 'c.95.aS.9.g1.r1.G0',
+        'options': '-c 0.97 -G 0 -aS 0.9 -g 1 -d 0',
+        'mem': 1000000,
+        'output_str': 'c.97.aS.9.g1.r1.G0',
     },
 }
 apply_defaults(config, defaults)
@@ -21,5 +22,6 @@ rule cluster_faa:
     params:
         cd_hit_options=config['cdhit']['options']
     shell:
-        "cd-hit -T {threads} {params.cd_hit_options} \
+        "cd-hit -T {threads} {config[cdhit][options]} \
+         -M {config[cdhit][mem]} \
          -i {input} -o {output}"
