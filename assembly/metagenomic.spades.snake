@@ -76,12 +76,16 @@ rule run_spades_metagenomic:
                                 suffix='tmp', \
                                 prefix='spades', \
                                 dir=config['spades']['tmp_dir']),
-        continue_flags="--continue" if os.path.isdir('spades') else "",
+        cont="CONTINUE" if os.path.isdir('spades') else "",
         skip_ec='' if run_ec else '--only-assembler',
     shell:
         """
-        spades.py {params.mode} -m {params.ram_limit} -t {threads} \
-                  -k {params.kmers} --tmp-dir {params.tmp_dir.name} \
-                  --pe1-12 {input} -o spades \
-                  {params.continue_flags} {params.skip_ec} 
+        if [ "{params.cont}" == "CONTINUE" ]; then
+            spades.py --continue -o spades
+        else
+            spades.py {params.mode} -m {params.ram_limit} -t {threads} \
+                      -k {params.kmers} --tmp-dir {params.tmp_dir.name} \
+                      --pe1-12 {input} -o spades \
+                      {params.skip_ec} 
+        fi
         """
