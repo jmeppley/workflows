@@ -95,6 +95,7 @@ rule quant_reads_kallisto:
     params:
         outdir="kallisto/{sample}.vs.{contigs}.quant",
         bam="--pseudobam" if config['produce_bam'] else ""
+    threads: config['kallisto']['threads']
     shell:
         """
         {config[kallisto_prefix]}
