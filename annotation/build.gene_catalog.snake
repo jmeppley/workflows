@@ -110,12 +110,22 @@ def get_assembly_coverage_files(wildcards=None):
     Find all the contig.coverages.{sample}.txt for each assembly
     """
     for assembly_path in config['assembly_list']:
-        for file_name in glob.glob(os.path.join(assembly_path,
-                                'contigs.final.stats.txt')):
+        # find a coverage file
+        # Try a combined coverage file
+        master_file = os.path.join(assembly_path,
+                                'contigs.final.stats.txt')
+        if os.path.exists(master_file):
             if assembly_path in assembly_renaming_map:
-                file_name = "renamed_dir" + file_name
+                file_name = "renamed_dir" + master_file
+                yield file_name
+        else:
+            # look for per-sample coverage files
+            for file_name in glob.glob(os.path.join(assembly_path,
+                                    'contigs.all.coverages.*.t??')):
+                if assembly_path in assembly_renaming_map:
+                    file_name = "renamed_dir" + file_name
 
-            yield file_name
+                yield file_name
 
 def get_assembly_read_stats(wildcards=None):
     """
@@ -211,6 +221,11 @@ rule get_gene_coverages:
                 contig_genes.setdefault(contig, []).append(gene)
 
         with open(get_file_name(output), 'wt') as OUT:
-            for contig, coverage in gene_catalog.normalize_coverages(input):
+            for contig, coverage in gene_catalog.normalize_coverages(input,
+                                                                     config.get('contig_col',
+                                                                                'Contigs'),
+                                                                     config.get('cov_col',
+                                                                                'MeanCov'),
+                                                                    ):
                 for gene in contig_genes.get(contig, []):
                     OUT.write('{}\t{}\n'.format(gene, coverage))

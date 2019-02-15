@@ -273,7 +273,7 @@ def write_tsv(out_file, data_tuples, sep='\t', header=None):
         for data_tuple in data_tuples:
             out_handle.write(sep.join(data_tuple)+'\n')
 
-def normalize_coverages(input):
+def normalize_coverages(input, contig_col='Contig', cov_col='MeanCov'):
     """
     Loop over read stats files and create a normalization factor for each assembly (number of reads/10M)
 
@@ -309,8 +309,8 @@ def normalize_coverages(input):
         _coverages = pandas.read_table(cov_file,
                                        index_col=0,
                                        header=0,
-                                       usecols=['Contig', 'MeanCov'],
-                                       )['MeanCov'] / read_counts[assembly]
+                                       usecols=[contig_col, cov_col],
+                                       )[cov_col] / read_counts[assembly]
         if coverages is None:
             coverages = _coverages
         else:
