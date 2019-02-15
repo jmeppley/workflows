@@ -1,8 +1,17 @@
 """
+read_mapping.2.snake
+
 Calculate abundances by mapping reads to a reference catalog
 
  * Map reads to catalog with BWA or similar
- * count abundances
+ * Convert to sorted compressed BAM with only top hits to save space
+ * Count hits in table
+
+Changes from read_mapping.snake:
+ 
+ * Doesn't use py-metagenomics scripts
+ * uses BAM to save space instaed of dropping header
+ * doesn't quite work!!!
 
 There are two key configuration values:
 
@@ -42,7 +51,7 @@ import os, sys
 workflows_dir = os.path.dirname(os.path.dirname(workflow.snakefile))
 sys.path.append(workflows_dir)
 
-include "../common/download.snake"
+include: "../common/download.snake"
 from python.download import remote_wrapper
 
 def check_sample_data(config):
@@ -76,11 +85,11 @@ references_file = remote_wrapper(config['references_file'])
 logger.debug("references_file: " + repr(references_file))
 
 search_result_template = "{sample}.vs.references.sam"
-filtered_result_template = "{sample}.vs.references.F0.sam"
+read_count_template = "{sample}.vs.references.read_counts"
 
 check_sample_data(config)
 
-search_results = {s:filtered_result_template.format(sample=s) \
+search_results = {s:read_count_template.format(sample=s) \
                   for s in config['sample_data']}
 
 rule outputs:
@@ -111,10 +120,13 @@ rule mapped_read_counts:
     params:
         input="{root}.bam"
     shell:
-        "samtools view -F 2304 {params.input} \
+        "samtools view {params.input} \
          | cut -f 3 \
          | uniq -c \
          > {output}"
+
+## Coverage calculaations
+# currently unused, we just use read counts
 
 rule coverages:
     """ turn mapping depth into coverage values """
