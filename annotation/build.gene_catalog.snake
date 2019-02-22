@@ -116,8 +116,8 @@ def get_assembly_coverage_files(wildcards=None):
                                 'contigs.final.stats.txt')
         if os.path.exists(master_file):
             if assembly_path in assembly_renaming_map:
-                file_name = "renamed_dir" + master_file
-                yield file_name
+                master_file = "renamed_dir" + master_file
+            yield master_file
         else:
             # look for per-sample coverage files
             for file_name in glob.glob(os.path.join(assembly_path,
@@ -221,11 +221,13 @@ rule get_gene_coverages:
                 contig_genes.setdefault(contig, []).append(gene)
 
         with open(get_file_name(output), 'wt') as OUT:
-            for contig, coverage in gene_catalog.normalize_coverages(input,
-                                                                     config.get('contig_col',
-                                                                                'Contigs'),
-                                                                     config.get('cov_col',
-                                                                                'MeanCov'),
-                                                                    ):
+            for contig, coverage in gene_catalog.normalize_coverages(
+                                                    input,
+                                                    config.get(
+                                                        'contig_col',
+                                                        'Contig'),
+                                                    config.get('cov_col',
+                                                               'MeanCov'),
+                                                 ):
                 for gene in contig_genes.get(contig, []):
                     OUT.write('{}\t{}\n'.format(gene, coverage))
