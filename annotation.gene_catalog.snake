@@ -38,6 +38,8 @@ from python.annotate import get_db_dot_fmt_strings
 #
 # defaults for basic operation
 # ranks to collect taxa on (defaults to order)
+include: "common/stats.snake"
+
 config.setdefault('clade_ranks', ['order'])
 
 # set some defaults
@@ -75,7 +77,6 @@ else:
             include: 'annotation/dummy.coverage.snake'
 
 # rules for gene annotation workflow
-include: "common/stats.snake"
 include: "annotation/common.genes.snake"
 
 # the annotaton will work from the clustered genes
