@@ -47,6 +47,7 @@ setup() {
 
     run bash -c "snakemake -j 10 -s ../../../normalize_by_standards.snake -p --configfile ../../data/configs/illumina.yaml --verbose --config joining_program=flash discover_fastx_for_stats=True cleaning_protocol=join_and_standards standards_fasta=../../data/other/standards.fasta spike_amounts_table=../../data/other/spike_amounts.tsv > spikes.log 2>&1"
     [ "$status" -eq 0 ]
+    [ -e stats/fortyk.scripseq.ATCACG.trim_adapt.solo.paired.noadaptp.trimmed.fastq.hist ]
 }
 
 @test "Split reads into rRNA or not" {
