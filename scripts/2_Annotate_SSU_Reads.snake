@@ -1,13 +1,13 @@
 """
-# This workflow maps reads against a modified Silva database and assigns them to 'miTags'
-# using the LCA method
+# This workflow maps reads against a modified Silva database and
+assigns them to 'miTags' using the LCA method
 
 use the conda environment in test/conda/mitags.yaml
 """
 ###
 # functions
 def get_project_name():
-    """ TODO: use the cuurent working dir name as the project """
+    """ TODO: use the current working dir name as the project """
     return "MiTags"
 
 def string_from_opts(options):
