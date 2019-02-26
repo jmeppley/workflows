@@ -221,14 +221,6 @@ rule get_gene_coverages:
                 contig_genes.setdefault(contig, []).append(gene)
 
         with open(get_file_name(output), 'wt') as OUT:
-<<<<<<< HEAD
-            for contig, coverage in gene_catalog.normalize_coverages(input,
-                                                                     config.get('contig_col',
-                                                                                'Contig'),
-                                                                     config.get('cov_col',
-                                                                                'MeanCov'),
-                                                                    ):
-=======
             for contig, coverage in gene_catalog.normalize_coverages(
                                                     input,
                                                     config.get(
@@ -237,6 +229,5 @@ rule get_gene_coverages:
                                                     config.get('cov_col',
                                                                'MeanCov'),
                                                  ):
->>>>>>> 8b78401016f7391fee0bd20932dc5d7fd22d3d35
                 for gene in contig_genes.get(contig, []):
                     OUT.write('{}\t{}\n'.format(gene, coverage))
