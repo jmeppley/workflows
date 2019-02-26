@@ -223,7 +223,7 @@ rule get_gene_coverages:
         with open(get_file_name(output), 'wt') as OUT:
             for contig, coverage in gene_catalog.normalize_coverages(input,
                                                                      config.get('contig_col',
-                                                                                'Contigs'),
+                                                                                'Contig'),
                                                                      config.get('cov_col',
                                                                                 'MeanCov'),
                                                                     ):
