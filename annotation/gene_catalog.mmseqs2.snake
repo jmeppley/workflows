@@ -1,5 +1,6 @@
 import tempfile
 from python.common import apply_defaults
+from python.gene_catalog import parse_mmseq_clusters
 
 # software parameters
 defaults = {
@@ -60,3 +61,24 @@ rule formatdb_for_mmseqs:
     output: 'all_genes.faa.db'
     benchmark: 'benchmarks/format_for_mmseqs.time'
     shell: "mmseqs createdb {input} {output} > {input}.createdb.log 2>&1"
+
+rule generate_table:
+    input:
+        clusters="all_genes.faa.{}.result".format(cluster_suffix),
+        db='all_genes.faa.db',
+    output: "all_genes.faa.{}.tab".format(cluster_suffix)
+    benchmark: 'benchmarks/all_genes.faa.{}.extract.tab.time' \
+                        .format(cluster_suffix)
+    shell:
+        """
+         mmseqs createtsv {input.db} {input.db} {input.clusters} {output} > {output}.log
+        """
+
+rule reformat_table:
+    """ turn .clstr file into simple cluster table """
+    input: "all_genes.faa.{}.tab".format(cluster_suffix)
+    output: prefix + ".clusters"
+    benchmark: 'benchmarks/{}.clusters.time'.format(prefix)
+    run:
+        parse_mmseq_clusters(get_file_name(input),
+                           get_file_name(output))

@@ -99,9 +99,10 @@ def parse_stats(stats_file):
     if os.stat(stats_file).st_size == 0:
         return {'reads':0, 'bases':0}
 
-    stats = pandas.read_table(stats_file,
-                              names=('module', 'key', 'value'),
-                              index_col=1)['value']
+    stats = pandas.read_csv(stats_file,
+                            sep='\t',
+                            names=('module', 'key', 'value'),
+                            index_col=1)['value']
     return {k:int(stats[k]) for k in ['reads', 'bases']}
 
 def add_stats_outputs(snakefile, config):

@@ -1,4 +1,5 @@
 from python.common import apply_defaults
+from python.gene_catalog import parse_bio_clusters
 
 # software parameters
 defaults = {
@@ -14,11 +15,23 @@ cluster_suffix = config['vsearch']['output_str']
 
 rule cluster_ffn:
     input: "all_genes.ffn"
-    output: "all_genes.ffn.{}".format(cluster_suffix)
+    output:
+        ffn="all_genes.ffn.{}".format(cluster_suffix),
+        bio="all_genes.ffn.{}.bio".format(cluster_suffix),
     benchmark: 'benchmarks/all_genes.ffn.{}.time' \
                         .format(cluster_suffix)
     threads: config['vsearch']['threads']
     shell:
         "vsearch --cluster_fast {input} --no_progress \
+         --biomout {output.bio} \
          {config[vsearch][options]} \
-         --threads {threads} --centroids {output}"
+         --threads {threads} --centroids {output.ffn}"
+
+rule parse_clusters:
+    """ turn .clstr file into simple cluster table """
+    input: "all_genes.ffn.{}.bio".format(cluster_suffix)
+    output: prefix + ".clusters"
+    benchmark: 'benchmarks/{}.clusters.time'.format(prefix)
+    run:
+        parse_bio_clusters(get_file_name(input),
+                           get_file_name(output))

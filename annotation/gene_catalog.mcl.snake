@@ -94,3 +94,10 @@ rule process_for_mcl:
                         format='blast',
                         pctid=float(config['mcl']['filters']['pctid']),
                         minbit=float(config['mcl']['filters']['minbit']),)
+
+# mcl cluster file is the format we use internally, so just link to it
+# (via transitions)
+config.get('transitions',{})[prefix + ".clusters"] = \
+        "all_genes.{cluster_type}.{cluster_suffix}.raw" \
+                .format(cluster_type=config.get('cluster_type', 'faa'),\
+                        cluster_suffix=cluster_suffix)
