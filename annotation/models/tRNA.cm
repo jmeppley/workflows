@@ -1,6 +1,7 @@
 INFERNAL1/a [1.1 | October 2013]
 NAME     tRNA
 ACC      RF00005
+DESC     tRNA
 STATES   227
 NODES    60
 CLEN     71
@@ -324,6 +325,7 @@ CM
 HMMER3/f [i1.1 | October 2013]
 NAME  tRNA
 ACC   RF00005
+DESC     tRNA
 LENG  71
 MAXL  253
 ALPH  RNA
@@ -562,6 +564,7 @@ HMM          A        C        G        U
 INFERNAL1/a [1.1 | October 2013]
 NAME     tRNA-Sec
 ACC      RF01852
+DESC     Selenocysteine transfer RNA
 STATES   292
 NODES    75
 CLEN     91
@@ -965,6 +968,7 @@ CM
 HMMER3/f [i1.1 | October 2013]
 NAME  tRNA-Sec
 ACC   RF01852
+DESC     Selenocysteine transfer RNA
 LENG  91
 MAXL  164
 ALPH  RNA

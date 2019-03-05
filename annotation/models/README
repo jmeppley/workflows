@@ -1,7 +1,7 @@
 Rfam: Multiple alignments, secondary structures and covariance models
 of non-coding RNA families
 
-Release 12.1
+Release 14.1
 ------------
 
 0. CONTENTS
@@ -15,30 +15,32 @@ Release 12.1
 
 1. Rfam is a database of structure-annotated multiple sequence alignments,
 convariance models and family annotation for a number of non-coding RNA,
-cis-regulatory and self-splicing intron families. Rfam 12.1 contains 2473
+cis-regulatory and self-splicing intron families. Rfam 14.0 contains 2,791
 families. The seed alignments are hand curated and aligned using available
 sequence and structure data, and covariance models are built from these
-alignments using the INFERNAL 1.1 software suite (http://infernal.janelia.org).
+alignments using the INFERNAL v1.1.2 software suite (http://infernal.janelia.org).
 The full regions list is created by searching the RFAMSEQ database (described
 below) using the covariance model, and then listing all hits above a family
-specific threshold to the model. Rfam 12.1 annotates 19,639,727 regions in the
-RFAMSEQ database.
+specific threshold to the model. Rfam 14.0 annotates a total of 2,917,933 
+regions in the RFAMSEQ database. The annotations are based on a collection 
+of 14,434 reference genomes, provided by Uniprot proteomes. 
 
 Rfam is maintained by a consortium of researchers at the EMBL European
-Bioinformatics Institute, Hinxton, UK and the Howard Huges Medical Institute,
-Janelia Farm Research Campus, Ashburn, Virginia, USA. We are very keen to hear
-any feedback, positive or negative, that you may have on Rfam - please contact
-rfam-help@ebi.ac.uk.
+Bioinformatics Institute (EMBL-EBI, UK), Sean Eddy's laboratory 
+(Harvard University, USA) and Eric Nawrocki (NIH, USA).
+We are very keen to hear any feedback, positive or negative, that you 
+may have on Rfam - please contact rfam-help@ebi.ac.uk.
 
 Rfam is freely available and in the public domain under the Creative Commons
 Zero licence. See ftp://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/COPYING for
 more information.
 
+
 2. AVAILABILITY
 
-Rfam is available on the web at the following URL:
+Rfam is available on the web from the following URL:
 
-http://rfam.xfam.org
+http://rfam.org
 
 The database is also available for download in flatfile format from: 
 
@@ -47,346 +49,128 @@ ftp://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/
 Dumps of the relational MySQL database used at the EBI are also available,
 although documentation for this set of files is almost non-existent.
 
-ftp://ftp.ebi.ac.uk/pub/databases/Rfam/12.1/database_files/
+ftp://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/database_files/
+
+Since Rfam 12.1, our database has become publicly available:
+
+http://rfam.readthedocs.io/en/latest/database.html
 
 For local searching the INFERNAL software package is also required:
 
-http://infernal.janelia.org
+http://eddylab.org/infernal/
 
 This release also comes with a publicly accessible readonly version of our database.
 For access information please visit our DB documentation available at:
 
- 
 
 3. NOTABLE CHANGES IN RECENT RELEASES
 
-Release 12.1
+Release 14.1
 ------------
 
-(0) Rfam 12.1 is a point release of Rfam 12.0 with the addition of 20 new families,
-following the same procedure as in Rfam 12.0. 
+(0) Rfam 14.1 is a point release of Rfam 14.0 making available 226 families with the total number of 
+Rfam families adding up to 3,016. In addition, we now display pseudoknots supported by the latest 
+R-scape version 1.2.2. The two main sources of pseudoknots are: manual annotation of pseudoknots in 
+SEED alignments and R-scape predictions. 
 
-(1) 20 new Rfam families have been added to Rfam the types of which may be broken down 
+(1) This new release comprises 226 new families from 5 distinct ncRNA types which are listed below:
+	
+	* 56	Cis-reg;
+	* 2	Cis-reg; leader;
+	* 5	Cis-reg; riboswitch;
+	* 4	Gene; antisense;
+	* 159	Gene; sRNA;
+
+(2) Additional 3D structures were identified for 11 families.
+
+(3) Families RF02440 (ldcC RNA) and RF02840 (Lacto-3 RNA) have been updated using the SEED alignments
+provided by Dr Zasha Weinberg.
+
+
+From release 14.0
+-----------------
+
+(0) Rfam 14.0 is another major release following the transition to the genome-centric
+sequence database. This new release makes available genome annotations on slightly over 
+10,000 species with the addition of 6,519 new species since release 13.0.
+
+(1) This new release comprises 105 new families from 8 distinct ncRNA types which are listed below:
+	
+	* 1     Cis-reg;
+	* 1     Cis-reg; leader;
+	* 1     Cis-reg; riboswitch;
+	* 4     Cis-reg; thermoregulator;
+	* 17    Gene; antisense;
+	* 5     Gene; snRNA; snoRNA; CD-box;
+	* 11    Gene; snRNA; snoRNA; HACA-box;
+	* 65    Gene; sRNA;
+
+(3) Additional structures were identified for 17 families and three new structures were made 
+available one for each family DnaX (RF00382), HIV_PBS (RF00375) and Pab160 (RF02796).  
+
+
+From release 13.0
+-----------------
+(0) Rfam 13.0 is the first major release after 12.0. This release brings back Rfam genomes 
+with a renovated web interface that comes with many new features.
+
+(1) There are no new families in this release apart from the deletion of RF00871 (mir-689)
+following its suppression by miRBase.
+
+(2) Rfam models have been enhanced with the addition of GO terms in 260 more families. 
+
+(3) All seed sequences have been inherited from the old sequence database, therefore the 
+models remained intact. 
+
+(4) New website features have become available, including genome and sequence browsing. 
+
+
+From release 12.3
+-----------------
+
+(0) Rfam 12.3 is another point release of Rfam 12.0 with the addition of 101 new families
+to those released in 12.2. The release procedure followed was as in its preceding releases 
+Rfam 12.0, 12.1 and 12.2.
+
+(1) 101 new Rfam families have been added to Rfam the types of which may be broken down
 as follows:
- * 3  Cis-reg;
- * 4  Gene; antisense;
- * 2  Gene; rRNA;
- * 11 Gene; sRNA;
 
+	* 5	Cis-reg;
+	* 1	Cis-reg; riboswitch;
+	* 21	Cis-reg; thermoregulator;
+	* 8	Gene; antisense; 
+	* 1	Gene; ribozyme;
+	* 7	Gene; snRNA; snoRNA; CD-box
+	* 1	Gene; snRNA; snoRNA; HACA-box
+	* 2	Gene; snRNA; snoRNA; HACA-box;
+	* 5	Gene; snRNA; snoRNA; scaRNA
+	* 1	Gene; sRNA
+	* 49	Gene; sRNA;
 
+(2) From this release onwards clan competition will also be applied on pdb annotations
+to reduce family annotation duplicates on pdb sequences as well. 
 
-From release 12.0
------------------
+(3) New website features have become available with this release. A new unified text 
+search aims at simplifying searching and users are now able to download unaligned 
+family sequences directly from the family pages.   
 
-(0) Rfam 12.0 was built using INFERNAL v1.1. In order to migrate from using
-Infernal 1.0, all families had to be manually rethresholded. Therefore there may
-have been some significant gains/losses in families when compared with Rfam
-11.0. The BLAST prefilters have now been entirely replaced by the internal
-HMM-based filters of INFERNAL. 
+(4) The file used for clan competition will be named Rfam.clanin from this release onwards.
+This is the equivalent of Rfam12.2.claninfo provided in the previous release.
 
-(1) 329 new Rfam families have been added to Rfam. The majority of these are
-bacterial sRNAs. Of particular interest are the new LSU models for archaea,
-bacteria and eukaryotes. Types of the new families may be broken down as follows:
-  * 31  Cis-reg;
-  * 3   Cis-reg; IRES;
-  * 4   Cis-reg; leader;
-  * 2   Cis-reg; thermoregulator;
-  * 7   Gene;
-  * 2   Gene; antitoxin;
-  * 25  Gene; lncRNA;
-  * 13  Gene; miRNA;
-  * 5   Gene; ribozyme;
-  * 4   Gene, rRNA;
-  * 45  Gene; snRNA; snoRNA; CD-box;
-  * 40  Gene; snRNA; snoRNA; HACA-box;
-  * 4   Gene; snRNA; splicing;
-  * 144 Gene; sRNA;
-
-(2) We have removed 22 families from the database. Some families did not survive
-the upgrade to Infernal 1.1. Several lncRNA families have been removed due to
-their position within introns. Details for each family are below:
-
-  * RF01017 (mir-625)     Unspecific model
-  * RF01063 (mir-324)     Unspecific model
-  * RF01112 (UPD-PKg)     Unspecific model
-  * RF01115 (TMV_UPD-PK2) Unspecific model
-  * RF01148 (sR13)        Merged into RF00095
-  * RF01311 (sR8)         Merged into RF01133
-  * RF01372 (CRISPR-DR59) Merged into RF01340
-  * RF01868 (NAMA_1)      Intronic lncRNA
-  * RF01869 (NAMA_2)      Intronic lncRNA
-  * RF01870 (MEG3_1)      Intronic lncRNA
-  * RF01878 (PRINS)       Intronic lncRNA
-  * RF01893 (PCA3_1)      Intronic lncRNA 
-  * RF01907 (HOTAIR_4)    Intronic lncRNA
-  * RF01908 (HOTAIR_5)    Intronic lncRNA
-  * RF01958 (EGOT)        Intronic lncRNA
-  * RF01961 (KCNQ1DN)     Intronic lncRNA
-  * RF01980 (Nkx2-2as)    Intronic lncRNA
-  * RF02152 (MIMT1_2)     Intronic lncRNA
-  * RF02361 (Yfr9)        Merged into RF02360
-  * RF02380 (csRNA2)      Merged into RF02379
-  * RF02381 (csRNA3)      Merged into RF02379
-  * RF02382 (csRNA4)      Merged into RF02379
-  * RF02383 (csRNA5)      Merged into RF02379
-
-(3) As of Rfam 12.0, we no longer provide FULL alignments for each family. As
-the size of our full alignments grew, the overheads involved in creating,
-storing and manipulating them became too great to support. Instead, we provide
-full region lists, which contain the ENA sequence accession, start/end
-coordinates and bitscore for each hit to a family. If you wish to build a FULL
-alignment equivalent to those supplied in previous releases of Rfam, you may do
-so by downloading the CM for a given family and the Rfam sequence database,
-RFAMSEQ (or indeed you may choose to use your own set of sequences). This means
-that some sections of the website are no longer available, such as the option to
-download or view the full alignment for a given family.
-
-(4) Secondary structures have been removed from lncRNA families due to lack of
-supporting evidence
-
-From release 11.0
------------------
-
-(1) 246 new Rfam families have been added to Rfam. The majority of
-    these new families are lncRNA and bacterial sRNAs. Counts for the
-    new families break down into the following types:
-     
-     *	7	Cis-reg;
-     *	23	Gene;
-     *	1	Gene; antisense;
-     *	1	Gene; antitoxin;
-     *	144	Gene; lncRNA;
-     *	11	Gene; miRNA;
-     *	2	Gene; ribozyme;
-     *	1	Gene; snRNA; snoRNA; CD-box;
-     *	56	Gene; sRNA;
-
-
-(2) We have introduced two new sub categories to our family type
-    classifications. The new types have been used for new families and for
-    the reclassification of existing families. The new types are:
-    
-    * Gene; antitoxin; 
-    * Gene; lncRNA; 
-
-(3) 11 families have been removed from the database. Details of the
-    families and reasons for their removal are given below:
-
-    3 families : RF00491 (SVLPA), RF01058 (MIR806) and RF01062
-    (MIR812) were nonspecific models which we were unable to improve.
-
-    1 family: RF01110 (PSLVbeta_UPD-PK2) was reduced to a single
-    sequence after rethresholding and insufficient for model building.
-
-    2 Ciona specific families: RF01187 (snoU83C) and RF01154 (snoU43C)
-    are no longer in the snoRNA databases and no publication evidence
-    for these ncRNA families can be found.
-
-    1 family: RF01086 (LR-PK1) contained protein coding sequence and
-    matched Pfam family PF00707 (IF3_C).
-
-    4 families: RF00982 (mir-200), RF01217 (snoR72Y), RF01657
-    (ceN74-2) and RF01949 (KCNQ1OT1_4 ) - had extensive overlaps with
-    other families and have been merged into RF00241 (mir-8), RF00343
-    (snoZ122), RF01656 (ceN72-3) and RF1947 (KCNQ1OT1_2) respectively.
-    
-(4) We have annotated the genome sequences for 3,110 unique
-    species. These include 101 Eukaryotic, 1747 Bacterial, 123
-    Archaeal and 1139 Viral genomes. This includes the Human GRCh37
-    genome assembly.
-
-(5) 4 new clans have been added CL00103 (SNORD11), CL00104
-    (Hepadnavirus_epsilon), CL00105 (RyeA/RyeB) and CL00106
-    (Csr_Rsm_clan). mir-2 has been removed from the clan CL00083
-    according to Marco (2012) Evolution and function of the extended
-    miR-2 microRNA family RNA Biol 9(3):242-8.
-
-(6) We now provide mappings between Rfam and the ncRNA category of
-    the non redundant database Refseq. For Rfam 11.0 we have generated
-    21283 Rfam annotations to Refseqs (ncRNA) release 53. These
-    mappings are from 860 Rfam families to 12334 different Refseq
-    ncRNAs.
-    
-(7) Due to the increasing size of the nucleotide sequence databases
-    and the resulting increase in the size of our alignments we are
-    now unable to provide complete sequence alignments and trees for
-    our 5 largest families tRNA (RF0005), SSU (RF00177, RF01959,
-    RF0160) and ultra conserved element uc_338 (RF02271). For these
-    families we have provided a full alignment that is composed of
-    SEED and genome sequences only. The entries for these families in
-    the files: Rfam.fasta, Rfam.full and Rfam_full.tree are based on
-    these reduced genome alignments.  We do however provide a fasta
-    file containing the complete WGS+STD annotations for each family
-    on our ftp site (see below for release files). The number of
-    sequences annotated in the reduced genome alignments and complete
-    WGS_STD alignments:
-
-       	       genome_alignment	   WGS_STD_alignment
-    RF00005    298470		   2106268
-    RF00177    7429		   744528
-    RF01959    7394		   881056
-    RF01960    425		   65901
-    RF02271    857		   229907
-
-(8) There are PDB mappings for 62 Rfam families covering 2287 unique
-     PDB entries (2325 PDB chains). Our PDB mappings to tRNA and SSU
-     sequences will be affected by the reduced alignments for these
-     families.
-
-(9) We have updated our family GO annotations and we now have 2750
-    annotations associated with 1444 Rfam families. We also have 2218
-    SO annotations and all families have at least one associated SO
-    term.
-
-(10) We now provide a graphical overview of the species distributions
-     of a family using a "sunburst" representation. The new sunburst
-     interface should be intuitive and provide a more flexible access
-     point for users to select specific species or taxonomic groups of
-     sequences from a family alignment.
-
-(11) We have implemented a Biomart to enable users to perform more
-     sophisticated and complex queries on Rfam data. The Biomart may
-     be found at http://xfam-biomart.sanger.ac.uk
-
-From release 10.1
- ----------------- 
-
-(1) 528 new Rfam families have been added to Rfam. The new families
-     include group II introns domains 1-4, Toxin-antitoxin systems,
-     frame-shift elements, miRNAs, lncRNA models (eg. MEG3, MALAT1,
-     MIAT, PRINS, Xist, TUG1, HSR-omega, Evf1, HOTAIR, KCNQ1OT1,
-     SOX2OT, NEAT1, EGOT, H19, HOTAIRM1), and insertion element PYLIS
-     and SECIS. Counts for the new families break down into the
-     following types:
-        
-	* 134 	 Cis-reg;
-        * 1 	 Cis-reg;leader;
-        * 10 	 Cis-reg;riboswitch;
-        * 4 	 Cis-reg;thermoregulator;
-        * 111 	 Gene;
-        * 7 	 Gene;antisense;
-        * 2 	 Gene;ribozyme;
-        * 2 	 Gene;rRNA;
-        * 2 	 Gene;snRNA;
-        * 79 	 Gene;snRNA;snoRNA;CD-box;
-        * 68 	 Gene;snRNA;snoRNA;HACA-box;
-        * 1 	 Gene;snRNA;splicing;
-        * 98 	 Gene;sRNA;
-        * 1 	 Gene;tRNA;
-        * 8 	 Intron;
-
-(2)  Family RF00120 (C0343) has been removed as there is strong
-     evidence that this family is actually protein coding. See
-     Washietl et al. (2011) RNAcode. 
-(3)  Our Small Subunit (SSU) ribosomal model RF00177 has been split into
-     SSU_rRNA_bacteria (RF00177), SSU_rRNA_archaea (RF01959) and
-     SSU_rRNA_eukarya (RF01960). The improved longer models and alignments
-     were derived from Robin Gutell's Comparative RNA web-resource
-     (http://www.rna.ccbb.utexas.edu/).  The full alignments were built
-     using ssu-align (http://selab.janelia.org/software.html).
-(4)  Our Signal Recongition Particle (SRP) models have been rebuilt
-     according to Rosenblad et al (2009) Kinship in the SRP RNA family
-     RNA Biol.6:508-16. We now have 7 SRP families: Metazoa_SRP
-     (RF00017), Bacteria_small_SRP (RF00169), Fungi_SRP (RF01502)
-     Bacteria_large_SRP (RF01855), Plant_SRP (RF01855), Protozoa_SRP
-     (RF01856), Archaea_SRP (RF01857). These new models should improve
-     specificity and reduce pseduogene annotation.
-(5)  3 new clans have been added U3 (CL00100), Cobalamin (CL00101) and
-     group-II-D1D4 (CL00102). Membership of the clans tRNA (CL00001),
-     RNaseP (CL00002) and SNORA62 (CL00040) have been updated. 
-(6) There are genome mappings for 1,723 unique species. These include
-     65 Eukaryotic, 840 Bacterial, 63 Archaeal and 755 Viral
-     genomes. This includes the latest Human GRCh37 genome assembly.
-(7)  There are PDB mappings for 50 Rfam families covering 795 unique
-     PDB entries. The total number of PDB regions we cover is 2,340.
-(8)  Several problematic microRNA families mir-544 (RF01045),
-     mir-1302(RF00951), mir-1255(RF00994), mir-548 (RF01061), mir-649
-     (RF01029), mir-562 (RF00998) and spliceosomal U13 (RF01210) were
-     rethresholded to remove the excessive number of pseudogene
-     annotations in the full alignments. This rethresholding along
-     with the rebuilding of our SSU models have removed ~600,000
-     annotations from Rfam.
-
-From release 10.0
------------------
-
-(1)  The underlying sequence database (RFAMSEQ) has been updated,
-     including the STD, WGS and ENV sections of EMBL 100. This database
-     contains 170 Giga-bases of sequence, from more than 55 million
-     sequences.
-(2)  All the CMs have been built and searched using Infernal 1.0. Each
-     family has been individually re-thresholded to accomodate the
-     new models.
-(3)  74 new families have been added. Including several S. pombe
-     snoRNAs.
-(4)  99 clans have been added to the database. This is another concept
-     borrowed from Rfam's sister database, Pfam. Any families that are
-     clearly homologous yet are too divergent to be aligned together
-     are now explicitly connected (but not aligned) by inclusion in a
-     clan. Each clan is annotated with references and evidence for
-     homology.
-(5)  There are genome mappings for 1,682 unique species. These include
-     66 Eukaryotic, 827 Bacterial, 63 Archaeal and 726 Viral
-     genomes. This includes the latest Human GRCh37 genome assembly.
-(6)  There are PDB mappings for 43 Rfam families covering 633 unique
-     PDB entries. The total number of PDB regions we cover is 2,425.
-(7)  We have added a new set of alignments to the database (accessible
-     via the website). These use sequence labels derived from species
-     names rather than EMBL accessions and coordinates. In order to
-     ensure that the provenance of each sequence can still be
-     determined, the original labels have been included using "#=GS"
-     tags. These are also available as HTML formatted files, produced
-     using Ian Holmes' colorstock.pl script.
-(8)  The secondary structure images have updated, now including 5' and
-     3' labels. Structure images rendered by VARNA should also be
-     available on the website.
-(9)  Sequence ontology (SO) and gene ontology (GO) mappings have been
-     generated for each family, thanks in large part to the work at
-     fRNAdb.
-(10) Updated links to the snoRNA orthological gene database (snOPY). 
-
-From release 9.1
-----------------
-
-(1) 768 new rfam families have been added to Rfam. Counts for the new
-    families break down into the following types:
-        * 56   Cis-reg;
-        * 5    Cis-reg;riboswitch;
-        * 9    Gene;
-        * 65   Gene;CRISPR;
-        * 408  Gene;miRNA;
-        * 1    Gene;rRNA;
-        * 30   Gene;sRNA;
-        * 144  Gene;snRNA;snoRNA;CD-box;
-        * 50   Gene;snRNA;snoRNA;HACA-box;
-(2) Genome mappings for 1,130 species are now avaiable from the browse
-    page. These are complete with GFFs.
-(3) Mappings to PDB tertiary structure are provided where applicable.
-
-From release 9.0
-----------------
-
-(1) The underlying sequence database (RFAMSEQ) has been updated, now
-    including WGS and ENV sections of EMBL 92.
-(2) More than 370 families have been iterated, improving the species
-    depth and sequence coverage of these models. Four families have
-    been merged or killed. 
-(3) A new catalyst-based website has been developed.
-(4) Phylogenetic trees have been computed for each family.
-(5) New secondary structure views are available.
 
 4. FILES
-As of Rfam 12.0
+
+As of Rfam 14.1
 ---------------
 README                 - this file
 COPYING                - some legal things
 USERMAN                - a description of the Rfam flatfile formats
-Rfam.tar.gz             - a concatenated set of Rfam covariance models in ascii INFERNAL 1.1 format
+Rfam.tar.gz            - a concatenated set of Rfam covariance models in ascii INFERNAL 1.1 format
 Rfam.seed.gz	       - annotated seed alignments in STOCKHOLM format
 Rfam.full_region.gz    - list of sequences which make up the full family
                          membership for each family. Fields are as follows:
                          1. RF00001 is the Rfam accession
-                         2. EU093378.1 is the EMBL accession and version number
+                         2. EU093378.1 is the sequence accession and version number
                          3. Start coordinate of match on sequence
                          4. End coordinate of match on sequence
                          5. Bitscore
@@ -396,111 +180,57 @@ Rfam.full_region.gz    - list of sequences which make up the full family
                          9. If match is a truncated match to CM, this field is 1
                          10. Type is either seed or full
 Rfam.seed_tree.tar.gz  - annotated tree files for each seed alignment [tarbomb]
-Rfam.pdb.gz        - tab delimited mappings of pdb seqs to Rfam families. 
+Rfam.pdb.gz            - tab delimited mappings of pdb seqs to Rfam families. 
+Rfam.clanin	       - This file lists the families which belong to the same clan. To be
+		       used with --clanin option of Invernal's v1.1.2 cmscan tool to remove
+		       region overlaps among the hits.
 	
 database_files:
-        alignment_and_tree.txt.gz
-        clan.txt.gz
-        clan_database_link.txt.gz
-        clan_literature_reference.txt.gz
-        clan_membership.txt.gz
-        database_link.txt.gz
-        db_version.txt.gz
-        dead_clan.txt.gz
-        dead_family.txt.gz
-        family.txt.gz
-        family_literature_reference.txt.gz
-        family_ncbi.txt.gz
-        features.txt.gz
-        full_region.txt.gz
-        html_alignment.txt.gz
-        keywords.txt.gz
-        literature_reference.txt.gz
-        matches_and_fasta.txt.gz
-        motif.txt.gz
-        motif_database_link.txt.gz
-        motif_family_stats.txt.gz
-        motif_file.txt.gz
-        motif_literature.txt.gz
-        motif_matches.txt.gz
-        motif_pdb.txt.gz
-        motif_ss_image.txt.gz
-        pdb_full_region.txt.gz
-        rfamseq.txt.gz
-        secondary_structure_image.txt.gz
-        seed_region.txt.gz
-        sunburst.txt.gz
-        tables.sql
-        taxonomy.txt.gz
-        taxonomy_websearch.txt.gz
-        version.txt.gz
-        wikitext.txt.gz
+        		alignment_and_tree.txt.gz
+        	       	clan.txt.gz
+        		clan_database_link.txt.gz
+        		clan_literature_reference.txt.gz
+        		clan_membership.txt.gz
+        		database_link.txt.gz
+        		db_version.txt.gz
+        		dead_clan.txt.gz
+        		dead_family.txt.gz
+        		family.txt.gz
+        		family_literature_reference.txt.gz
+        		family_ncbi.txt.gz
+        		features.txt.gz
+        		full_region.txt.gz
+			genome.txt.gz
+			genseq.txt.gz
+        		html_alignment.txt.gz
+        		keywords.txt.gz
+        		literature_reference.txt.gz
+        		matches_and_fasta.txt.gz
+        		motif.txt.gz
+        		motif_database_link.txt.gz
+        		motif_family_stats.txt.gz
+        		motif_file.txt.gz
+        		motif_literature.txt.gz
+        		motif_matches.txt.gz
+        		motif_pdb.txt.gz
+        		motif_ss_image.txt.gz
+        		pdb_full_region.txt.gz
+        		rfamseq.txt.gz
+        		rnacentral_matches.txt.gz
+        		secondary_structure_image.txt.gz
+        		seed_region.txt.gz
+        		sunburst.txt.gz
+        		tables.sql
+        		taxonomy.txt.gz
+        		taxonomy_websearch.txt.gz
+        		version.txt.gz
+        		wikitext.txt.gz
 
-Previous releases of Rfam
--------------------------
-README                 - this file
-COPYING                - some legal things
-USERMAN                - a description of the Rfam flatfile formats
-Rfam.cm.gz             - a concatenated set of Rfam covariance models in ascii INFERNAL format
-Rfam.cm.1_1.gz	       - a concatenated set of the covariance models converted to Infernal 1.1 format
-Rfam.seed.gz	       - annotated seed alignments in STOCKHOLM format
-Rfam.full.gz	       - annotated full alignments in STOCKHOLM format
-Rfam.fasta.gz	       - fasta sequences of Rfam members filtered to <90% identity, 
-		         The fields in the fasta headers for eg. ">RF00001;5S_rRNA;L27170.1/1-122   29282:Haloarcula japonica" are:
-			 1. RF00001 is the Rfam Accession
-			 2. 5S_rRNA is the Rfam Identifier
-			 3. L27170.1 is the EMBL Accession and version number (1)
-			 4. 1-122 gives the start (1) and stop (122) coordinate for the region annotated by 
-			    Rfam. The strand is determined by the order of the coordinates.
-			 5. 29282 is the NCBI taxonomy ID
-			 6. Haloarcula japonica is the species name
-Rfam.qc.gz	       - sequence and structure QC measures for each family	
-Rfam.full_tree.tar.gz  - annotated tree files for each full alignment [tarbomb]
-Rfam.seed_tree.tar.gz  - annotated tree files for each seed alignment [tarbomb]
-genome.gff3.tar.gz     - set of GFF files for each genomic element annotated by Rfam.
-Rfam_pdbmap.dat        - tab delimited mappings of pdb seqs to Rfam families. 
-		       
-database_files:
-	alignments_and_trees.txt.gz
-	chromosome_build.txt.gz
-	clan_database_links.txt.gz
-	clan_literature_references.txt.gz
-	clan_membership.txt.gz
-	clans.txt.gz
-	dead_families.txt.gz
-	features.txt.gz
-	genome_entry.txt.gz
-	genome_gff.txt.gz
-	genome_summary.txt.gz
-	html_alignments.txt.gz
-	literature_references.txt.gz
-	pdb_rfam_reg.txt.gz
-	rfam.txt.gz
-	rfam_CM.txt.gz
-	rfam_refseq.txt.gz
-	rfam_database_links.txt.gz
-	rfam_keywords.txt.gz
-	rfam_literature_references.txt.gz
-	rfam_ncbi.txt.gz
-	rfam_reg_full.txt.gz
-	rfam_reg_seed.txt.gz
-	rfamseq.txt.gz
-	secondary_structure_images.txt.gz
-	tables.sql
-	taxonomy.txt.gz
-	taxonomy_websearch.txt.gz
-	wikitext.txt.gz
-	VERSION.txt.gz
-
-large_family_files: For the 5 large families (RF00005, RF00177,
-	RF01959, RF01960, RF02271) we have provided fasta files and
-	associated data files for the FULL alignments containing all
-	of the WGS and STD region annotations.  WGS_STD.align.fa.gz
-	WGS_STD.scores.gz WGS_STD.out.list.gz WGS_STD.species.gz.
-
-rfam_scan: rfam_scan.pl - a perl script for annotating
-	sequence files on your local machine(s). Rfam.cm.gz and
-	Rfam.fasta.gz are required, as is blast and bioperl.
+fasta_files    	- These fasta files contain ncRNA sequences identified in the collection 
+		of non-redundant and representative complete genomes. The sequences 
+		are organised by family accession. For example, fasta file RF00001.fa.gz
+		contains all 5S ribosomal RNA sequences identified in Rfamseq14.  
+				   
 
 5. HISTORY
 
@@ -520,37 +250,55 @@ Version     Date        # families    # regions      Rfamseq
   6.1       07/04          379         287512        EMBL 78
   7.0       03/05          503         362959        EMBL 80
   8.0       02/07          574         273989        EMBL 84
-  8.1       10/07	   607         277523        EMBL 84
+  8.1       10/07	   	   607         277523        EMBL 84
   9.0       07/08          603         636138        EMBL 92
-  9.1	    12/08	  1372	      1148236	     EMBL 92
- 10.0	    01/10	  1446	      3192596	     EMBL 100
- 10.1       06/11	  1973	      2756313	     EMBL 100
- 11.0	    08/12	  2208	      6125803	     EMBL 110	
- 12.0       09/14         2450       19623515        EMBL 110
+  9.1	    12/08	  	  1372	      1148236	     EMBL 92
+ 10.0	    01/10	  	  1446	      3192596	     EMBL 100
+ 10.1       06/11	  	  1973	      2756313	     EMBL 100
+ 11.0	    08/12	  	  2208	      6125803	     EMBL 110	
+ 12.0	    09/14         2450       19623515        EMBL 110
+ 12.1		04/16		  2473		 19639727	  	 EMBL 110
+ 12.2		01/17		  2588		 19652424		 EMBL 110
+ 12.3		06/17		  2687		 19636279		 EMBL 110
+ 13.0		09/17		  2686		  2487655		 ENA 132
+ 14.0		08/18		  2791		  2917933		 ENA 133/134
+ 14.1		01/19		  3016		  2917933		 ENA 133/134
+ 	
 6. GENOME ANNOTATION
 
 The Rfam library of covariance models can be used to search sequences
 (including whole genomes) for homologues to known non-coding RNAs, in
-conjunction with the INFERNAL software.  This seems to work
-particularly well for bacterial genomes, but there are some important
-drawbacks to this approach for larger genomes, particularly
-vertebrates.  The most important of these is our current inability to
-computationally distinguish ncRNA derived pseudogenes and repeat
-elements from real ncRNA genes.  If you intend to annotate large
-eukaryotic genomes using Rfam you should first read the help pages on
-the Rfam websites.
+conjunction with the INFERNAL software. From this release onwards, Rfam 
+will be providing annotations on a continuously increasing collection of
+reference genomes, imported from various resources such as Uniprot, Ensembl, 
+Ensembl Genomes and NCBI. For more information on how to annotate genomes 
+and RNA sequences, please read "Genome annotation" section on Rfam Help
+(http://rfam.readthedocs.io/en/latest/genome-annotation.html). 
+
 
 7. RFAMSEQ
 
-RFAMSEQ is built from a subset of the EMBL nucleotide database
-(available from ftp://ftp.ebi.ac.uk/pub/databases/embl/release/).  We
-use the STD and WGS data classes and exclude the SYN, PAT and TGN
-divisions.
+RFAMSEQ is majorly built from a small fragment of the EMBL nucleotide Archive (ENA). 
+As ENA grew almost one order of magnitude larger in size, instead of using the STD 
+and WGS data classes, Rfam now "filters" those a step further, by focusing only on 
+reference genomes provided by Uniprot. The current version of RFAMSEQ release 14.0 
+is composed of a total of 14,451 genomes and it will keep increasing continuously 
+with new species added to the genome collection.
 
 8. HOW TO CITE RFAM
 
 If you make use of Rfam in your work we ask that you cite the
 following publications:
+
+I. Kalvari, J. Argasinska, N. Quinones-Olvera, E.P. Nawrocki, E. Rivas, 
+S.R. Eddy, A. Bateman, R.D. Finn and A.I. Petrov
+Rfam 13.0: shifting to a genome-centric resource for non-coding RNA families
+Nucleic Acids Res. 2017 Sep;
+
+E.P. Nawrocki, S.W. Burge, A. Bateman, J. Daub, R.Y. Eberhardt, S.R. Eddy, 
+E.W. Floden, P.P. Gardner, T.A. Jones, J.T. and R.D. Finn
+Rfam 12.0: updates to the RNA families database
+Nucleic Acids Res. 2014 Nov;
 
 Burge SW, Daub J, Eberhardt R, Tate JG, Barquist L, Nawrocki E, Eddy S, Gardner
 PP, Bateman A
@@ -562,7 +310,7 @@ Wilkinson AC, Finn RD, Griffiths-Jones S, Eddy SR, Bateman A
 Rfam: updates to the RNA families database.
 Nucleic Acids Res. 2008 Oct;
 
-Daub J, Gardner PP, Tate J, Ramsköld D, Manske M, Scott WG,
+Daub J, Gardner PP, Tate J, RamskË†ld D, Manske M, Scott WG,
 Weinberg Z, Griffiths-Jones S, Bateman A
 The RNA WikiProject: Community annotation of RNA families.
 RNA. 2008 Dec; 14:(12)2462-2464
