@@ -20,6 +20,13 @@ from snakemake.logging import logger
 
 TRUTH = ['True', True, 'true', 'TRUE', 'T']
 
+def get_string_from_opts(options):
+    """ turn a series of command line options into a naming string
+        drops whitespace and turns dashes into dots """
+    return re.sub(' ', '',
+                  re.sub('-', '.',
+                         options))
+
 
 def is_in_working_dir(path):
     """

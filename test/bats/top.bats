@@ -63,4 +63,13 @@ setup() {
     [ "${lines[0]}" -lt 75 ]
 }
 
-
+@test "Find SSU hits in a database" {
+    rm -rf test/scratch/top.ssu
+    mkdir -p test/scratch/top.ssu
+    cd test/scratch/top.ssu
+    run bash -c "snakemake -s ../../../annotation.tophits.snake --configfile ../../data/configs/reads.top.SSU.yaml -p -k -j 5 > top.annot.log 2>&1"
+    [ "$status" -eq 0 ]
+    run bash -c "snakemake -s ../../../annotation.tophits.snake --configfile ../../data/configs/reads.top.SSU.yaml -p -k -n 2>&1 | grep '^Nothing'"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" == "Nothing to be done." ]
+}

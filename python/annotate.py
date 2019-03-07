@@ -2,8 +2,11 @@
 Functions for the annotation workflows
 """
 import os
+import re
+from snakemake.logging import logger
 
 def get_db_types(config):
+    """ returns vailable db types """
     gene_family_dbs = []
     taxdb = None
     for db in config['dbs']:
@@ -113,3 +116,58 @@ def get_db_frag_template(full_hmm, n_frags):
 def get_db_frags(full_hmm, n_frags):
     template = get_db_frag_template(full_hmm, n_frags)
     return [template.format(N) for N in range(1, n_frags+1)]
+
+##
+# rRNA/Silva
+
+BLANK_FILE_NAME = ".empty.file"
+RNA_SEARCH_HITS_TEMPLATE = \
+    "contigs.all.vs.rRNA.cmsearch.{rmol}.gt{length}.gff.vs.{db_dot_fmt}"
+
+def get_rna_search_hits(wildcards, config,
+                        blank_file_name=BLANK_FILE_NAME,
+                        rna_search_hits_template=RNA_SEARCH_HITS_TEMPLATE,
+                       ):
+    """ return search result that matches
+    rmol (SSU or LSU) in wildcards.mol"""
+    database = find_db_by_mol(wildcards.rmol, config)
+    if database is not None:
+        db_data = config['dbs'][database]
+        fmt = db_data.get('format', 'lastdb')
+        fmt = get_last_alg(fmt, 'fna')
+        db_dot_fmt = "{}.{}".format(database, fmt)
+        hits_file = rna_search_hits_template \
+                                    .format(db_dot_fmt=db_dot_fmt,
+                                            length=wildcards.length,
+                                            rmol=wildcards.rmol)
+        logger.debug("returning " + hits_file)
+        return hits_file
+    logger.debug("returing blank file")
+    return blank_file_name
+
+def get_rna_id_names_file(wildcards, config, \
+                          blank_file_name=BLANK_FILE_NAME):
+    """ get the .ids file from the Silva db
+        # if rRNA DBs configured, this is a map to id/desc dict
+        # otherwise put blank place holder """
+    database = find_db_by_mol(wildcards.rmol, config)
+    if database is not None:
+        path = get_db_ids_file(database, config)
+        logger.debug("returning " + path)
+        return path
+    logger.debug("returing blank file")
+    return blank_file_name
+
+def find_db_by_mol(mol, config):
+    " search the configured dbs for given rRNA molecule db "
+    for database, db_data in config.get('dbs', {}).items():
+        if db_data.get('type') == 'rrna':
+            if re.search(mol, database):
+                return database
+    return None
+
+def get_db_ids_file(database, config):
+    "get the ids file for a db. check db['ids'] then add .ids to path"
+    if 'ids' in config['dbs'][database]:
+        return config['dbs'][database]['ids']
+    return config['dbs'][database]['path'] + ".ids"

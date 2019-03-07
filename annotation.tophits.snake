@@ -14,10 +14,14 @@ Finally
  * compile a table of hit counts by sample
 
 """
-import re
-from python.common import get_version
+import re, pandas
+from python.common import get_version, apply_defaults, get_file_name
 from python.tophit import get_top_hit_outputs, get_non_rna_reads, get_get_ids_cmd
+from python.annotate import get_db_ids_file
 from snakemake.logging import logger
+
+defaults = {'filter': {'F': 0, 'B': 50}} 
+apply_defaults(config, defaults)
 
 needs_qc = get_top_hit_outputs(config)
 if needs_qc:
@@ -27,8 +31,8 @@ outputs = config.setdefault('outputs',set())
 logger.debug(config)
 
 include: 'common/stats.snake'
-
 include: "annotation/lastal.snake"
+include: "annotation/bwa.snake"
 include: "common/fastq.snake"
 include: "common/transitions.snake"
 
@@ -46,7 +50,7 @@ rule all:
 
 filter_params_patt=r'(?:_([a-zA-Z])(-?[0-9.]+))'
 filter_params_rexp=re.compile(filter_params_patt)
-rule filter_m8:
+rule filter_hits:
     input: '{file_root}.{alg}'
     output: '{file_root}.{alg}.{params}'
     wildcard_constraints:
@@ -76,39 +80,26 @@ rule assign_top_hits:
         get_version('assign_top_hit.py')
     params:
         fmt=lambda w: 'blast' if re.search('last', w.alg) else w.alg,
+        # assign_top_hit will interperet -o as a suffix if >1 file given
+        output=lambda w: '.' + w.top if len(config['sample_data']) > 1 \
+                   else ' '.join(
+                            expand('{sample}.vs.{db}.{alg}.{filter}.{top}', \
+                                   db=w.db, alg=w.alg, top=w.top, \
+                                   filter=w.filter, \
+                                   sample=config['sample_data'])) 
     shell:
         "assign_top_hit.py -f {params.fmt} -C {wildcards.top} \
-        -o .{wildcards.top} {input}"
+        -o {params.output} {input}"
 
-rule count_hits:
-    """ take a hit table and count hits to each hitid 
+rule remove_rRNA_hits:
+    """ remove rRNA reads from count table (only works for fastq input)
+    We do this post search, so the RNA filtering can happen in parallel
+    with the database search. (cmsearch is slow compared to last & bwa)
     
-    if {rna} in the output file is non-rRNA,
-        use the ".non-rRNA" version of the top hits
-    if {rna} in the output file is "all":
-        use the full top hits file (no suffix)
+    If your data has a high percentage rRNA reads, consider filtering
+    before starting this workflow (and using remove_rna=False).
     """
-    input:
-        lambda w: '{sample}.{search}.{top}{rna}'.format(
-            sample=w.sample,
-            search=w.search,
-            top=w.top,
-            rna="" if w.rna == 'all' else '.' + w.rna,
-        )
-    output:
-        '{sample}.{search}.{top}.{rna}.hitid.counts'
-    benchmark:
-        "benchmarks/{sample}.{search}.{top}.{rna}.count.time"
-    log:
-        "logs/{sample}.{search}.{top}.{rna}.count.log"
-    version:
-        get_version("count_hits.py")
-    shell:
-        "count_hits.py -v -i {input} -H 1 \
-        > {output} 2> {log}"
 
-rule filter_hits:
-    """ remove rRNA reads from count table (only works for fastq input)"""
     input:
         hits='{sample}.{search}.{top}',
         nonrna=lambda w: get_non_rna_reads(w, config)
@@ -121,44 +112,63 @@ rule filter_hits:
              -l <({params.get_ids_cmd}) > {output}"
 
 rule compile_hit_counts:
-    """
-    Uses pandas to outer join hit counts. The {rna} wildcard is 
-    expected to be "non-rRNA" or "all".
+    """ take hit tables and count hits to each hitid 
+    
+    if {rna} in the output file is non-rRNA,
+        use the ".non-rRNA" version of the top hits
+    if {rna} in the output file is "all":
+        use the full top hits file (no suffix)
+
+    Uses count_taxa.py to count filtered hit tables
     """
     input:
-        lambda w: expand('{sample}.{filter}.{top}.{rna}.hitid.counts',
-                         filter=config['db_strings'][w.db],
+        lambda w: expand('{sample}.{search}.{top}{rna}',
+                         sample=config['sample_data'],
+                         search=config['db_strings'][w.db],
                          top=w.top,
-                         rna=w.rna,
-                         sample=config['sample_data'])
+                         rna="" if w.rna == 'all' else '.' + w.rna)
     output:
         'counts.{db}.{top}.{rna}.hitids'
     params:
-        input_map=lambda w: {s:'{sample}.{filter}.{top}.{rna}.hitid.counts'\
-                                .format(sample=s,
-                                        top=w.top,
-                                        rna=w.rna,
-                                        filter=config['db_strings'][w.db]) \
-                             for s in config['sample_data']},
+        input=lambda w: ' '.join('{s}={s}.{search}.{top}{rna}'.format(
+                                 s=sample,
+                                 search=config['db_strings'][w.db],
+                                 top=w.top,
+                                 rna="" if w.rna == 'all' else '.' + w.rna) \
+                             for sample in config['sample_data']),
+        fmt=lambda w: 'blast' \
+                        if re.search('last', config['dbs'][w.db]['format']) \
+                        else 'sam',
+    version:
+        get_version("count_taxa.py")
+    log:
+        'logs/counts.{db}.{top}.{rna}.hitids.log'
     benchmark:
         'benchmarks/counts.{db}.{top}.{rna}.hitidis.time'
+    shell:
+        'count_taxa.py {params.input} -f {params.fmt} -v > {output} 2> {log}'
+
+rule translate_and_collapse_counts:
+    input:
+        counts='counts.{db}.{top}.{rna}.hitids',
+        id_map=lambda w: get_db_ids_file(w.db, config)
+    output: 'counts.{db}.{top}.{rna}.translated'
+    benchmark: 'benchmarks/counts.{db}.{top}.{rna}.translate.time'
     run:
-        import pandas, re
-        for sample, input_file in params.input_map.items():
-            sample_counts = pandas.read_table(input_file, 
-                                              index_col=0,
-                                              names=[sample,])
-            try:
-                counts = counts.join(sample_counts, how='outer')
-            except NameError:
-                counts = sample_counts
-        counts.to_csv(output[0], sep='\t')
+        counts = pandas.read_csv(get_file_name(input.counts),
+                                 sep='\t',
+                                 header=0, index_col=0)
+
+        hit_id_map = {}
+        with open(input.id_map) as IDS:
+            for line in IDS:
+                hitid, description = line.split(None, 1)
+                if hitid in counts.index:
+                    hit_id_map[hitid] = description.strip()
+
+        counts['descriptions'] = [hit_id_map.get(h, h) for h in counts.index]
+
+        counts.groupby('descriptions').agg(sum).to_csv(get_file_name(output),
+                                                       sep='\t')
 
 
-
-
-
-###TODO: how can we assign top hit accross all samples, yet leave the separate
-#files???
-# * assign_tophits.py will take multiple files. We need to modify the
-#   rule to take advantage of this...

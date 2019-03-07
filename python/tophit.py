@@ -4,13 +4,12 @@ Methods for setting up top hit workflow
 get_top_hit_outputs: populates the outputs and transitions config dicts based
 on the values in 'reads', 'dbs', 'filter', and 'top_alg'
 """
-import os, re
+import os
+import re
 from snakemake.logging import logger
 from python.samples import process_sample_data
 from python.qc import setup_qc_outputs
 from python.annotate import get_last_alg
-
-DEFAULT_FILTER = {'F': 0, 'B': 50}
 
 def get_top_hit_outputs(config):
     """
@@ -27,10 +26,13 @@ def get_top_hit_outputs(config):
         filter: dict of filter_blast_m8 options (eg: {F: 0, I: 90})
         top_alg: tophit or toporg (all dbs must include tax files for taxorg)
     """
-    config.setdefault('transitions', {})
-    config.setdefault('outputs', set())
+
+    # set up some empty collections in the config object to store data in
+    transitions = config.setdefault('transitions', {})
+    outputs = config.setdefault('outputs', set())
     db_strings = config.setdefault('db_strings', {})
 
+    # we MUST have sample_data to proceed
     try:
         sample_data = config['sample_data']
     except KeyError:
@@ -38,26 +40,27 @@ def get_top_hit_outputs(config):
                         "for finding them in "
                         "config[sample_data]")
 
-    # process any patterns in sample_data[reads_patterns]
-    samples = process_sample_data(sample_data, config)
-    if len(samples)==0:
-            raise Exception("Please supply a list of samples and reads in "
-                            "config[sample_data] or rules for finding them "
-                            "in config[sample_data][reads_patterns]")
-
-    # if any samples don't have cleaned reads, try setting up QC
-    if sum(1 for s in samples if 'clean' not in sample_data[s]) > 0:
-        cleaned_reads_list = setup_qc_outputs(config)
-        config['outputs'].update(cleaned_reads_list)
-        needs_qc = True
-    else:
-        needs_qc = False
-
+    # There MUST be some databases configured
     try:
         dbs = config['dbs']
     except KeyError:
         raise Exception("There must be a map of databases called 'dbs' in "
                         "your configuration!")
+
+    # process any patterns in sample_data[reads_patterns]
+    samples = process_sample_data(sample_data, config)
+    if len(samples) == 0:
+        raise Exception("Please supply a list of samples and reads in "
+                        "config[sample_data] or rules for finding them "
+                        "in config[sample_data][reads_patterns]")
+
+    # if any samples don't have cleaned reads, try setting up QC
+    if sum(1 for s in samples if 'clean' not in sample_data[s]) > 0:
+        cleaned_reads_list = setup_qc_outputs(config)
+        outputs.update(cleaned_reads_list)
+        needs_qc = True
+    else:
+        needs_qc = False
 
     # setup starting point for reads for each sample
     is_prot = None
@@ -87,19 +90,29 @@ def get_top_hit_outputs(config):
         logger.debug("{} becomes {}".format(extension, base_ext))
         config['transitions']['{sample}{base_ext}'.format(**vars())] = reads_file
 
-    # set up databases
+    # set up databases and final counts files for each database
     for dbase in dbs:
         logger.debug('processing database: ' + dbase)
         search_alg = get_last_alg(dbs[dbase]['format'], is_prot)
-        hit_filter = get_filter_string(config.get('filter', DEFAULT_FILTER))
+        hit_filter = get_filter_string(config['filter'])
         db_strings[dbase] = \
-                'vs.{dbase}.{search_alg}.{hit_filter}'.format(**vars())
+                'vs.{dbase}.{search_alg}.{hit_filter}'.format(
+                    dbase=dbase,
+                    search_alg=search_alg,
+                    hit_filter=hit_filter,
+                )
         topalg = config.get('top_alg', 'tophit')
-        config['outputs'].add('counts.{dbase}.{topalg}.all.hitids'.format(**vars()))
-        if config.get('remove_rna'):
-            # also do counts without rRNA reads
-            config['outputs'].add('counts.{dbase}.{topalg}.non-rRNA.hitids'.format(**vars()))
-        logger.debug('added counts.{dbase}.{topalg}.hitids to outputs'.format(**vars()))
+        rna_str = 'non-rRNA' if config.get('remove_rna') else 'all'
+        suffix = 'translated' if config.get('translate_ids') \
+                else 'hitids'
+        outputs.add('counts.{dbase}.{topalg}.{rna_str}.{suffix}'.format(
+            dbase=dbase,
+            topalg=topalg,
+            rna_str=rna_str,
+            suffix=suffix,
+        ))
+        logger.debug('added counts.{dbase}.{topalg}.hitids to outputs'
+                     .format(**vars()))
 
     return needs_qc
 
@@ -111,16 +124,15 @@ def get_filter_string(filter_dict):
                    for k in sorted(filter_dict.keys()))
 
 def get_non_rna_reads(wildcards, config):
+    " get non-rRNA read file "
     cleaned_reads = config['sample_data'][wildcards.sample]['clean']
     return re.sub(r'\.(fast[aq])$', r'.non-rRNA.\1', cleaned_reads)
 
 def get_get_ids_cmd(wildcards, config):
+    " return bash command to get IDs from fasta file "
     nonrna = get_non_rna_reads(wildcards, config)
     if nonrna.endswith('fasta'):
         return "grep '^>' {nonrna} | \
                  perl -pe 's/^>(\\S+).*/\\1/'".format(nonrna=nonrna)
-    else:
-        return "gawk '(NR+3) % 4 == 0' {nonrna} | \
-                 perl -pe 's/^@(\\S+).*/\\1/'".format(nonrna=nonrna)
-
-
+    return "gawk '(NR+3) % 4 == 0' {nonrna} | \
+             perl -pe 's/^@(\\S+).*/\\1/'".format(nonrna=nonrna)

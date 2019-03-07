@@ -3,40 +3,12 @@ include: "../annotation/bwa.snake"
 from python.common import get_file_name
 
 # available rRNA DBs
-from python.annotate import get_last_alg
+from python.annotate import get_last_alg, get_rna_id_names_file, \
+                            get_rna_search_hits
 
 blank_file_name = ".empty.file"
 rna_search_hits_template = \
     "contigs.all.vs.rRNA.cmsearch.{rmol}.gt{length}.gff.vs.{db_dot_fmt}"
-
-def get_rna_search_hits(w):
-    """ return search result that matches rmol (SSU or LSU) """
-    for db, db_data in config.get('dbs',{}).items():
-        if db_data.get('type') == 'rrna':
-            if re.search(w.rmol, db):
-                fmt = db_data.get('format', 'lastdb')
-                fmt = get_last_alg(fmt, 'fna')
-                db_dot_fmt = "{}.{}".format(db, fmt)
-                hits_file = rna_search_hits_template \
-                                            .format(db_dot_fmt=db_dot_fmt,
-                                                    length=w.length,
-                                                    rmol=w.rmol)
-                logger.debug ("returning " + hits_file)
-                return hits_file
-    logger.debug ("returing blank file")
-    return blank_file_name
-
-def get_rna_id_names_file(w):
-    """ get the .ids file from the Silva db 
-        # if rRNA DBs configured, this is a map to id/desc dict
-        # otherwise put blank place holder """
-    for db, db_data in config.get('dbs',{}).items():
-        if db_data.get('type') == 'rrna':
-            if re.search(w.rmol, db):
-                logger.debug ("returning " + db_data['path'] + ".ids")
-                return db_data['path'] + ".ids"
-    logger.debug ("returing blank file")
-    return blank_file_name
 
 # this should be set in the wf: assembly/contig.annotation.snake
 logger.debug("SAMPLE COVERAGES:\n" + repr(contig_coverage_files))
@@ -90,8 +62,11 @@ rule rrna_report:
     input:
         gff="contigs.all.vs.rRNA.cmsearch.{rmol}.gt{length}.gff",
         stats=contig_coverage_files.values(),
-        hits=get_rna_search_hits,
-        id_names=get_rna_id_names_file,
+        hits=lambda w: get_rna_search_hits(w, config,
+                        blank_file_name=blank_file_name,
+                        rna_search_hits_template=rna_search_hits_template),
+        id_names=lambda w: get_rna_id_names_file(w, config
+                                          blank_file_name=blank_file_name),
     output:
         "contigs.all.vs.rRNA.cmsearch.{rmol}.gt{length}.tsv"
     run:

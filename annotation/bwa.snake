@@ -45,4 +45,4 @@ rule bwa_index_file:
     input: "{file_root}.fasta"
     output: "{file_root}/bwadb.ids"
     shell:
-        "cat {input} | sed -r 's/^>(\\S+)\\s+(\\S.*)$/\\1\\t\\2/' > {output}"
+        "grep '^>' {input} | sed -r 's/^>(\\S+)\\s+(\\S.*)$/\\1\\t\\2/' > {output}"
