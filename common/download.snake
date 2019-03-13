@@ -34,6 +34,8 @@ rule download_remote:
     """
     input: lambda w: download_map[w.dl_path]['remote']
     output: temp("remote/{dl_path}")
+    resources:
+        disk=1
     params:
         link=lambda w: ("$(realpath --relative-to=$(dirname remote/{}) {})"
                         .format("w.dl_path",
@@ -42,6 +44,8 @@ rule download_remote:
     
 rule download_rsync:
     output: temp("rsync/{dl_path}")
+    resources:
+        disk=1
     params:
         host=lambda w: download_map[w.dl_path]['host'],
         remote_path=lambda w: download_map[w.dl_path]['remote_path'],

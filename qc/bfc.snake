@@ -13,6 +13,8 @@ rule bfc_error_correction:
         temp("{prefix}.corrected.fastq")
     benchmark:
         "benchmarks/{prefix}.kmer_trimmed.time"
+    resources:
+        disk=2
     log:
         "logs/{prefix}.kmer_trimmed.log"
     version:

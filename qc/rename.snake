@@ -10,6 +10,8 @@ rule rename_raw_reads:
     output:
         reads=temp("{prefix}.renamed.{dir,R[12]}.fastq"),
         name_map="{prefix}.renamed.{dir}.tsv"
+    resources:
+        disk=2
     log:
         "logs/{prefix}.renamed.{dir}.log"
     benchmark:

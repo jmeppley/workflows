@@ -35,6 +35,8 @@ rule trim_bbduk_adapters_paired:
         suffix=r'\..*(?<=\.)'
     benchmark:
         "benchmarks/{prefix}.{suffix}.noadapt_paired.fastq.time"
+    resources:
+        disk=4
     log:
         "logs/{prefix}.{suffix}.noadapt_paired.log"
     version:
@@ -59,6 +61,8 @@ rule trim_bbduk_adapters:
         "{prefix}.{suffix}"
     output:
         temp("{prefix}.noadapt.{suffix}")
+    resources:
+        disk=2
     wildcard_constraints:
         suffix=r'(R[12]\.)?fastq'
     benchmark:
@@ -89,6 +93,8 @@ rule trim_bbduk_phix:
     output:
         "{prefix}.nophix.fastq",
         "{prefix}.nophix.gchist.txt"
+    resources:
+        disk=2
     benchmark:
         "benchmarks/{prefix}.nophix.fastq.time"
     log:
@@ -117,6 +123,8 @@ rule trim_bbduk_standards:
         counts="{prefix}.spikes.counts.txt",
     benchmark:
         "benchmarks/{prefix}.nospikes.fastq.time"
+    resources:
+        disk=2
     log:
         "logs/{prefix}.nospikes.log"
     version:

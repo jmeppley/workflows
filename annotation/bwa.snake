@@ -14,6 +14,8 @@ rule map_genes_to_bwadb:
         db=lambda w: config['dbs'][w.db]['path'] + ".bwt"
     output:
         ("{file_root}.vs.{db}.bwa.sam")
+    resources:
+        disk=2
     log:
         "logs/{file_root}.vs.{db}.bwa.sam.log"
     benchmark:
@@ -32,6 +34,8 @@ rule index_bwadb:
         "{bwadb_name}.fasta"
     output:
         "{bwadb_name}/bwadb.bwt"
+    resources:
+        disk=2
     log:
         "logs/bwadb.{bwadb_name}.index.log"
     benchmark:
@@ -44,5 +48,7 @@ rule bwa_index_file:
     """ generate tab file mapping hit ids to descriptions """
     input: "{file_root}.fasta"
     output: "{file_root}/bwadb.ids"
+    resources:
+        disk=1
     shell:
         "grep '^>' {input} | sed -r 's/^>(\\S+)\\s+(\\S.*)$/\\1\\t\\2/' > {output}"

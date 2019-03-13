@@ -2,6 +2,8 @@
 rule fastq_to_fasta:
     input: "{file_root}.fastq"
     output: temp("{file_root}.fasta")
+    resources:
+        disk=2
     benchmark: "benchmarks/{file_root}.fasta.time"
     version: get_version("seqtk", "", lines=2)
     shell:

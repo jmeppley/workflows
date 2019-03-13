@@ -26,6 +26,8 @@ if enable_hist:
             "{file_root}.{ext}"
         output:
             "stats/{file_root}.{ext,f(aa|fn|na|a|asta|astq)(\.gz)?}.hist"
+        resources:
+            disk=1
         log:
             "logs/{file_root}.{ext}.hist.log"
         benchmark:
@@ -59,6 +61,8 @@ rule prinseq_any:
         "{file_root}.{ext}"
     output:
         "stats/{file_root}.{ext,f[a-z]+(\.gz)?}.stats"
+    resources:
+        disk=1
     log:
         "logs/{file_root}.{ext}.stats.log"
     benchmark:

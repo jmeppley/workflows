@@ -41,6 +41,8 @@ rule iu_filter_quality_minoche:
         r1="{sample}.renamed-QUALITY_PASSED_R1.fastq",
         r2="{sample}.renamed-QUALITY_PASSED_R2.fastq",
         stats="{sample}.renamed-STATS.txt"
+    resources:
+        disk=2
     log: "logs/{sample}.iu_minoche.log"
     benchmark: "benchmarks/{sample}.iu_minoche.time"
     threads: config['iu']['threads']

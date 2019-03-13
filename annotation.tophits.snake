@@ -53,6 +53,8 @@ filter_params_rexp=re.compile(filter_params_patt)
 rule filter_hits:
     input: '{file_root}.{alg}'
     output: '{file_root}.{alg}.{params}'
+    resources:
+        disk=2
     wildcard_constraints:
         params=filter_params_patt + r'+'
     params:
@@ -74,6 +76,8 @@ rule assign_top_hits:
     output:
         expand('{sample}.vs.{{db}}.{{alg}}.{{filter}}.{{top}}',
                sample=config['sample_data'])
+    resources:
+        disk=2
     benchmark:
         'benchmarks/assign_top_hits.{db}.{alg}.{filter}.{top}.time'
     version:
@@ -104,6 +108,8 @@ rule remove_rRNA_hits:
         hits='{sample}.{search}.{top}',
         nonrna=lambda w: get_non_rna_reads(w, config)
     output: '{sample}.{search}.{top}.non-rRNA'
+    resources:
+        disk=2
     threads: 2
     benchmark: 'benchmarks/{sample}.{search}.{top}.non-rRNA.time'
     params:
@@ -129,6 +135,8 @@ rule compile_hit_counts:
                          rna="" if w.rna == 'all' else '.' + w.rna)
     output:
         'counts.{db}.{top}.{rna}.hitids'
+    resources:
+        disk=1
     params:
         input=lambda w: ' '.join('{s}={s}.{search}.{top}{rna}'.format(
                                  s=sample,
@@ -153,6 +161,8 @@ rule translate_and_collapse_counts:
         counts='counts.{db}.{top}.{rna}.hitids',
         id_map=lambda w: get_db_ids_file(w.db, config)
     output: 'counts.{db}.{top}.{rna}.translated'
+    resources:
+        disk=1
     benchmark: 'benchmarks/counts.{db}.{top}.{rna}.translate.time'
     run:
         counts = pandas.read_csv(get_file_name(input.counts),

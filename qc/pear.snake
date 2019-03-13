@@ -13,6 +13,8 @@ rule run_pear:
        "{file_root}.paired.assembled.fastq",
        "{file_root}.paired.unassembled.forward.fastq",
        "{file_root}.paired.unassembled.reverse.fastq",
+    resources:
+        disk=3
     log:
         "logs/{file_root}.paired.pear.log",
     benchmark:
@@ -34,6 +36,8 @@ rule dummy_join:
         rev="{file_root}.unassembled.reverse.trimmed.fastq"
     output:
         "{file_root}.trimmed.dummy.fastq"
+    resources:
+        disk=2
     log:
         "logs/{file_root}.dummy.log"
     benchmark:
@@ -51,6 +55,8 @@ rule merge_pear:
         unpaired2="{file_root}.R2.unpaired.trimmed.fastq",
     output:
         merged="{file_root}.joined.fastq"
+    resources:
+        disk=2
     log:
         "logs/{file_root}.joined.log"
     benchmark:

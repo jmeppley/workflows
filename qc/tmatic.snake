@@ -25,6 +25,8 @@ rule trimmomatic_trim:
         "{file_root}.fastq"
     output:
         temp("{file_root}.trimmed.fastq")
+    resources:
+        disk=2
     log:
         "logs/{file_root}_trimmomatic_trim.log"
     benchmark:
@@ -61,6 +63,8 @@ rule trimmomatic_adapters:
         "adapters/{chemistry}_{barcode}_adapters.fa"
     log:
         "logs/{chemistry}_{barcode}_adapters.fa.log"
+    resources:
+        disk=2
     benchmark:
         "benchmarks/adapters/{chemistry}_{barcode}.time"
     run:
@@ -81,6 +85,8 @@ rule trimmomatic_clean_adapters:
         "{prefix}.{chemistry}.{barcode}.trim_adapt.R2.paired.fastq",
         "{prefix}.{chemistry}.{barcode}.trim_adapt.R1.unpaired.fastq",
         "{prefix}.{chemistry}.{barcode}.trim_adapt.R2.unpaired.fastq",
+    resources:
+        disk=3
     log:
         "logs/{prefix}_{chemistry}.{barcode}.trim_adapt.log"
     benchmark:
@@ -103,6 +109,8 @@ rule trimomatic_recombine:
         "{prefix}.trim_adapt.{dir}.paired.fastq",
         "{prefix}.trim_adapt.{dir}.unpaired.fastq"
     output: "{prefix}.trim_adapt.{dir}.fastq"
+    resources:
+        disk=3
     wildcard_constraints:
         prefix=r'.+(?<!paired)',
         dir=r'R[12]',
