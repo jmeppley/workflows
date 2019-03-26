@@ -126,10 +126,13 @@ rule split_reads_for_quant:
         temp("reads/{sample}.2.fastq"),
     run:
         from Bio import SeqIO
+        # keep track of reads w/no pairs as we loop over input file
         unpaired_reads = {}
         with open(output[1], 'w') as O1:
           with open(output[2], 'w') as O2:
             for record in SeqIO.parse(input.paired, 'fastq'):
+
+                # remove trailing 'slash-dir' if present
                 recordid = re.sub(r'/[12]$', '', record.id)
                 if recordid not in unpaired_reads:
                     unpaired_reads[recordid] = record.format('fastq')
