@@ -5,10 +5,12 @@
 # collection of methods for annotating gene_families
 ## normalize_coverage(input):
 #    process contig and read stats into map from gene to abundance
-## 
 ###
+import re
+import os
+import json
+import pandas
 from Bio import SeqIO
-import sys, re, os, logging, pandas
 from edl import taxon as edltaxon, util, hits as edlhits, blastm8, kegg
 from snakemake import logger
 try:
@@ -57,7 +59,7 @@ def get_lca(hits, translate=lambda x: [x]):
         lca = lca.getLCA(orgs.pop())
     return lca
 
-# Simplify the list of ranks 
+# Simplify the list of ranks
 printed_ranks=[edltaxon.ranks[i] for i in [3,7,11,17,21,24]] + ['domain']
 major_ranks=[edltaxon.ranks[i] for i in [2,3,7,11,17,21,24,27,28]]
 def get_major_rank(rank):
@@ -80,7 +82,7 @@ def approximate_rank(taxon, use_major_ranks=True):
             last_rank=rank
         else:
             return "Unknown"
-    
+
     if use_major_ranks:
         return get_major_rank(ret_rank)
     else:
@@ -104,7 +106,7 @@ class RefSeqGeneAnnotator():
 
     def set_bad_refs_from_file(self, bad_ref_file, **kwargs):
         """
-        Use util.parse_list_to_set() to generate list of bad_refs 
+        Use util.parse_list_to_set() to generate list of bad_refs
         to exclude during annotation
         """
         self.set_bad_refs(util.parse_list_to_set(bad_ref_file, **kwargs))
@@ -120,8 +122,8 @@ class RefSeqGeneAnnotator():
         self.genome_clades=genome_clades
 
     def set_genome_clades_from_file(self,
-                                    genome_clade_file, 
-                                    column='Clade', 
+                                    genome_clade_file,
+                                    column='Clade',
                                     **kwargs):
         kwargs.setdefault('index_col',0)
         genome_data=pandas.read_csv(genome_clade_file,**kwargs)
@@ -135,7 +137,7 @@ class RefSeqGeneAnnotator():
         rsdb_dir = os.path.split(self.rsdb)[0]
         self.taxonomy = edltaxon.readTaxonomy(rsdb_dir)
         rsdb_taxid_map = self.rsdb + ".tax"
-        self.taxid_map = util.parseMapFile(rsdb_taxid_map, 
+        self.taxid_map = util.parseMapFile(rsdb_taxid_map,
                 valueDelim=taxid_delim,
                 valueType=int)
         self.hit_translator = edlhits.getHitTranslator(hitStringMap=self.taxid_map, parseStyle=edlhits.ACCS, taxonomy=self.taxonomy, hitsAreObjects=True)
@@ -186,7 +188,7 @@ class RefSeqGeneAnnotator():
             lca_ranked = {'domain': lca.getAncestorClosestToRank('domain').name}
             if lca_rank in major_ranks:
                 for r in range(phylum_index,species_index-1,-1):
-                    lca_ranked[major_ranks[r]] = lca.getAncestorClosestToRank(major_ranks[r]).name 
+                    lca_ranked[major_ranks[r]] = lca.getAncestorClosestToRank(major_ranks[r]).name
                     if r<=major_ranks.index(lca_rank):
                         break
 
@@ -226,7 +228,7 @@ class KeggGeneAnnotator():
         self.parse_db_metadata()
         self.m8_params = edlhits.FilterParams(format=blastm8.BLASTPLUS,
                                               top_pct=5., sort='score')
-    
+
     def parse_db_metadata(self):
         """
         Given a refseq database in my style, parse the associated map files
@@ -273,6 +275,135 @@ def write_tsv(out_file, data_tuples, sep='\t', header=None):
         for data_tuple in data_tuples:
             out_handle.write(sep.join(data_tuple)+'\n')
 
+def parse_clusters(cluster_file):
+    """
+    expects one line per cluster, tab separated:
+        cluster_1_rep  member_1_1 member 1_2 ...
+        cluster_2_rep  member_2_1 member_2_2 ...
+        """
+    cluster_dict = {}
+    with open(cluster_file) as LINES:
+        for line in LINES:
+            genes = line.strip().split('\t')
+            rep = genes[0]
+            for gene in genes:
+                cluster_dict[gene] = rep
+    return cluster_dict
+
+def parse_bio_clusters(bio_json, out_tab):
+    """ convert bio cluster format from vsearch to our syle table """
+    with open(bio_json) as BIO:
+        data = json.load(BIO)
+
+    # build map from rep to other genes
+    clusters = {}
+    for row, column, value in data['data']:
+        rep = data['rows'][row]['id']
+        gene = data['columns'][column]['id']
+        if rep == gene:
+            # make sure a cluster exists for this rep
+            clusters.setdefault(rep, [])
+        else:
+            # add gene to cluster for this rep
+            clusters.setdefault(rep, []).append(gene)
+
+    # write table
+    with open(out_tab, 'wt') as TAB:
+        for rep, other_genes in clusters.items():
+            if len(other_genes) > 0:
+                TAB.write("{}\t{}\n".format(rep,
+                                            "\t".join(other_genes)))
+
+def parse_mmseq_clusters(mm_tab, out_tab):
+    """ reformat mmseqs cluster table to our style 
+        input: every line maps rep to member
+        output: every non-single cluster listed starting w/rep
+    """
+    with open(out_tab, 'wt') as TAB:
+        with open(mm_tab) as MM:
+            prev_rep = None
+            gene_count = 0
+            cluster_count = 0
+            for line in MM:
+                rep, gene = line.strip().split('\t')
+                if rep != prev_rep:
+                    if rep != gene:
+                        raise Exception("expected first gene to be same "
+                                        " as rep. {} != {}".format(rep, gene))
+                    gene_count = 1
+                    prev_rep = rep
+                    continue
+                gene_count += 1
+                if gene_count == 2:
+                    # start writing, by ending previous line
+                    if cluster_count != 0:
+                        TAB.write('\n')
+                    cluster_count += 1
+                    # ... and writing the rep
+                    TAB.write(rep)
+                # ... add this gene
+                TAB.write('\t' + gene)
+            # end final cluster
+            TAB.write('\n')
+
+
+def parse_cdhit_clusters(clstr_file, cluster_file):
+    """ reformat cdhit's .clstr file into simple table """
+    gene_expr = re.compile(r'\s>(\S+)\.\.\.\s\s*(.+)\s*$')
+    with open(cluster_file, 'wt') as TAB:
+        with open(clstr_file) as CLSTR:
+            cluster = []
+            cluster_rep = None
+            for line in CLSTR:
+                if line.startswith('>'):
+                    if cluster_rep is not None:
+                        TAB.write('{}\t{}\n'.format(
+                            cluster_rep,
+                            '\t'.join(g for g in cluster)))
+                    cluster = []
+                    cluster_rep = None
+                    continue
+                try:
+                    gene, alignment = gene_expr.search(line).groups()
+                except AttributeError:
+                    print("can't parse: \n" + line)
+                    raise
+                if alignment.strip() == "*":
+                    cluster_rep = gene
+                else:
+                    cluster.append(gene)
+            if cluster_rep is not None:
+                TAB.write('{}\t{}\n'.format(
+                    cluster_rep,
+                    '\t'.join(g for g in cluster)))
+
+
+def merge_cluster_coverages(cluster_file,
+                            coverage_tables):
+    """
+    given a cluster file mapping cluster reps to members
+    and a map from assemblies to coverage tables of member genes
+
+    generate a table of cluster coverages by assembly
+    """
+    cluster_map = parse_clusters(cluster_file)
+    cluster_coverages = None
+    for assembly, gene_coverage_table in coverage_tables.items():
+        gene_coverages = pandas.read_csv(gene_coverage_table,
+                                         index_col=0)
+        gene_coverages.columns = [assembly,]
+        gene_coverages['Cluster'] = [cluster_map.get(g,g) \
+                                     for g in gene_coverages.index]
+        _cluster_coverages = gene_coverages.groupby('Cluster').agg(sum)
+        if cluster_coverages is None:
+            cluster_coverages = _cluster_coverages
+        else:
+            cluster_coverages = \
+                cluster_coverages.join(_cluster_coverages,
+                                       how='outer')
+    return cluster_coverages
+
+# deprecated
 def normalize_coverages(input, contig_col='Contig', cov_col='MeanCov'):
     """
     Loop over read stats files and create a normalization factor for each assembly (number of reads/10M)
@@ -281,8 +412,8 @@ def normalize_coverages(input, contig_col='Contig', cov_col='MeanCov'):
     input.read_stats: the cleaned read stats from all assemblies
     input.contig_covs: the contig stats from all assemblies
 
-    Loop over coverage files, 
-    group by assembly (some assemblies have 2), 
+    Loop over coverage files,
+    group by assembly (some assemblies have 2),
     normalize by adjusted number of reads,
     yield (contig, coverage) tuples
     """
@@ -306,11 +437,12 @@ def normalize_coverages(input, contig_col='Contig', cov_col='MeanCov'):
                     yield item
             coverages = None
             last_assembly = assembly
-        _coverages = pandas.read_table(cov_file,
-                                       index_col=0,
-                                       header=0,
-                                       usecols=[contig_col, cov_col],
-                                       )[cov_col] / read_counts[assembly]
+        _coverages = pandas.read_csv(cov_file,
+                                     sep='\t',
+                                     index_col=0,
+                                     header=0,
+                                     usecols=[contig_col, cov_col],
+                                     )[cov_col] / read_counts[assembly]
         if coverages is None:
             coverages = _coverages
         else:
@@ -336,7 +468,7 @@ def main():
     parser.add_argument("-t", "--type", default=None, metavar="TYPE",
                         choices=['refseq','kegg'],
                         help="The type of database. Either 'refseq' or 'kegg'")
-                       
+
     arguments = parser.parse_args()
 
     # try to guess type from DB name/path
@@ -357,7 +489,7 @@ def main():
         annotator.annotate_genes_rs_prot(arguments.hit_table,
                                          arguments.output_table)
 
-def process_for_mcl(input_file, fasta_file, output_file, 
+def process_for_mcl(input_file, fasta_file, output_file,
                     format='last',
                     pctid=.95,
                     minbit=.5):
@@ -377,12 +509,13 @@ def process_for_mcl(input_file, fasta_file, output_file,
 
 
 def process_hit(hit, output_handle, self_bits, minbit):
+    """ following mcl parsing used by Anvio, filter hits to feed to mcl """
     bitratio = hit.score / min(self_bits[hit.hit],
                                self_bits[hit.read])
     if bitratio < minbit:
         return
     output_handle.write("{}\t{}\t{}\n".format(hit.hit, hit.read, hit.pctid))
-                
+
 
 def get_longest_seq(clusters, genes, format='fasta'):
     """

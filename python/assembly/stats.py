@@ -12,7 +12,7 @@ from edl.util import ascii_histogram
 from snakemake import logger
 
 def get_contig_stats(contigs_fasta,
-                     contig_stats_out):
+                     contig_stats_out=None):
     """
     Extracts GC and length from contigs fasta
     """
@@ -28,8 +28,11 @@ def get_contig_stats(contigs_fasta,
         if col in contig_stats.columns:
             contig_stats[col] = contig_stats[col].astype(int)
 
-    logger.info("Writing stats table to: {}".format(contig_stats_out))
-    contig_stats.to_csv(contig_stats_out, sep='\t', float_format="%0.2f")
+    if contig_stats_out:
+        logger.info("Writing stats table to: {}".format(contig_stats_out))
+        contig_stats.to_csv(contig_stats_out, sep='\t', float_format="%0.2f")
+    else:
+        return contig_stats
 
 def get_sequence_stats_from_contigs(contigs_fasta):
     """

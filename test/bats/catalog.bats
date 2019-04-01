@@ -63,9 +63,9 @@ setup() {
 
 @test "Compile and annotate gene catalog: cdhit" {
     cd test/scratch/catalog/cdhit
-    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=cdhit -p -k -j 20 --notemp > gene_catalog.log 2>&1"
+    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=cdhit discover_fastx_for_stats=True -p -k -j 20 --notemp > gene_catalog.log 2>&1"
     [ "$status" -eq 0 ]
-    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=cdhit -p -k -j 20 -n 2>&1 | grep Nothing"
+    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=cdhit discover_fastx_for_stats=True -p -k -j 20 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" == "Nothing to be done." ]
 }

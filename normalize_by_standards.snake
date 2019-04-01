@@ -35,6 +35,8 @@ from python.qc import setup_qc_outputs, get_cleaned_suffix
 from python.standards import get_best_fit, calculate_factors
 from snakemake.logging import logger
 
+include: 'common/stats.snake'
+
 ##
 # where to find the data
 # You can set these to something differnt on the command line by adding, EG:
@@ -83,13 +85,18 @@ if len(final_factor_files) == 0:
     raise Exception("No samples configured!")
 
 # finally pull in some utility rules
-include: 'common/stats.snake'
 include: "common/transitions.snake"
 
 logger.debug("Snakefile config:\n" + yaml.dump(config))
 
-## The first rule is run by default
 localrules: collate_factors
+
+## The first rule is run by default
+rule outputs:
+    input:
+        config['outputs'],
+        "normalization.factors.txt"
+
 rule collate_factors:
     """
     Collect all the factors into one table

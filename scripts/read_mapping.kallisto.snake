@@ -1,0 +1,187 @@
+"""
+Calculate abundances by mapping reads to a reference catalog
+
+ * Map reads to catalog with kallisto
+ * count abundances
+
+There are two key configuration values:
+
+  references_file: location of the reference database
+  sample_glob: snakemake wildcard glob string to locate read files and name samples
+
+The sample glob should look like:
+
+    /path/to/read/files/{sample}.reads.fastq
+
+Or even:
+
+    SFTP://server.provider.com/remote_path/{project}/{sample}/reads.fastq
+
+Just make sure that one of the wildcards is called 'sample'.
+
+
+Files (including the glob) can be local or remote. Remote files should be formatted for the snakemake remote provider. EG
+
+   SFTP://server.domain.edu/path/to/file.ext
+
+Supported protocols are SFTP, HTTP, and FTP
+
+login credentials should be passed in the configuration EG:
+
+config = {'remote': {'FTP': {'server.domain.edu': {
+    'username': 
+    'password':
+}
+
+SFTP only works with keys (no password).
+
+"""
+
+# get remote file tools
+import os, sys
+import pandas
+workflows_dir = os.path.dirname(os.path.dirname(workflow.snakefile))
+sys.path.append(workflows_dir)
+
+include: "../common/download.snake"
+from python.common import get_file_name
+from python.download import remote_wrapper
+
+def check_sample_data(config):
+    """ if sample_data not explicitly listed in config, work from glob """
+    if "sample_data" not in config:
+        if "sample_glob" not in config:
+            raise Exception("Please supply read files explicitly in "
+                            "config[sample_data] or with config[sample_glob]")
+        # string like "/path/to/files/{sample}.fastq"
+        sample_glob = config['sample_glob']
+        wildcard_values = remote_wrapper(sample_glob, config, glob=True)
+        sample_data = config.setdefault('sample_data', {})
+        # which wildcard in glob was "sample"
+        wildcard_names = list(wildcard_values._fields)
+        sample_index = wildcard_names.index('sample')
+        # build sample_data dictionary
+        for wildcard_tuple in zip(*list(wildcard_values)):
+            for value in wildcard_tuple:
+                # skip if wildcard spans folders
+                if re.search(os.path.sep, value):
+                    break
+            else:
+                # add sample
+                sample = wildcard_tuple[sample_index]
+                sample_data[sample] = remote_wrapper(
+                                        sample_glob.format(
+                                            **dict(zip(wildcard_names,
+                                                       wildcard_tuple))),
+                                                       config)
+
+references_file = remote_wrapper(config['references_file'], config)
+logger.debug("references_file: " + repr(references_file))
+
+# find readsusing config['sample_glob']
+check_sample_data(config)
+
+quant_result_template = "{sample}.vs.references.kallisto/abundance.tsv"
+search_results = {s:quant_result_template.format(sample=s) \
+                  for s in config['sample_data']}
+
+rule outputs:
+    input:
+        "reference.hit_counts.tsv",
+
+rule count_table:
+    """ merge kallisto quant tables into one """
+    input: search_results.values()
+    output: 'reference.hit_counts.tsv'
+    benchmark: "benchmarks/count_table.time"
+    log: "logs/count_table.log"
+    run:
+        merged_counts = None
+        for sample, quant_file in search_results.items():
+            quant_table = pandas.read_csv(quant_file,
+                                          sep='\t',
+                                          index_col=0,
+                                          usecols=[0,4])
+            quant_table.columns = [sample,]
+
+            if merged_counts is None:
+                merged_counts = quant_table
+            else:
+                merged_counts = \
+                    merged_counts.join(quant_table, how='outer')
+
+        if merged_counts is not None:
+            merged_counts.to_csv(get_file_name(output), sep='\t')
+        else:
+            raise Exception("No samples to merge!")
+
+rule split_reads_for_quant:
+    """ take an interleaved fastq file and split
+    into .se .1 and .2"""
+    input: 
+        paired=lambda w: config['sample_data'][w.sample]
+    output:
+        temp("reads/{sample}.se.fastq"),
+        temp("reads/{sample}.1.fastq"),
+        temp("reads/{sample}.2.fastq"),
+    run:
+        from Bio import SeqIO
+        # keep track of reads w/no pairs as we loop over input file
+        unpaired_reads = {}
+        with open(output[1], 'w') as O1:
+          with open(output[2], 'w') as O2:
+            for record in SeqIO.parse(input.paired, 'fastq'):
+
+                # remove trailing 'slash-dir' if present
+                recordid = re.sub(r'/[12]$', '', record.id)
+                if recordid not in unpaired_reads:
+                    unpaired_reads[recordid] = record.format('fastq')
+                else:
+                    O1.write(record.format('fastq'))
+                    O2.write(unpaired_reads.pop(recordid))
+        with open(output[0], 'w') as SE:
+            for fastq in unpaired_reads.values():
+                SE.write(fastq)
+
+produce_bam = config.get('produce_bam', False)
+rule quant_reads_kallisto:
+    """ quantify a set of reads a gainst a kallisto index """
+    input:
+        index="references.index",
+        fwd="reads/{sample}.1.fastq",
+        rev="reads/{sample}.2.fastq"
+    output:
+        info="{sample}.vs.references.kallisto/run_info.json",
+        quant="{sample}.vs.references.kallisto/abundance.tsv",
+        bamfile="{sample}.vs.references.kallisto/pseudoalignments.bam" \
+            if produce_bam else [],
+    log: "logs/kallisto.{sample}.quant.log"
+    benchmark: "benchmarks/kallisto.{sample}.time"
+    params:
+        outdir="{sample}.vs.references.kallisto",
+        bootstraps=config.get('bootstraps', '100'),
+        opts=config.get('quant_opts', ''),
+        bam="--pseudobam" if produce_bam else ""
+    threads: config.get('quant_threads', 6)
+    shell:
+        """
+        rm -rf {params.outdir}
+        kallisto quant -i {input.index} -t {threads} \
+         -b {params.bootstraps} {params.opts} \
+         {input.fwd} {input.rev} -o {params.outdir} {params.bam} \
+         > {log} 2>&1
+        """
+
+rule index_refs_kallisto:
+    """ process a set of dna sequences for kallisto quanitfication """
+    input: references_file
+    output: "references.index"
+    log: "logs/kallisto.index"
+    benchmark: "benchmarks/kallisto.index.time"
+    params:
+        opts=config.get('index_options', '')
+    shell:
+        """
+        kallisto index -i {output} {input} {params.opts} \
+         > {log} 2>&1
+        """

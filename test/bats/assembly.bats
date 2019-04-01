@@ -21,8 +21,10 @@ setup() {
     mkdir -p test/scratch/spades
     cd test/scratch/spades
 
-    run bash -c "snakemake -j 10 -s ../../../assembly.metagenomic.snake -p --configfile ../../data/configs/spades.yaml --verbose > assembly.log 2>&1"
+    run bash -c "snakemake -j 10 -s ../../../assembly.metagenomic.snake -p --config discover_fastx_for_stats=True --configfile ../../data/configs/spades.yaml --verbose > assembly.log 2>&1"
     [ "$status" -eq 0 ]
+    [ -e stats/fourk.renamed.interleaved.noadapt.nophix.fastq.stats ]
+    [ -e stats/fourk.renamed.interleaved.noadapt.fastq.hist ]
     run bash -c "snakemake -j 10 -s ../../../assembly.metagenomic.snake -p --configfile ../../data/configs/spades.yaml -n 2>&1 | grep '^Nothing'"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" == "Nothing to be done." ]

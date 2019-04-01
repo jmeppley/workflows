@@ -1,4 +1,4 @@
-
+from python.gene_catalog import parse_cdhit_clusters
 
 # software parameters
 defaults = {
@@ -15,7 +15,9 @@ config['cluster_type'] = 'faa'
 
 rule cluster_faa:
     input: "all_genes.faa"
-    output: "all_genes.faa.{}".format(cluster_suffix)
+    output:
+        faa="all_genes.faa.{}".format(cluster_suffix),
+        clst="all_genes.faa.{}.clstr".format(cluster_suffix)
     benchmark: 'benchmarks/all_genes.faa.{}.time' \
                         .format(cluster_suffix)
     threads: config['cdhit']['threads']
@@ -24,4 +26,13 @@ rule cluster_faa:
     shell:
         "cd-hit -T {threads} {config[cdhit][options]} \
          -M {config[cdhit][mem]} \
-         -i {input} -o {output}"
+         -i {input} -o {output.faa}"
+
+rule parse_clusters:
+    """ turn .clstr file into simple cluster table """
+    input: "all_genes.faa.{}.clstr".format(cluster_suffix)
+    output: prefix + ".clusters"
+    benchmark: 'benchmarks/{}.clusters.time'.format(prefix)
+    run:
+        parse_cdhit_clusters(get_file_name(input),
+                             get_file_name(output))

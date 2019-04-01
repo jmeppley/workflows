@@ -11,6 +11,10 @@ Workflow:
  * pull out faa version of cluster reps
 """
 
+from python.common import parse_stats
+from python.gene_catalog import merge_cluster_coverages
+from urllib.parse import quote_plus, unquote_plus
+
 #########
 # CONFIGURATION
 #
@@ -103,44 +107,49 @@ def get_all_gene_call_files(ext, config,
         if assembly_path in assembly_renaming_map:
             file_name = "renamed_dir" + file_name
 
-        yield get_unique_local_file(file_name, local_dir)
+        yield (quote_plus(assembly_path), 
+               get_unique_local_file(file_name, local_dir))
 
-def get_assembly_coverage_files(wildcards=None):
-    """
-    Find all the contig.coverages.{sample}.txt for each assembly
-    """
-    for assembly_path in config['assembly_list']:
-        # find a coverage file
-        # Try a combined coverage file
-        master_file = os.path.join(assembly_path,
-                                'contigs.final.stats.txt')
-        if os.path.exists(master_file):
-            if assembly_path in assembly_renaming_map:
-                file_name = "renamed_dir" + master_file
-                yield file_name
-        else:
-            # look for per-sample coverage files
-            for file_name in glob.glob(os.path.join(assembly_path,
-                                    'contigs.all.coverages.*.t??')):
-                if assembly_path in assembly_renaming_map:
-                    file_name = "renamed_dir" + file_name
 
-                yield file_name
-
-def get_assembly_read_stats(wildcards=None):
+def get_assembly_coverage_files(wildcards):
     """
-    Find all the cleaned reads stats files for each assembly
+    Find all the contig.coverages.{sample}.txt for an assembly
     """
-    for assembly_path in config['assembly_list']:
+    assembly_path = unquote_plus(wildcards.assembly)
+    # find a coverage file
+    # Try a combined coverage file
+    master_file = os.path.join(assembly_path,
+                            'contigs.final.stats.txt')
+    if os.path.exists(master_file):
+        if assembly_path in assembly_renaming_map:
+            master_file = "renamed_dir" + master_file
+        yield master_file
+    else:
+        # look for per-sample coverage files
         for file_name in glob.glob(os.path.join(assembly_path,
-                                'stats',
-                                '*.clean.fastq.stats')):
+                                'contigs.all.coverages.*.t??')):
+            if assembly_path in assembly_renaming_map:
+                file_name = "renamed_dir" + file_name
+
             yield file_name
+
+def get_assembly_read_stats(wildcards):
+    """
+    Find all the cleaned reads stats files for an assembly
+    """
+    assembly_path = unquote_plus(wildcards.assembly)
+    for file_name in glob.glob(os.path.join(assembly_path,
+                            'stats',
+                            '*.clean.fastq.stats')):
+        yield file_name
 
 
 ## Collect file names now, so we can set up transitions for remote files
 collect_exts = ['faa', 'ffn']
-gene_call_files = {e:list(get_all_gene_call_files(e, config)) for e in collect_exts}
+gene_call_files = {e:dict(get_all_gene_call_files(e, config)) for e in collect_exts}
+
+print("DEBUG:")
+print(gene_call_files)
 
 # TODO: as of now, the workflow cant get coverage info from remote servers, so
 # the gene counting part of the workflow will fail.
@@ -167,7 +176,7 @@ rule rename_contigs_and_genes:
             > {output}"
 
 rule collect_gene_calls:
-    input: lambda w: gene_call_files[w.ext]
+    input: lambda w: gene_call_files[w.ext].values()
     output: "all_genes.{ext}"
     benchmark: 'benchmarks/all_genes.{ext}.time'
     wildcard_constraints:
@@ -203,29 +212,76 @@ rule get_cluster_rep_faa:
     shell: "screen_list.py -l {input[0]} -k {input[1]} > {output}"
 
 ## We also need to collect the contig coverages
-rule get_gene_coverages:
-    input: 
+rule assembly_gene_coverages:
+    """
+    For each assembly:
+        map contig coverage onto individual genes
+        normalize by total raeds in assembly
+    """
+    input:
         contig_covs=get_assembly_coverage_files,
         read_stats=get_assembly_read_stats,
-        gene_list="{}.faa.idlist".format(prefix)
-    output: '{}.coverage.tsv'.format(prefix)
-    benchmark: 'benchmarks/{}.coverage.tsv.time'.format(prefix)
+        genes=lambda w: gene_call_files['faa'][w.assembly],
+    output:
+        table=temp('coverages/{assembly}.coverages.tsv'),
+    benchmark: 'benchmarks/{assembly}.coverages.time'
     run:
-        # get map from contig name to genes
-        contig_genes = {}
-        contig_rexp = re.compile(r'_\d+$')
-        with open(get_file_name(input.gene_list)) as GENES:
-            for gene in GENES:
-                gene = gene.strip()
-                contig = contig_rexp.sub('', gene)
-                contig_genes.setdefault(contig, []).append(gene)
+        # get number of reads in assembly
+        read_counts = 0
+        for stats_file in input.read_stats:
+            reads = parse_stats(stats_file)['reads'] / 10000000
+            read_counts += reads
 
-        with open(get_file_name(output), 'wt') as OUT:
-            for contig, coverage in gene_catalog.normalize_coverages(input,
-                                                                     config.get('contig_col',
-                                                                                'Contigs'),
-                                                                     config.get('cov_col',
-                                                                                'MeanCov'),
-                                                                    ):
-                for gene in contig_genes.get(contig, []):
-                    OUT.write('{}\t{}\n'.format(gene, coverage))
+        # get dict of contig coverages
+        coverages = None
+        if len(input.contig_covs) == 0:
+            raise Exception("Cannot find coverage file for " +
+                            assembly_path)
+        contig_col = config.get('contig_col', 'Contig')
+        cov_col = config.get('cov_col', 'MeanCov')
+        for cov_file in input.contig_covs:
+            _coverages = pandas.read_csv(cov_file,
+                                         sep='\t',
+                                         index_col=0,
+                                         header=0,
+                                         usecols=[contig_col, cov_col],
+                                        )[cov_col] / read_counts
+            if coverages is None:
+                coverages = _coverages
+            else:
+                coverages = coverages + _coverages
+
+        # transfer contig coverages to genes
+        contig_rexp = re.compile(r'_\d+$')
+        def get_gene_cov(gene):
+            " get contig name from gene and look up cov "
+            return coverages.get(contig_rexp.sub('', gene), 0)
+        gene_coverages = \
+            pandas.DataFrame(
+                {gene.id:{'Coverage':get_gene_cov(gene.id)} \
+                          for gene in SeqIO.parse(input.genes, 'fasta')}
+            ).T
+        gene_coverages.to_csv(output.table)
+
+rule gene_coverage_table:
+    """
+    collect assembly gene coverages
+    use clusters to combine into one big coverage table for clusters
+    """
+    input: 
+        gene_covs=expand('coverages/{assembly}.coverages.tsv',
+                         assembly=gene_call_files['faa']),
+        clusters=prefix + ".clusters"
+    output:
+        table='{}.sample.coverage.tsv'.format(prefix),
+        sums=temp('{}.coverage.tsv'.format(prefix))
+    benchmark: 'benchmarks/{}.sample.coverage.tsv.time'.format(prefix)
+    run:
+        gene_cov_dict = {a:'coverages/{}.coverages.tsv'.format(a) \
+                         for a in gene_call_files['faa']}
+        coverages = merge_cluster_coverages(input.clusters,
+                                            gene_cov_dict)
+
+        coverages.to_csv(output.table)
+        coverages.sum(axis=1).to_csv(output.sums)
+ 

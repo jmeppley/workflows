@@ -101,3 +101,36 @@ def test_contig_coverage_table():
     logging.debug(str(coverages))
     assert coverages.shape == (3, 6)
     assert coverages.loc['contig_c2', 'Q2Q3Cov'] == 0.2
+
+def test_contig_stats():
+    contigs_file = 'test/data/contigs/contigs.100.fa'
+    stats_table = stat.get_sequence_stats_from_contigs(contigs_file)
+    logging.debug(str(stats_table))
+    assert stats_table.shape == (100, 2)
+    assert '{:0.3f}'.format(stats_table.loc['k99_227', 'GC']) == '36.908'
+    assert stats_table.loc['k99_227', 'Length'] == 2723
+    assert stats_table.loc['k99_7348', 'Length'] == 9664
+    assert stats_table.loc['k99_10078', 'Length'] == 10609
+
+    stats_table_2 = stat.get_contig_stats(contigs_file)
+    assert stats_table_2.shape == (100, 3)
+    assert '{:0.3f}'.format(stats_table_2.loc['k99_227', 'GC']) == '36.908'
+    assert stats_table_2.loc['k99_227', 'Length'] == 2723
+    assert stats_table_2.loc['k99_7348', 'Length'] == 9664
+    assert stats_table_2.loc['k99_10078', 'Length'] == 10609
+    last_contig = stats_table_2.index[-1]
+    first_contig = stats_table_2.index[0]
+    assert stats_table_2.loc[first_contig, 'Length'] == \
+            stats_table_2.loc[first_contig, 'CumuLength']
+    assert stats_table_2.loc[last_contig, 'CumuLength'] == \
+            stats_table_2.Length.sum()
+
+
+    summary_stats = stat.get_contig_length_summary_stats(stats_table_2,
+                                                         N_levels=[50, 80])
+
+    assert summary_stats['contig count'] == 100
+    assert summary_stats['total contig bases'] == stats_table.Length.sum()
+    logging.debug(summary_stats)
+    assert summary_stats['N80'] == 2989
+
