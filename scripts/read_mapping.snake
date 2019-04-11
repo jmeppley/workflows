@@ -1,8 +1,10 @@
 """
+read_mapping.snake
+
 Calculate abundances by mapping reads to a reference catalog
 
  * Map reads to catalog with BWA or similar
- * count abundances
+ * count abundances using filter_hits(F0) and count_taxa(partial)
 
 There are two key configuration values:
 
