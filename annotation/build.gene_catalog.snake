@@ -148,9 +148,6 @@ def get_assembly_read_stats(wildcards):
 collect_exts = ['faa', 'ffn']
 gene_call_files = {e:dict(get_all_gene_call_files(e, config)) for e in collect_exts}
 
-print("DEBUG:")
-print(gene_call_files)
-
 # TODO: as of now, the workflow cant get coverage info from remote servers, so
 # the gene counting part of the workflow will fail.
 
