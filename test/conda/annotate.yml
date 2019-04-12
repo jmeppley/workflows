@@ -20,4 +20,5 @@ dependencies:
  - prodigal
  - py-metagenomics
  - batch_launcher
+ - dynamic_remote_snake
  - coreutils

@@ -44,8 +44,8 @@ import os, sys
 workflows_dir = os.path.dirname(os.path.dirname(workflow.snakefile))
 sys.path.append(workflows_dir)
 
-include: "../common/download.snake"
-from python.download import remote_wrapper
+from jme.drs import remote_wrapper, get_dl_snakefile
+include: get_dl_snakefile()
 
 def check_sample_data(config):
     """ if sample_data not explicitly listed in config, work from glob """
