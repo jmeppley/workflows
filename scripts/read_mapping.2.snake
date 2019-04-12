@@ -47,41 +47,16 @@ SFTP only works with keys (no password).
 """
 
 # get remote file tools
-import os, sys
+import os, sys, pandas
 workflows_dir = os.path.dirname(os.path.dirname(workflow.snakefile))
 sys.path.append(workflows_dir)
+from python.common import get_file_name
+from python.mapping import check_sample_data
 
 from jme.drs import remote_wrapper, get_dl_snakefile
 include: get_dl_snakefile()
 
-def check_sample_data(config):
-    """ if sample_data not explicitly listed in config, work from glob """
-    if "sample_data" not in config:
-        if "sample_glob" not in config:
-            raise Exception("Please supply read files explicitly in "
-                            "config[sample_data] or with config[sample_glob]")
-        # string like "/path/to/files/{sample}.fastq"
-        sample_glob = config['sample_glob']
-        wildcard_values = remote_wrapper(sample_glob, glob=True)
-        sample_data = config.setdefault('sample_data', {})
-        # which wildcard in glob was "sample"
-        wildcard_names = list(wildcard_values._fields)
-        sample_index = wildcard_names.index('sample')
-        # build sample_data dictionary
-        for wildcard_tuple in zip(*list(wildcard_values)):
-            for value in wildcard_tuple:
-                # skip if wildcard spans folders
-                if re.search(os.path.sep, value):
-                    break
-            else:
-                # add sample
-                sample = wildcard_tuple[sample_index]
-                sample_data[sample] = remote_wrapper(
-                                        sample_glob.format(
-                                            **dict(zip(wildcard_names,
-                                                       wildcard_tuple))))
-
-references_file = remote_wrapper(config['references_file'])
+references_file = remote_wrapper(config['references_file'], config)
 logger.debug("references_file: " + repr(references_file))
 
 search_result_template = "{sample}.vs.references.sam"
@@ -104,8 +79,17 @@ rule count_table:
     params:
         hit_tables=' '.join(["=".join(kv) for kv in search_results.items()]),
         cutoff=config.get('cutoff', 0)
-    shell: "count_taxa.py {params.hit_tables} -p hitid -a portion -F 0 -f sam \
-            -o {output} -c {params.cutoff} -v 22> {log}"
+    run:
+        merged_counts = {}
+        for sample, count_file in search_results.items():
+            sample_counts = merged_counts.setdefault(sample, {})
+            with open(count_file) as count_handle:
+                for line in count_handle:
+                    count, ref = line.strip().split()
+                    sample_counts[ref] = int(count)
+
+        pandas.DataFrame(merged_counts) \
+            .to_csv(get_file_name(output), sep='\t')
 
 rule mapped_read_counts:
     """ 
@@ -124,17 +108,6 @@ rule mapped_read_counts:
          | cut -f 3 \
          | uniq -c \
          > {output}"
-
-## Coverage calculaations
-# currently unused, we just use read counts
-
-rule coverages:
-    """ turn mapping depth into coverage values """
-    input:
-        depths="{root}.depths",
-        references=references_file
-    output: "{root}.coverages"
-    run:
 
 rule mapped_read_depths:
     """
@@ -164,9 +137,9 @@ rule sam_to_bam:
     input: "{root}.sam"
     output: "{root}.bam"
     benchmark: "benchmarks/{root}.bwa_sam_bam.time"
-    threads: config.get('samtools',{'threads':5}['threads']
+    threads: config.get('samtools',{'threads':5})['threads']
     params:
-        ram=config.get('samtools',{'ram':'10G'}['ram']
+        ram=config.get('samtools',{'ram':'10G'})['ram']
     shell:
         "samtools view -F 2304 -b {input} \
         | samtools sort -l 5 -@ {threads} -m {params.ram} - \
