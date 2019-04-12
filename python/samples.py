@@ -7,14 +7,14 @@ import re
 import os
 import glob
 import snakemake
-from python.download import remote_wrapper
+from jme.drs import remote_wrapper
 
 def process_sample_data(sample_data, config):
     """
     sample_data is a top level config map that has two types of entries
 
      - samples: keyed on sample name and containing paths and other data
-     - 'reads_patterns': list of patterns to find samples. These are passed to 
+     - 'reads_patterns': list of patterns to find samples. These are passed to
             collect_sample_reads() below
 
     This method processes the read patterns to find samples
@@ -114,7 +114,7 @@ def collect_sample_reads(samples_pattern_data, config):
 
     # old way (deprecated)
     snakemake.logger.warning("getting reads from glob and re is deprecated, "
-                   "use wildcard_glob instead!")
+                             "use wildcard_glob instead!")
     sample_pattern = samples_pattern_data.get('re', r'/([^/]+)/[^/]+$')
     sample_RE = re.compile(sample_pattern)
     read_file_glob = samples_pattern_data.get('glob',
@@ -124,15 +124,15 @@ def collect_sample_reads(samples_pattern_data, config):
 def get_wc_glob_reads(wildcard_glob_string, config):
     """
     Use wildcard glob string to build map from samples to read fastq files
-    
+
     There must be a "sample" wildcard in the glob string.
-    
+   
     Other wildcards are ignored. Multiple fastq files per samples are assumed to be fwd/rev pair (in alphabetical order)
     """
     reads = {}
 
     wildcard_values = remote_wrapper(wildcard_glob_string, config, glob=True)
- 
+
     # which wildcard in glob was "sample"
     wildcard_names = list(wildcard_values._fields)
     sample_index = wildcard_names.index('sample')
@@ -175,7 +175,7 @@ def get_re_glob_reads(read_file_glob, sample_RE):
         if match is None:
             raise Exception(
                 ("The sample matching expression ({}) failed to find a sample "
-                 "name in the path: {}").format(sample_pattern, read_file)
+                 "name in the path: {}").format(sample_RE.pattern, read_file)
             )
         sample = match.group(1)
         # sanitize sample name
@@ -187,7 +187,7 @@ def get_re_glob_reads(read_file_glob, sample_RE):
 def get_sample_reads_for_mapping(wildcards, config):
     """
     reads for mapping can come from different places
-    
+
     if a for_mapping file is specified for this sample, use it
     if map_clean_reads is set to True, use the clean reads
 
@@ -205,10 +205,9 @@ def get_sample_reads_for_mapping(wildcards, config):
 
     # look in configuration first
     if sample in config['sample_data'] and (
-        'raw' in config['sample_data'][sample] or \
-        'for_mapping' in config['sample_data'][sample] or \
-        'clean' in config['sample_data'][sample]
-    ):
+            'raw' in config['sample_data'][sample] or \
+            'for_mapping' in config['sample_data'][sample] or \
+            'clean' in config['sample_data'][sample]):
 
         if 'for_mapping' in config['sample_data'][sample]:
             # use explicit decalration first
@@ -229,15 +228,14 @@ def get_sample_reads_for_mapping(wildcards, config):
         except:
             # OK, that didn't work
             pass
+
         # let's try simply using raw or clean reads
         if 'raw' in config['sample_data'][sample]:
             # just use the raw reads
             return config['sample_data'][sample]['raw']
-        else:
-            # return clean reads if that's all we have
-            return config['sample_data'][sample]['clean']
-    else:
-        # otherwise, look for fastq file with sample name
-        return "{}.fastq".format(sample)
 
+        # return clean reads if that's all we have
+        return config['sample_data'][sample]['clean']
 
+    # otherwise, look for fastq file with sample name
+    return "{}.fastq".format(sample)

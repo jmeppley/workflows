@@ -14,7 +14,7 @@ Another use if for when the input file is in another part of the file system. We
 We can also concat multiple files into one here by giving list of files
 """
 logger.debug("BUILDING TRANSITIONS")
-from python.download import remote_wrapper, url_rexp
+from jme.drs import remote_wrapper, URL_REXP
 
 # To prevent trying to copy or link from a file to itself
 #  remove redundant transistions here (prefilter URLs so we don't trip os.path)
@@ -22,7 +22,7 @@ from python.download import remote_wrapper, url_rexp
 logger.debug(config.setdefault('transitions', {}))
 transitions = {s:remote_wrapper(t, config) \
                    for s,t in config['transitions'].items() \
-                   if url_rexp.search(s) is not None \
+                   if URL_REXP.search(s) is not None \
                    or os.path.abspath(s) != os.path.abspath(t)}
 
 logger.debug(transitions)
@@ -49,7 +49,7 @@ pattern = "(" + "|".join(transitions.keys()) + ")"
 wildcard_constraints:
     transition_file_name=pattern
 
-include: "download.snake"
+include: os.environ['CONDA_PREFIX'] + "/share/drs/snake/download.snake"
 
 # transition rule will only match one of the configured files
 localrules: transition_link_or_cat

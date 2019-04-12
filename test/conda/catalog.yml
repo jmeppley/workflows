@@ -31,3 +31,5 @@ dependencies:
  - mcl
  - mmseqs2
  - py-metagenomics
+ - dynamic_remote_snake
+
