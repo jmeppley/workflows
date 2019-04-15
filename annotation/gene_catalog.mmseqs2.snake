@@ -20,40 +20,46 @@ tmp_dir = tempfile.TemporaryDirectory(dir=config['mmseqs2']['tmp_dir_root'],
 
 rule extract_faa:
     input: 
-        reps="all_genes.faa.{}.reps".format(cluster_suffix),
+        reps="all_genes.faa.{}.reps.index".format(cluster_suffix),
         db="all_genes.faa.db"
     output: "all_genes.faa.{}".format(cluster_suffix)
     benchmark: 'benchmarks/all_genes.faa.{}.extract.faa.time' \
                         .format(cluster_suffix)
+    params:
+        reps="all_genes.faa.{}.reps".format(cluster_suffix),
     shell:
         """
-         mmseqs result2flat {input.db} {input.db} {input.reps} {output} \
+         mmseqs result2flat {input.db} {input.db} {params.reps} {output} \
            --use-fasta-header > {output}.log
         """
 
 rule extract_reps:
     input:
-        clusters="all_genes.faa.{}.result".format(cluster_suffix),
+        clusters="all_genes.faa.{}.result.index".format(cluster_suffix),
         db='all_genes.faa.db',
-    output: "all_genes.faa.{}.reps".format(cluster_suffix)
+    output: "all_genes.faa.{}.reps.index".format(cluster_suffix)
     benchmark: 'benchmarks/all_genes.faa.{}.extract.reps.time' \
                         .format(cluster_suffix)
+    params:
+        clusters="all_genes.faa.{}.result".format(cluster_suffix),
+        reps="all_genes.faa.{}.reps".format(cluster_suffix),
     shell:
         """
-         mmseqs result2repseq {input.db} {input.clusters} {output} > {output}.log
+         mmseqs result2repseq {input.db} {params.clusters} {params.reps} > {output}.log
         """
 
 rule cluster_faa:
     input: "all_genes.faa.db"
-    output: "all_genes.faa.{}.result".format(cluster_suffix)
+    output: "all_genes.faa.{}.result.index".format(cluster_suffix)
     benchmark: 'benchmarks/all_genes.faa.{}.cluster.time' \
                         .format(cluster_suffix)
     threads: config['mmseqs2']['threads']
     params:
-        tmp_dir=tmp_dir.name
+        tmp_dir=tmp_dir.name,
+        output="all_genes.faa.{}.result".format(cluster_suffix)
     shell:
         "mmseqs {config[mmseqs2][program]} \
-            {input} {output} {params.tmp_dir} \
+            {input} {params.output} {params.tmp_dir} \
             {config[mmseqs2][options]} --threads {threads}"
 
 rule formatdb_for_mmseqs:
@@ -64,14 +70,16 @@ rule formatdb_for_mmseqs:
 
 rule generate_table:
     input:
-        clusters="all_genes.faa.{}.result".format(cluster_suffix),
+        clusters="all_genes.faa.{}.result.index".format(cluster_suffix),
         db='all_genes.faa.db',
     output: "all_genes.faa.{}.tab".format(cluster_suffix)
     benchmark: 'benchmarks/all_genes.faa.{}.extract.tab.time' \
                         .format(cluster_suffix)
+    params:
+        clusters="all_genes.faa.{}.result".format(cluster_suffix),
     shell:
         """
-         mmseqs createtsv {input.db} {input.db} {input.clusters} {output} > {output}.log
+         mmseqs createtsv {input.db} {input.db} {params.clusters} {output} > {output}.log
         """
 
 rule reformat_table:

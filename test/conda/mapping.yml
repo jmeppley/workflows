@@ -1,0 +1,11 @@
+channels:
+    - conda-forge
+    - bioconda
+    - jmeppley
+dependencies:
+    - snakemake-minimal
+    - pysftp
+    - bwa
+    - kallisto
+    - py-metagenomics
+    - dynamic_remote_snake

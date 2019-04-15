@@ -42,38 +42,11 @@ import os, sys
 import pandas
 workflows_dir = os.path.dirname(os.path.dirname(workflow.snakefile))
 sys.path.append(workflows_dir)
+from python.mapping import check_sample_data
 
-include: "../common/download.snake"
+from jme.drs import remote_wrapper, get_dl_snakefile
+include: get_dl_snakefile()
 from python.common import get_file_name
-from python.download import remote_wrapper
-
-def check_sample_data(config):
-    """ if sample_data not explicitly listed in config, work from glob """
-    if "sample_data" not in config:
-        if "sample_glob" not in config:
-            raise Exception("Please supply read files explicitly in "
-                            "config[sample_data] or with config[sample_glob]")
-        # string like "/path/to/files/{sample}.fastq"
-        sample_glob = config['sample_glob']
-        wildcard_values = remote_wrapper(sample_glob, config, glob=True)
-        sample_data = config.setdefault('sample_data', {})
-        # which wildcard in glob was "sample"
-        wildcard_names = list(wildcard_values._fields)
-        sample_index = wildcard_names.index('sample')
-        # build sample_data dictionary
-        for wildcard_tuple in zip(*list(wildcard_values)):
-            for value in wildcard_tuple:
-                # skip if wildcard spans folders
-                if re.search(os.path.sep, value):
-                    break
-            else:
-                # add sample
-                sample = wildcard_tuple[sample_index]
-                sample_data[sample] = remote_wrapper(
-                                        sample_glob.format(
-                                            **dict(zip(wildcard_names,
-                                                       wildcard_tuple))),
-                                                       config)
 
 references_file = remote_wrapper(config['references_file'], config)
 logger.debug("references_file: " + repr(references_file))
