@@ -9,6 +9,17 @@ Do the following for each set of sequences:
 
  * search against a sequence DB (EG RefSeq or a gene catalog)
  * assign a single top hit to each sequence
+ 
+Optional: rRNA filtering
+
+To also cout a specific subset of reads based on RFAM model filtering,
+turn on rrna filtering (remove_rrna=True) and specify one of (non-rRNA 
+(default), rRNA-only, SSU, or LSU). An example config snippet:
+
+```
+remove_rna: True
+rrna_subset: SSU
+```
 
 Finally
  * compile a table of hit counts by sample
@@ -16,7 +27,7 @@ Finally
 """
 import re
 from python.common import get_version
-from python.tophit import get_top_hit_outputs, get_non_rna_reads, get_get_ids_cmd
+from python.tophit import get_top_hit_outputs, get_rna_filtered_reads, get_get_ids_cmd
 from snakemake.logging import logger
 
 needs_qc = get_top_hit_outputs(config)
@@ -28,12 +39,24 @@ logger.debug(config)
 
 include: 'common/stats.snake'
 
-include: "annotation/lastal.snake"
-include: "common/fastq.snake"
+# include bwa rules if any db is bwa
+for db_info in config['dbs'].values():
+    if re.search('bwa', db_info.get('format', "")):
+        include: "annotation/bwa.snake"
+        break
+
+# include lastal rules if any db is lastdb
+for db_info in config['dbs'].values():
+    if re.search('last', db_info.get('format', "")):
+        include: "annotation/lastal.snake"
+        include: "common/fastq.snake"
+        break
+
 include: "common/transitions.snake"
 
 if config.get('remove_rna', True) in ['True', True]:
     include: "qc/sort.rna.snake"
+    include: "common/fastq.snake"
     ruleorder: filter_nonrrna_or_rrna > fastq_to_fasta
 
 wildcard_constraints:
@@ -83,8 +106,8 @@ rule assign_top_hits:
 rule count_hits:
     """ take a hit table and count hits to each hitid 
     
-    if {rna} in the output file is non-rRNA,
-        use the ".non-rRNA" version of the top hits
+    if {rna} in the output file is not "all",
+        use filtered version of the top hits
     if {rna} in the output file is "all":
         use the full top hits file (no suffix)
     """
@@ -111,10 +134,10 @@ rule filter_hits:
     """ remove rRNA reads from count table (only works for fastq input)"""
     input:
         hits='{sample}.{search}.{top}',
-        nonrna=lambda w: get_non_rna_reads(w, config)
-    output: '{sample}.{search}.{top}.non-rRNA'
+        nonrna=lambda w: get_rna_filtered_reads(w, config)
+    output: '{sample}.{search}.{top}.{rna}'
     threads: 2
-    benchmark: 'benchmarks/{sample}.{search}.{top}.non-rRNA.time'
+    benchmark: 'benchmarks/{sample}.{search}.{top}.{rna}.time'
     params:
         get_ids_cmd=lambda w: get_get_ids_cmd(w, config)
     shell: "screen_table.py {input.hits} -k \
@@ -123,7 +146,7 @@ rule filter_hits:
 rule compile_hit_counts:
     """
     Uses pandas to outer join hit counts. The {rna} wildcard is 
-    expected to be "non-rRNA" or "all".
+    expected to be "non-rRNA", "SSU", "LSU",  or "all".
     """
     input:
         lambda w: expand('{sample}.{filter}.{top}.{rna}.hitid.counts',

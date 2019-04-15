@@ -97,8 +97,11 @@ def get_top_hit_outputs(config):
         topalg = config.get('top_alg', 'tophit')
         config['outputs'].add('counts.{dbase}.{topalg}.all.hitids'.format(**vars()))
         if config.get('remove_rna'):
-            # also do counts without rRNA reads
-            config['outputs'].add('counts.{dbase}.{topalg}.non-rRNA.hitids'.format(**vars()))
+            # also do counts of requested rRNA subset
+            rrna_subset = config.get('rrna_subset', 'non-rRNA')
+            config['outputs'] \
+                    .add('counts.{dbase}.{topalg}.{rrna_subset}.hitids' \
+                         .format(**vars()))
         logger.debug('added counts.{dbase}.{topalg}.hitids to outputs'.format(**vars()))
 
     return needs_qc
@@ -110,17 +113,29 @@ def get_filter_string(filter_dict):
     return "".join("_{}{}".format(k, filter_dict[k]) \
                    for k in sorted(filter_dict.keys()))
 
-def get_non_rna_reads(wildcards, config):
+def get_rna_filtered_reads(wildcards, config):
+    """ 
+    get the clean reads for a sample
+    then insert requested sequence type name into fastsq file name
+    eg: turn sample.clean.fastq -> sample.clean.SSU.fastq
+    """
     cleaned_reads = config['sample_data'][wildcards.sample]['clean']
-    return re.sub(r'\.(fast[aq])$', r'.non-rRNA.\1', cleaned_reads)
+    rrna_subset = wildcards.rna
+    return re.sub(r'\.(fast[aq])$',
+                  r'.{}.\1'.format(rrna_subset),
+                  cleaned_reads)
 
 def get_get_ids_cmd(wildcards, config):
-    nonrna = get_non_rna_reads(wildcards, config)
-    if nonrna.endswith('fasta'):
-        return "grep '^>' {nonrna} | \
-                 perl -pe 's/^>(\\S+).*/\\1/'".format(nonrna=nonrna)
+    """
+    get the approriate fastq|fasta file of rrna filtered reads and
+    reutnr a commonad that will list the ids
+    """
+    reads = get_rna_filtered_reads(wildcards, config)
+    if reads.endswith('fasta'):
+        return "grep '^>' {reads} | \
+                 perl -pe 's/^>(\\S+).*/\\1/'".format(reads=reads)
     else:
-        return "gawk '(NR+3) % 4 == 0' {nonrna} | \
-                 perl -pe 's/^@(\\S+).*/\\1/'".format(nonrna=nonrna)
+        return "gawk '(NR+3) % 4 == 0' {reads} | \
+                 perl -pe 's/^@(\\S+).*/\\1/'".format(reads=reads)
 
 

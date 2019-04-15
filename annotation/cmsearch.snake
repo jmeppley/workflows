@@ -6,7 +6,7 @@ snakefile_path = os.path.dirname(
                     os.path.abspath(workflow.snakefile))
 
 defaults={'cmsearch': {
-                   'threads': 20,
+                   'threads': 3,
                    'models': \
                       os.path.join(snakefile_path,"annotation",'models'),
                    },
