@@ -2,22 +2,23 @@
 Workflow for assembling metagenomic samples
 
  * renames reads to sample name(s)
- * cleans with:
-   - bbduk (adapters)
-   - bfc (error correction)
-   - trimmomatic (quality and length)
+ * cleans with either:
+   - bbduk (adapters); bfc (error correction); trimmomatic (quality and length)
+   or
+   - https://github.com/merenlab/illumina-utils
  * runs assembler (SPAdes or megahit)
  * renames contigs
     (to config[assembly_name], if given)
     (to sample name, if only one)
  * annotates (rRNAs, tRNA, genes)
+ * counts (reads, contigs, genes)
 
-####
 # Required conda packages:
-#
-# snakemake bbmap infernal spades prodigal pandas biopython bfc (optional)
-###
+See test/conda/assembly.yml for details. Create env with:
 
+    conda env create -n assembly -f /path/to/workflows/test/conda/assembly.yml
+
+# configuration
 see test/data/configs/spades.yaml for an example configuration
 
 """
