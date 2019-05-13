@@ -1,0 +1,24 @@
+assembly_name: spades
+sample_data:
+    fortyk:
+        raw:
+          - "../../data/raw_reads/2014_ALOHA_XVII_1-1B_S1_R1_001.head40k.fastq"
+          - "../../data/raw_reads/2014_ALOHA_XVII_1-1B_S1_R2_001.head40k.fastq"
+        filter: ../../data/other/read_filter.list
+        chemistry: scripseq
+        barcode: ATCACG
+trimmomatic:
+    threads: 10
+    minlen: 100
+    leading: 10
+    trailing: 10
+    sliding_window: "4:20"
+bbduk:
+    threads: 5
+cmsearch:
+    threads: 10
+spades:
+    ram: 10
+samtools:
+    ram: 1G
+    threads: 2

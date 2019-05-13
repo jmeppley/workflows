@@ -32,6 +32,20 @@ setup() {
     [ "${lines[0]}" == "NS500472:37:HMMVTBGXX:1:11101:14387:1050fortyk_1" ]
 }
 
+@test "assemble filtered reads with spades" {
+    rm -rf test/scratch/filter
+    mkdir -p test/scratch/filter
+    cd test/scratch/filter
+
+    run bash -c "snakemake -j 10 -s ../../../assembly.metagenomic.snake -p --config discover_fastx_for_stats=True --configfile ../../data/configs/spades_filtered.yaml --verbose > assembly.log 2>&1"
+    [ "$status" -eq 0 ]
+    [ -e stats/fourk.renamed.interleaved.noadapt.nophix.fastq.stats ]
+    [ -e stats/fourk.renamed.interleaved.noadapt.fastq.hist ]
+    run bash -c "snakemake -j 10 -s ../../../assembly.metagenomic.snake -p --configfile ../../data/configs/spades_filtered.yaml -n 2>&1 | grep '^Nothing'"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" == "Nothing to be done." ]
+}
+
 @test "assemble single sample with megahit" {
     rm -rf test/scratch/megahit
     mkdir -p test/scratch/megahit

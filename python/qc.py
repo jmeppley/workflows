@@ -10,7 +10,6 @@ records jonied by a bunch of NNN's
 
 """
 
-import os
 import re
 from collections import defaultdict
 import yaml
@@ -106,81 +105,51 @@ def setup_qc_outputs(config):
     # process any patterns in sample_data[reads_patterns]
     samples = process_sample_data(sample_data, config)
 
+    # initialize:
+    #  create symlinks between paired files
     transitions = config.setdefault('transitions', {})
-
-    # Loop over samples that came with their own clean reads and:
-    #  1) set up pairs to be interleaved
-    #  2) replace with locally named file and add transition if not in workdir
-    samples_with_clean_reads = [s for s in samples if 'clean' in sample_data[s]]
-    drop_clean_reads_for_these_samples = []
+    #  dict of filter transitions
+    filter_dict = config.setdefault('filter_dict', {})
+    #  list of cleaned reads to include in assembly
     cleaned_read_list = config.setdefault('cleaned_read_list', [])
-    for sample in samples_with_clean_reads:
-        remote_cleaned_reads = sample_data[sample]['clean']
-        if not isinstance(remote_cleaned_reads, str) and \
-                                len(remote_cleaned_reads) > 1:
-            # list or tuple or multiple files: send through QC to be
-            # interleaved
-            # transitions will be set up as part of QC below
-            # add raw and remove clean so QC will get setup below
-            sample_data[sample].setdefault('raw', remote_cleaned_reads)
-            drop_clean_reads_for_these_samples.append(sample)
-            # set protocol to None, so the pair just gets interleaved
-            sample_data[sample].setdefault('protocol', 'None')
-        elif len(remote_cleaned_reads) == 0:
-            raise Exception("No clean reads for sample {}:\n{}"
-                            .format(sample, repr(sample_data[sample])))
-        else:
-            # change list with one string into single str object
-            if not isinstance(remote_cleaned_reads, str):
-                remote_cleaned_reads = remote_cleaned_reads[0]
-            #if nddot is_in_working_dir(remote_cleaned_reads):
-            #    logger.debug("{} is not in working dir".format(remote_cleaned_reads))
-            # if input file does not conform to naming convention, create link
-            local_cleaned_reads = '{sample}.clean.fastq'.format(**vars())
-            if re.search(r'\.gz$', remote_cleaned_reads) is not None:
-                local_cleaned_reads += ".gz"
-            transitions[local_cleaned_reads] = remote_cleaned_reads
-            sample_data[sample]['clean'] = local_cleaned_reads
-            cleaned_read_list.append(local_cleaned_reads)
-
-    for sample in drop_clean_reads_for_these_samples:
-        del sample_data[sample]['clean']
-
-    # find samples that need QC
-    samples_with_raw_reads = [s for s in samples \
-                                              if 'raw' in sample_data[s] \
-                                              and 'clean' not in sample_data[s]]
-
-    # loop back over samples and set up cleaning or interleaving if needed
+    #  list of final read files to consider as outputs
     outputs = []
-    for sample in samples_with_raw_reads:
-        raw_files = [sample_data[sample]['raw'],] \
-                    if isinstance(sample_data[sample]['raw'], str) \
-                    else sorted(sample_data[sample]['raw'])
 
-        # get protocol (try sample_Data first, fall back to global)
-        cleaning_protocol = \
-                sample_data[sample].setdefault('protocol',
-                                        config.setdefault('cleaning_protocol',
-                                                   'None'))
+    # LOOP over samples
+    for sample in samples:
+        data = sample_data[sample]
 
-        # check to see if they are compressed (we can handle .gz)
-        #  Bail out if one file is compressed and the other isn't
-        files_gzipped = None
-        for file_name in raw_files:
-            if re.search(r'\.gz$', file_name) is not None:
-                if files_gzipped is False:
-                    raise Exception("It seems one file is compressed and the "
-                                    "other is "
-                                    "not:\n{}".format("\n".join(raw_files)))
-                files_gzipped = True
-            else:
-                if files_gzipped:
-                    raise Exception("It seems one file is compressed and the "
-                                    "other is "
-                                    "not:\n{}".format("\n".join(raw_files)))
-                files_gzipped = False
-        extension = "fastq.gz" if files_gzipped else "fastq"
+        ## CLEAN
+        # Did this sample come with clean reads? If so:
+        #  1) set up pairs to be interleaved
+        #  2) replace with locally named file and add transition if not in workdir
+        if 'clean' in data:
+            cleaned_reads = process_cleaned_reads(sample, data, transitions)
+            if cleaned_reads != None:
+                cleaned_read_list.append(cleaned_reads)
+
+        ## RAW
+        # Does this sample have raw reads that need QC?
+        if 'raw' in data and 'clean' not in data:
+
+
+            # get files as sorted list
+            raw_files = [data['raw'],] \
+                        if isinstance(data['raw'], str) \
+                        else sorted(data['raw'])
+
+            # get protocol (try sample_Data first, fall back to global)
+            cleaning_protocol = \
+                    data.setdefault('protocol',
+                                    config.setdefault('cleaning_protocol',
+                                                       'None'))
+
+        # check to see if input is compressed (we can handle .gz)
+        extension = "fastq.gz" if are_files_gzipped(raw_files) else "fastq"
+
+        # do we need to filter reads first?
+        #  WARNING: filtering only works with uncompressed fastq
+        filter_file = data.get('filter', None)
 
         # starting files (define as transitions from raw files)
         new_raw_files = []
@@ -188,24 +157,32 @@ def setup_qc_outputs(config):
             # The reads are probably split up into lanes, merge into one pair
             for direction, file_list in setup_merge_by_lanes(raw_files,
                                                              sample).items():
-                merged_file = '{sample}.{direction}.{extension}'\
+                local_raw_file = '{sample}.{direction}.{extension}'\
                                                         .format(**vars())
-                transitions[merged_file] = file_list
-                new_raw_files.append(merged_file)
+                filter_or_link_transition(file_list,
+                                          local_raw_file,
+                                          filter_file,
+                                          transitions, filter_dict)
+                new_raw_files.append(local_raw_file)
         elif len(raw_files) == 2:
             for direction, source_file in zip(READ_DIRECTIONS, raw_files):
-                new_raw_file = '{sample}.{direction}.{extension}'\
-                                                .format(**vars())
-                transitions[new_raw_file] = source_file
-                new_raw_files.append(new_raw_file)
+                local_raw_file = '{sample}.{direction}.{extension}'\
+                                                        .format(**vars())
+                filter_or_link_transition(source_file,
+                                          local_raw_file,
+                                          filter_file,
+                                          transitions, filter_dict)
+                new_raw_files.append(local_raw_file)
         else:
             local_raw_file = '{sample}.{extension}'.format(**vars())
-            transitions[local_raw_file] = raw_files[0]
+            filter_or_link_transition(raw_files[0],
+                                      local_raw_file,
+                                      filter_file,
+                                      transitions, filter_dict)
             new_raw_files.append(local_raw_file)
 
         # everything else should work from the linked files
-        #raw_files = new_raw_files
-        sample_data[sample]['raw'] = new_raw_files
+        data['raw'] = new_raw_files
 
         # cleaned suffix
         cleaned_suffix = get_cleaned_suffix(cleaning_protocol,
@@ -218,14 +195,14 @@ def setup_qc_outputs(config):
             logger.debug("adding separated rrna reads to output")
             # add rRNA reads to output
             for rrna_split in ['SSU', 'LSU']:
-                outputs.append("{sample}.{cleaned_suffix}.{rrna_split}.fastq" \
+                outputs.append("{sample}.{cleaned_suffix}{rrna_split}.fastq" \
                                 .format(**vars()))
             # set non-rRNA as cleaned target
-            cleaned_raw_reads = '{sample}.{cleaned_suffix}.non-rRNA.fastq'\
+            cleaned_raw_reads = '{sample}.{cleaned_suffix}non-rRNA.fastq'\
                                                     .format(**vars())
         else:
             # otherwise, QC ends at cleaned_suffix
-            cleaned_raw_reads = '{sample}.{cleaned_suffix}.fastq'\
+            cleaned_raw_reads = '{sample}.{cleaned_suffix}fastq'\
                                                     .format(**vars())
 
         # this is the alias that will point to the actual QC output
@@ -233,9 +210,79 @@ def setup_qc_outputs(config):
         cleaned_read_list.append(cleaned_reads)
         outputs.append(cleaned_reads)
         transitions[cleaned_reads] = cleaned_raw_reads
-        sample_data[sample]['clean'] = cleaned_reads
+        data['clean'] = cleaned_reads
 
     return outputs
+
+
+def filter_or_link_transition(source_file, dest_file, filter_file,
+                              transitions, filter_dict,
+                             ):
+    """ Both the transitions mechanism and the filter mechanism can
+    handle multiple files """
+    if filter_file is not None:
+        filter_dict[dest_file] = {'all_reads': source_file,
+                                  'filter': filter_file}
+    else:
+        transitions[dest_file] = source_file
+
+
+def process_cleaned_reads(sample, data, transitions):
+    """
+    For a sample that came with clean reads, make sure we end up with
+    a single interleaved file of reads in working folder
+    """
+    drop_clean_reads = False
+    remote_cleaned_reads = data['clean']
+
+    # send reads through QC if there is any processing that neds to be done:
+    #  EG: interleaving or filtering
+    needs_filter = 'filter' in data
+    needs_interleaving = not isinstance(remote_cleaned_reads, str) and \
+                            len(remote_cleaned_reads) > 1
+    if needs_filter or needs_interleaving:
+        # we do this by sending through QC with no protocol
+        data.setdefault('raw', remote_cleaned_reads)
+        data.setdefault('protocol', 'None')
+        # remove 'clean' so QC will get setup below
+        del data['clean']
+        return None
+    elif len(remote_cleaned_reads) == 0:
+        raise Exception("No clean reads for sample {}:\n{}"
+                        .format(sample, repr(data)))
+    else:
+        # change list with one string into single str object
+        if not isinstance(remote_cleaned_reads, str):
+            remote_cleaned_reads = remote_cleaned_reads[0]
+        # build standardized cleaned reads file name in workdir
+        local_cleaned_reads = '{sample}.clean.fastq'.format(**vars())
+        if re.search(r'\.gz$', remote_cleaned_reads) is not None:
+            local_cleaned_reads += ".gz"
+        # if input file does not conform to naming convention, create link
+        if local_cleaned_reads != remote_cleaned_reads:
+            transitions[local_cleaned_reads] = remote_cleaned_reads
+        data['clean'] = local_cleaned_reads
+        return local_cleaned_reads
+
+def are_files_gzipped(raw_files):
+    """ if all input files end in .gz, return true
+        throw exception if mismatched """
+    files_are_gzipped = None
+    for file_name in raw_files:
+        if re.search(r'\.gz$', file_name) is not None:
+            if files_are_gzipped is False:
+                raise Exception("It seems one file is compressed and the "
+                                "other is "
+                                "not:\n{}".format("\n".join(raw_files)))
+            files_are_gzipped = True
+        else:
+            if files_are_gzipped:
+                raise Exception("It seems one file is compressed and the "
+                                "other is "
+                                "not:\n{}".format("\n".join(raw_files)))
+            files_are_gzipped = False
+    return files_are_gzipped
+
 
 def get_cleaned_suffix(cleaning_protocol, sample, config):
     """ determine what the final output file name suffix is """
@@ -245,7 +292,7 @@ def get_cleaned_suffix(cleaning_protocol, sample, config):
     # special cases
     if cleaning_protocol not in JOINING_PROTOCOLS and num_raw_files == 1:
         # if cleaning one file for assembly, drop interleave
-        cleaned_suffix = re.sub(r'\.interleaved', '', cleaned_suffix)
+        cleaned_suffix = re.sub(r'interleaved', '', cleaned_suffix)
     if cleaning_protocol == 'None' and num_raw_files == 2:
         # if not cleaning, but two files given, interleave them
         cleaned_suffix = 'interleaved'
@@ -256,7 +303,14 @@ def get_cleaned_suffix(cleaning_protocol, sample, config):
         cleaned_suffix = '.'.join([chemistry, barcodes]) + \
                             '.' + cleaned_suffix
 
+    # make sure it ends in a dot
+    cleaned_suffix += "."
+
+    # remove dupmlicate dots left over from above tweaks
+    cleaned_suffix = re.sub(r'\.\.', '.', cleaned_suffix)
+
     return cleaned_suffix
+
 
 def setup_merge_by_lanes(raw_files, sample):
     """

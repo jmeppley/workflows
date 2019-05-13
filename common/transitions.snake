@@ -49,7 +49,8 @@ pattern = "(" + "|".join(transitions.keys()) + ")"
 wildcard_constraints:
     transition_file_name=pattern
 
-include: os.environ['CONDA_PREFIX'] + "/share/drs/snake/download.snake"
+#include: os.environ['CONDA_PREFIX'] + "/share/drs/snake/download.snake"
+include: '/home/jmeppley/work/dynamic_remote_snake/download.snake'
 
 # transition rule will only match one of the configured files
 localrules: transition_link_or_cat

@@ -25,5 +25,3 @@ rule drop_singles:
     benchmark: "benchmarks/{prefix}.dropse.time"
     version: SEQTK_VERSION
     shell: "seqtk dropse {input} > {output}"
-    
-

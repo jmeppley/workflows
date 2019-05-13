@@ -7,6 +7,11 @@ if config.get('remove_rna', True) in ['True', True]:
     include: "../common/fastq.snake"
     include: "sort.rna.snake"
 
+# if any samples are filtered
+if sum(1 for s in config['sample_data'] \
+       if 'filter' in config['sample_data'][s])>0:
+    include: '../common/filter_reads.snake'
+
 # if we were given raw reads
 if sum(1 for s in config['sample_data'] \
          if 'raw' in config['sample_data'][s]

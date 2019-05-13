@@ -1,0 +1,20 @@
+filter_dict = config.get('filter_dict', {})
+
+if len(filter_dict) > 0:
+
+    # To prevent filter rule from matchin every file on earth:
+    #  dynamically generate overly specific regex constraint that lists all
+    #  file names
+    pattern = "(" + "|".join(filter_dict.keys()) + ")"
+    wildcard_constraints:
+        filtered_file=pattern
+    rule filter_reads:
+        """ IF a sample was supplied with a filter file, use that
+        file to pull out selected reads """
+        input:
+            reads=lambda w: filter_dict[w.filtered_file]['all_reads'],
+            keep=lambda w: filter_dict[w.filtered_file]['filter']
+        output: "{filtered_file}"
+        shell:
+            "screen_list.py -l {input.keep} {input.reads} -k -f fastq -o {output}"
+

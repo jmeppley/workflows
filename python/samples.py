@@ -27,6 +27,7 @@ def process_sample_data(sample_data, config):
     # First, process the patterns
     if 'reads_patterns' in sample_data:
         if isinstance(sample_data['reads_patterns'], dict):
+            # it should be a list of dicts, but if it's just one dict, thats OK
             reads_patterns = [sample_data['reads_patterns']]
         else:
             reads_patterns = sample_data['reads_patterns']
@@ -34,7 +35,7 @@ def process_sample_data(sample_data, config):
             other_read_data = {}
             read_key = 'raw'
             for key in pattern_data.keys():
-                if key == 'cleaned':
+                if key in ['cleaned', 'clean']:
                     read_key = 'clean' if pattern_data[key] else 'raw'
                 elif key in ['glob', 're', 'wildcard_glob']:
                     continue
@@ -43,7 +44,12 @@ def process_sample_data(sample_data, config):
 
             for sample, reads in collect_sample_reads(pattern_data, config).items():
                 sample_data.setdefault(sample, {})[read_key] = reads
-                sample_data[sample].update(other_read_data)
+                for key, value in other_read_data:
+                    if key == 'filter':
+                        # this will need to be a template, eg: {sample}.list
+                        value = value.format(sample=sample)
+                    else:
+                        sample_data[key] = value
 
         # Now get rid of any patterns from config
         del sample_data['reads_patterns']
@@ -116,21 +122,24 @@ def collect_sample_reads(samples_pattern_data, config):
     snakemake.logger.warning("getting reads from glob and re is deprecated, "
                              "use wildcard_glob instead!")
     sample_pattern = samples_pattern_data.get('re', r'/([^/]+)/[^/]+$')
-    sample_RE = re.compile(sample_pattern)
+    sample_rexp = re.compile(sample_pattern)
     read_file_glob = samples_pattern_data.get('glob',
                                               './*/reads.cleaned.fastq.gz')
-    return get_re_glob_reads(read_file_glob, sample_RE)
+    return get_re_glob_reads(read_file_glob, sample_rexp)
 
 def get_wc_glob_reads(wildcard_glob_string, config):
     """
     Use wildcard glob string to build map from samples to read fastq files
 
-    There must be a "sample" wildcard in the glob string.
+    There must be a "sample" wildcard in the glob string. 
    
-    Other wildcards are ignored. Multiple fastq files per samples are assumed to be fwd/rev pair (in alphabetical order)
+    Other wildcards are ignored. Multiple fastq files per samples are assumed
+    to be fwd/rev pair (in alphabetical order). We'll throw an error later
+    if there are more than 2 files.
     """
     reads = {}
 
+    # returns a snakemake wildards object
     wildcard_values = remote_wrapper(wildcard_glob_string, config, glob=True)
 
     # which wildcard in glob was "sample"
@@ -153,7 +162,7 @@ def get_wc_glob_reads(wildcard_glob_string, config):
                                config))
     return reads
 
-def get_re_glob_reads(read_file_glob, sample_RE):
+def get_re_glob_reads(read_file_glob, sample_rexp):
     """
     Given a glob string and regular expression,
     find all the matching files and use rexp
@@ -171,11 +180,11 @@ def get_re_glob_reads(read_file_glob, sample_RE):
 
     # collect files into lists by sample
     for read_file in read_files:
-        match = sample_RE.search(read_file)
+        match = sample_rexp.search(read_file)
         if match is None:
             raise Exception(
                 ("The sample matching expression ({}) failed to find a sample "
-                 "name in the path: {}").format(sample_RE.pattern, read_file)
+                 "name in the path: {}").format(sample_rexp.pattern, read_file)
             )
         sample = match.group(1)
         # sanitize sample name
