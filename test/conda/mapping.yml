@@ -9,3 +9,4 @@ dependencies:
     - kallisto
     - py-metagenomics
     - dynamic_remote_snake
+    - samtools

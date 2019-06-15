@@ -1,4 +1,5 @@
 setup() {
+    eval "$(conda shell.bash hook)"
     mkdir -p test/conda/envs
     ENV=annotate
     ENV_DIR=`pwd`/test/conda/envs/$ENV
@@ -7,7 +8,7 @@ setup() {
         rm -rf $ENV_DIR
         conda env create -f $ENV_FILE -p $ENV_DIR --force --quiet > /dev/null 2>&1
     fi
-    source activate $ENV_DIR
+    conda activate $ENV_DIR
 }
 
 @test "Annotate reads from a bam file with prodigal" {

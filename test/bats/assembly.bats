@@ -1,4 +1,5 @@
 setup() {
+    eval "$(conda shell.bash hook)"
     mkdir -p test/conda/envs
     ENV=assembly
     ENV_DIR=`pwd`/test/conda/envs/$ENV
@@ -8,7 +9,7 @@ setup() {
         conda env create -f $ENV_FILE -p $ENV_DIR --force --quiet > test/conda/envs/.create.$ENV 2>&1
     fi
     # suppress warnings
-    source activate $ENV_DIR 2>/dev/null || true
+    conda activate $ENV_DIR 2>/dev/null || true
     # quit if activation failed
     if [ "$CONDA_PREFIX" != "$ENV_DIR" ]; then
         echo "ERROR activating cond env $ENV_DIR"
