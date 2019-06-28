@@ -5,6 +5,7 @@ channels:
  - jmeppley
 dependencies:
  - python=3
+ - pip
  - snakemake-minimal
  - pysftp
  - psutil
