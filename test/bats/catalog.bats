@@ -42,6 +42,11 @@ setup() {
     run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config genes_file=../../../data/other/all_genes.clustered.faa -p -k -j 20 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" == "Nothing to be done." ]
+    [ -e all_genes.clustered.annotations.pfam ]
+    run bash -c "grep ';' all_genes.clustered.annotations.tab | grep -c Bacteria"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" == "2" ]
+
 }
 
 @test "assemble sample ALOHA_04" {

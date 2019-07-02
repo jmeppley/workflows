@@ -28,3 +28,9 @@ dbs:
     COGfrg:
         path: ../../../data/seqdbs/COG/COG.partial.hmm
         frags: 8
+    pfam:
+        path: ../../../data/seqdbs/PFAM/pfam.31.slice.hmm
+        assign_type: pfam
+        cutoffs: 
+            evalue: 0.001
+            nonoverlapping: 5
