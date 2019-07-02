@@ -19,6 +19,50 @@ default_threads=config.setdefault('threads',{}).get('default', 3)
 include: "lastal.snake"
 include: "hmmer.snake"
 
+def get_hit_filter(wildcards):
+    """
+    inserts up to two filters into the bash pipeline:
+     * remove suffixes from prodigal or six-frame-translation
+     * apply hit filters from configuration
+    """
+    logger.debug("Wildcards: " + repr(wildcards))
+    read_name_filter = get_read_name_filter(wildcards)
+    logger.debug("read filter is: " + read_name_filter)
+    hit_table_filter = get_hit_table_filter(wildcards)
+    logger.debug("hits filter is: " + hit_table_filter)
+
+    cmds = set([c for c in [read_name_filter, hit_table_filter] if c != 'cat'])
+    logger.debug(cmds)
+    if len(cmds) >= 1:
+        return " | ".join(cmds)
+    else:
+        return "cat"
+
+
+def get_hit_table_filter(wildcards):
+    """
+    If "cutoffs" in the db config, run filter_blast_m8.py
+    """
+    db=wildcards.db
+    db_config=config['dbs'][db]
+    if 'cutoffs' in db_config:
+        # get format string for filter script
+        # this is a little different for tax and path searches
+        if 'lastalg' in wildcards._names:
+            fmt='blast' if re.search(r'^b?last[pnx]$', wildcards.lastalg) \
+                        else wildcards.lastalg
+        else:
+            fmt='hmmsearchdom' if re.search(r'^tbl\b', wildcards.ext) \
+                                        else 'blast'
+    
+        # the filter cutoffs
+        filter_opts = " ".join("--{} {}".format(f,v) \
+                               for f,v in db_config['cutoffs'].items())
+
+        return "filter_blast_m8.py -f {fmt} {filter_opts}".format(**locals())
+    else:
+        return "cat"
+
 def get_read_name_filter(wildcards):
     """
     Figure out if we need to translate read names. Usually this takes gene 
@@ -52,7 +96,7 @@ rule assign_taxa:
         format=lambda w: 'blast' if re.search(r'^b?last[pnx]$', w.lastalg)\
                                  else w.lastalg,
         # Filter reading frame suffixes if translated with transeq or prodigal
-        filter=get_read_name_filter,
+        filter=get_hit_filter,
     version:
         get_version('assign_taxa.py')
     shell:
@@ -84,11 +128,11 @@ rule assign_paths:
         # KEGG and PFAM need special handling
         params=lambda w: get_db_assignment_params(w, config),
         # Filter reading frame suffixes if translated with transeq or prodigal
-        filter=get_read_name_filter,
+        filter=get_hit_filter,
     shell:
          "cat {input} \
           | {params.filter} \
-          | assign_paths.py --sort evalue -C first -f {params.format} {params.params} \
+          | assign_paths.py --sort evalue -f {params.format} {params.params} \
             -o {output}"
 
 rule count_tax_hits:

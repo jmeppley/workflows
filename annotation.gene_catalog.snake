@@ -161,6 +161,11 @@ rule kegg_annotations:
         a = gene_catalog.KeggGeneAnnotator(get_file_name(params.db))
         a.annotate_genes_kg(get_file_name(input.hits), get_file_name(output))
 
+def collapse_duplicates(table, col='Gene', sep=','):
+    """ aggregate on given column by simply concatenating around the given
+    separator """
+    return table.groupby(col).agg(lambda S: sep.join(str(v) for v in S))
+
 rule final_table:
     input: expand('{prefix}.annotations.{db}', \
                   prefix=prefix, \
@@ -186,9 +191,12 @@ rule final_table:
         # iteratively join other annotations
         for db in sorted(db_file_map.keys()):
             table = pandas.read_table(db_file_map[db],
-                                      index_col=0,
+                                      index_col=None,
                                       header=0,
                                       names=['Gene', db])
+            # if there are duplicate entries Cfor some genes, separate by
+            # semicolon
+            table = collapse_duplicates(table, col='Gene', sep=';')
             annot = annot.join(table, how='outer')
             logger.debug("Annotation table shape is: {}".format(annot.shape))
 

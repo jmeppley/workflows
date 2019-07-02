@@ -87,10 +87,10 @@ def get_db_assignment_params(wildcards, config):
     """
     assign_type = config['dbs'][wildcards.db].get('assign_type','hitid').lower()
     if assign_type=='kegg':
-        return '-p hitid -M kegg -m %s.kos' % (config['dbs'].get('KEGG',{'path':''})['path'])
+        return '-p hitid -C first -M kegg -m %s.kos' % (config['dbs'].get('KEGG',{'path':''})['path'])
     if assign_type=='pfam':
-        return '-p pfam'
-    return '-p hitid'
+        return '-p pfam -C all'
+    return '-C first -p hitid'
 
 
 def get_db_frag(config, db, N):
