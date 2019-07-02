@@ -45,7 +45,7 @@ setup() {
     [ -e all_genes.clustered.annotations.pfam ]
     run bash -c "grep ';' all_genes.clustered.annotations.tab | grep -c Bacteria"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "2" ]
+    [ "${lines[0]}" == "3" ]
 
 }
 
