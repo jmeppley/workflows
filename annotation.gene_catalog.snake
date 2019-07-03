@@ -185,12 +185,12 @@ rule final_table:
                 db_file_map[db_name] = table_file
 
         # load RefSeq annotations
-        annot = pandas.read_table(ref_seq_table, header=0, index_col=0)
+        annot = pandas.read_csv(ref_seq_table, sep='\t', header=0, index_col=0)
         logger.debug("Annotation table shape is: {}".format(annot.shape))
 
         # iteratively join other annotations
         for db in sorted(db_file_map.keys()):
-            table = pandas.read_table(db_file_map[db],
+            table = pandas.read_csv(db_file_map[db], sep='\t',
                                       index_col=None,
                                       header=0,
                                       names=['Gene', db])

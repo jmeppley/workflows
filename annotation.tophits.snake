@@ -178,10 +178,3 @@ rule compile_hit_counts:
         counts.to_csv(output[0], sep='\t')
 
 
-
-
-
-###TODO: how can we assign top hit accross all samples, yet leave the separate
-#files???
-# * assign_tophits.py will take multiple files. We need to modify the
-#   rule to take advantage of this...
