@@ -13,9 +13,15 @@ Files created:
 """
 from Bio import SeqIO
 
-dummy_coverage_file = prefix + ".coverage.dummy.tsv"
-local_coverage_file = '{}.coverage.tsv'.format(prefix)
-transitions[local_coverage_file] = dummy_coverage_file
+if 'sample_data' in config:
+    samples = config['sample_data'].keys()
+else:
+    samples = ['prefix']
+
+for prefix in samples:
+    dummy_coverage_file = prefix + ".coverage.dummy.tsv"
+    local_coverage_file = '{}.coverage.tsv'.format(prefix)
+    transitions[local_coverage_file] = dummy_coverage_file
 
 rule dummy_gene_coverage:
     """ generate a coverage table of all 1s """

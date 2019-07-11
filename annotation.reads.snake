@@ -148,22 +148,26 @@ for sample, reads_file in sample_data.items():
 ##########
 
 include: "common/stats.snake"
-include: "common/transitions.snake"
 aa_conversion = config.get('aa_conversion', 'sixframe')
 if faa_count > 0 and faa_count < len(sample_data):
     raise Exception("If any input files are protein (.faa), they all must be")
 if faa_count == len(sample_data):
     include: "annotation/common.genes.snake"
-    converted_suffix = "faa"
+    include: "annotation/dummy.coverage.snake"
+    stats_suffixes = ["faa",]
     fastq_query_extension = 'faa'
+    if config.setdefault('remove_rna', False) in ['True', True]:
+        raise Exception("Cannot run faa files through rRNA search. "
+                        "Please set remove_rna: False")
 elif aa_conversion == 'prodigal':
     include: "annotation/common.prodigal.snake"
-    converted_suffix = "pred.genes.faa"
+    stats_suffixes = ['fasta', "pred.genes.faa"]
     fastq_query_extension = 'faa'
 else:
     include: "annotation/common.sixframe.snake"
-    converted_suffix = "sixframe.faa"
+    stats_suffixes = ['fasta', "sixframe.faa"]
     fastq_query_extension = 'fasta'
+include: "common/transitions.snake"
 
 if need_fastq:
     include: "common/fastq.snake"
@@ -201,7 +205,7 @@ annotation_file_list = \
                    db_dot_fmt=gene_family_db_dot_fmts,) + \
             expand("stats/{prefix}.{rna_step}{suffix}.{ext}", 
                    ext=['stats','hist'],
-                   suffix=['fasta', converted_suffix],
+                   suffix=stats_suffixes,
                    rna_step=rna_step,
                    prefix=sample_data)
 
