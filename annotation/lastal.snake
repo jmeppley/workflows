@@ -11,6 +11,8 @@ rule compile_lastdb:
     output: "{db_path}.prj"
     threads:
         lambda wildcards: config.get('lastal',{}).get('threads',10)
+    resources:
+        disk=1
     params:
         lastdb=lambda w: 'lastdb8' \
                     if os.path.dirname(w.db_path)[-1]=='8' \
@@ -25,6 +27,8 @@ rule get_db_id_map:
     """
     input: '{db_path}.faa'
     output: "{db_path}.ids"
+    resources:
+        disk=1
     shell: r"grep '^>' {input} | perl -pe 's/^>(\S+)\s+/\1\t/' > {output}"
 
 rule lastal:
@@ -45,6 +49,8 @@ rule lastal:
         get_version('lastal')
     threads:
         lambda wildcards: config.get('lastal',{}).get('threads',10)
+    resources:
+        disk=1
     params:
         db_path=lambda w: config['dbs'][w.db]['path'],
         fshift=lambda w: "-F 15" if w.alg=='x' else "",

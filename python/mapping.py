@@ -12,12 +12,7 @@ from jme.drs import remote_wrapper, get_dl_snakefile
 
 def check_sample_data(config):
     """ if sample_data not explicitly listed in config, work from glob """
-    if "sample_data" not in config:
-        if "sample_glob" not in config:
-            raise Exception("Please supply read files explicitly in "
-                            "config[sample_data] or with  "
-                            "config[sample_glob]")
-
+    if "sample_glob" in config:
         # string like "/path/to/files/{sample}.fastq"
         sample_glob = config['sample_glob']
         wildcard_values = remote_wrapper(sample_glob, config, glob=True)
@@ -36,9 +31,15 @@ def check_sample_data(config):
             else:
                 # add sample
                 sample = wildcard_tuple[sample_index]
-                sample_data[sample] = remote_wrapper(
-                                        sample_glob.format(
+                sample_data[sample] = sample_glob.format(
                                             **dict(zip(wildcard_names,
-                                                       wildcard_tuple))),
-                                                       config)
+                                                       wildcard_tuple)))
+    if "sample_data" not in config:
+            raise Exception("Please supply read files explicitly in "
+                            "config[sample_data] or with  "
+                            "config[sample_glob]")
 
+
+    # apply remote_wrapper to all files in sample_data
+    config['sample_data'] = {s:remote_wrapper(f, config) \
+                             for s, f in config['sample_data'].items()}

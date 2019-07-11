@@ -53,6 +53,8 @@ import yaml
 import os
 from python.common import get_version
 from python.annotate import get_db_dot_fmt_strings, get_last_alg
+from python.mapping import check_sample_data
+from jme.drs import remote_wrapper
 
 #########
 # CONFIGURATION
@@ -61,25 +63,49 @@ from python.annotate import get_db_dot_fmt_strings, get_last_alg
 # ranks to collect taxa on (defaults to order)
 config.setdefault('clade_ranks', ['order'])
 #
+# EXPERIMENTAL: support for glob_wildcards or detailed sample:fastq config map
+#  checks for sample_data map or sample_glob template string
+#    - sample_glob must have a "{sample}" wild card in it
+#    - all files are run through remote_wrapper
+check_sample_data(config)
+
+sample_data = config.get('sample_data', {})
+
 # read file names for start of workflow
-prefix = config.setdefault('annot_prefix', 'reads')
-reads_file = config.setdefault('reads_file', '{prefix}.fasta'.format(**vars()))
+#  old way: single file (use defaults if nothing else configured)
+if 'annot_prefix' in config or 'reads_file' in config or len(sample_data) == 0:
+    prefix = config.setdefault('annot_prefix', 'reads')
+    reads_file = remote_wrapper( \
+        config.setdefault('reads_file', '{prefix}.fasta'.format(**vars())),
+        config)
+    sample_data[prefix] = reads_file
+
+
+## process sample_data file names
 transitions = config.setdefault('transitions',{})
-#
-# If the starting file doesn't fit our naming scheme,
-#  call for a symbolic link to be made (using transitions dict)
-extension = re.search(r'\.([a-z0-1A-Z]+)$', reads_file).group(1)
-if extension in ['fna', 'ffn', 'fa', 'fasta']:
-    extension = 'fasta'
-if extension in ['fasta', 'fastq', 'bam']:
-    if extension == 'fastq':
-        include: "common/fastq.snake"
-    annot_start_file = "{prefix}.{extension}".format(**vars())
-    if reads_file != annot_start_file:
-        transitions[annot_start_file] = reads_file
-else:
-    raise Exception("Initial file must be bam or fasta! I don't know what to do "
-            "with {reads_file}".format(**vars()))
+need_fastq = False
+need_bam = False
+for sample, reads_file in sample_data.items():
+    #
+    # If the starting file doesn't fit our naming scheme,
+    #  call for a symbolic link to be made (using transitions dict)
+    extension = re.search(r'\.([a-z0-1A-Z]+)$', reads_file).group(1)
+
+    # workflow expects .fasta, so rename .fna, .faa, etc
+    if extension in ['fna', 'ffn', 'fa', 'fasta']:
+        extension = 'fasta'
+    if extension in ['fasta', 'fastq', 'bam']:
+        if extension == 'fastq':
+            need_fastq = True
+        elif extension == 'bam':
+            need_bam = True
+        annot_start_file = "{sample}.{extension}".format(**vars())
+        if reads_file != annot_start_file:
+            transitions[annot_start_file] = reads_file
+    else:
+        raise Exception("Initial file must be bam or fasta!" \
+                        "I don't know what to do " \
+                        "with {reads_file}".format(**vars()))
 #
 # End configuration
 ##########
@@ -96,15 +122,17 @@ else:
     converted_suffix = "sixframe.faa"
     fastq_query_extension='fasta'
 
-if extension == 'fastq' and aa_conversion != 'prodigal':
-    ruleorder: remove_colons > fastq_to_fasta
-if extension == 'bam' and aa_conversion == 'prodigal':
+if need_fastq:
+    include: "common/fastq.snake"
+    if aa_conversion != 'prodigal':
+        ruleorder: remove_colons > fastq_to_fasta
+if need_bam and aa_conversion == 'prodigal':
     ruleorder: predict_genes_prodigal > extract_reads
 
 if config.get('remove_rna',True) in ['True', True]:
     include: "qc/sort.rna.snake"
     rna_step = 'non-rRNA.'
-    if extension == 'fastq':
+    if need_fastq:
         ruleorder: filter_nonrrna_or_rrna > fastq_to_fasta
 else:
     rna_step = ''
@@ -122,7 +150,7 @@ gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs,
                                                  fastq_query_extension)
 annotation_file_list = \
             expand("{prefix}.{rna_step}annot.{taxdb}.{taxalg}.{clade_rank}.vs.{db_dot_fmt}.tsv",
-                   prefix=prefix,
+                   prefix=sample_data,
                    taxalg=config['taxalg'],
                    rna_step=rna_step,
                    taxdb=config['taxdb'],
@@ -132,7 +160,7 @@ annotation_file_list = \
                    ext=['stats','hist'],
                    suffix=['fasta', converted_suffix],
                    rna_step=rna_step,
-                   prefix=prefix)
+                   prefix=sample_data)
 
 logger.debug("Snakefile config:\n" + yaml.dump(config))
 logger.debug(repr(annotation_file_list))
@@ -160,6 +188,8 @@ if extension == 'bam':
             "logs/{prefix}_extract_reads.log"
         version:
             get_version('samtools', lines=[0,])
+        resources:
+            disk=1
         shell:
             "samtools fasta -0 {output} {input} > {log} 2>&1"
 

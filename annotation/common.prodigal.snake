@@ -37,6 +37,8 @@ rule predict_genes_prodigal:
             get_version('prodigal', '-v', lines=[1,])
     threads:
         config['prodigal'].get('threads',default_threads)
+    resources:
+        disk=2
     shell:
         # Use batch launcher to run prodigal multithreaded
         "batch_launcher.py -N {threads} -i -i -o -a -T fasta -X local -v -- \
@@ -64,6 +66,8 @@ rule compile_counts:
         get_version('compile_hit_counts.py')
     params:
         three_column_opt="-L" if config.get('output_style','default').lower() == 'long' else ""
+    resources:
+        disk=1
     shell:
         "compile_hit_counts.py {params.three_column_opt} -1 {input[0]} -2 {input[1]} -o {output} -S"
 

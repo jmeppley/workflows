@@ -36,6 +36,8 @@ rule compile_counts:
         "logs/compile_counts.{prefix}.{taxdb}.{taxalg}.{rank}.{db}.{dbfmt}"
     version:
         get_version('compile_hit_counts.py')
+    resources:
+        disk=1
     params:
         three_column_opt="-L" if config.get('output_style','default').lower() == 'long' else ""
     shell:

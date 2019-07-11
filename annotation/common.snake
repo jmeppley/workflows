@@ -99,6 +99,8 @@ rule assign_taxa:
         filter=get_hit_filter,
     version:
         get_version('assign_taxa.py')
+    resources:
+        disk=1
     shell:
          "cat {input} \
           | {params.filter} \
@@ -120,6 +122,8 @@ rule assign_paths:
         "benchmarks/{prefix}.assign_paths.{db}.{ext}.time"
     log:
         "logs/{prefix}.assign_paths.{db}.{ext}.log"
+    resources:
+        disk=1
     version:
         get_version('assign_paths.py')
     params:
@@ -146,6 +150,8 @@ rule count_tax_hits:
         "logs/{hit_table_prefix}.{db}.{alg}.{rank}.count.log"
     version:
         get_version("count_hits.py")
+    resources:
+        disk=1
     shell:
         "count_hits.py -v -i {input} -H 1 -a portion\
         > {output} 2> {log}"

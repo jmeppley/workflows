@@ -36,6 +36,8 @@ rule cmsearch:
                         '-h',
                         lines=1) + " :: " + \
                 get_cm_model_version(config['cmsearch']['models'])
+    resources:
+        disk=1
     params:
         cmfile=os.path.join(config['cmsearch']['models'],'{molecule}.cm'),
         flags=lambda wildcards:\
@@ -60,6 +62,8 @@ rule hit_table_to_gff:
         get_version('filter_blast_m8.py')
     params:
         format=lambda w: w.tool
+    resources:
+        disk=2
     shell:
         #"filter_blast_m8.py -v -f {params.format} --gff -o {output} {input}"
         "sort {input} \
