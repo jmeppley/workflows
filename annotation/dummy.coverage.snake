@@ -16,7 +16,7 @@ from Bio import SeqIO
 if 'sample_data' in config:
     samples = config['sample_data'].keys()
 else:
-    samples = ['prefix']
+    samples = [prefix]
 
 for prefix in samples:
     dummy_coverage_file = prefix + ".coverage.dummy.tsv"
