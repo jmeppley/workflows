@@ -4,6 +4,10 @@ Python Makefile to annotate a set of amino acid seqs
 Annotations are generated as tables of gene_family counts 
   groupbed by taxonomic clade
 
+To tun on multiple files you can use annotation.reads.snake, but that does not
+support multiplying bay a coverage file. If you need to adjust for coverage
+over multiple samples, you'll need to run this in a bash loop for each sample.
+
 To run:
 
 snakemake -s /path/to/workflows/annotate.genes.snake --configfile annotate.genes.yaml [OPTIONS]

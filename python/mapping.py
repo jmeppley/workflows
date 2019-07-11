@@ -39,6 +39,9 @@ def check_sample_data(config):
                             "config[sample_data] or with  "
                             "config[sample_glob]")
 
+    if len(config["sample_data"]) == 0:
+            raise Exception("wildcard glob matched 0 files!")
+
 
     # apply remote_wrapper to all files in sample_data
     config['sample_data'] = {s:remote_wrapper(f, config) \

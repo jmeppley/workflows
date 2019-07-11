@@ -1,0 +1,25 @@
+sample_glob: ../../data/raw_reads/{sample}_R1_001.fastq
+clade_ranks: 
+ - class
+ - genus
+output_style: long
+hmmer:
+    threads: 2
+lastal:
+    threads: 10
+prodigal:
+    threads: 20
+dbs:
+    RefSeq: 
+        path: ../../data/seqdbs/RefSeq/lastdb
+        format: lastp
+        type: tax
+    KEGG: 
+        path: ../../data/seqdbs/KEGG/lastdb
+        format: lastp
+        assign_type: kegg
+    COG:
+        path: ../../data/seqdbs/COG/COG.partial.hmm
+    COGfrg:
+        path: ../../data/seqdbs/COG/COG.partial.hmm
+        frags: 8

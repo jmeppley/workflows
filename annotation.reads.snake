@@ -4,6 +4,11 @@ Python Makefile to pull out reads from a BAM alignment
 Annotations are generated as tables of gene_family counts 
   groupbed by taxonomic clade
 
+Supports:
+ * bam, fasta, or fastq inputs
+ * .faa (protein) inputs (will skip aa_conversion)
+ * multiple input files (can't mix prot and nucl)
+
 To run:
 
 snakemake -s /path/to/workflows/annotate.reads.snake --configfile annotate.reads.yaml [OPTIONS]
@@ -15,6 +20,7 @@ You will need to run the makefiles in tools/pymg/databases two download and form
 reference databases if your lab doesn't already have them.
 
 With a config file that looks like test/data/configs/reads.annot.prod/yml or reads.annot.six.yml.
+
 Or like this:
 reads_file: /path/to/file.bam
 annot_prefix: reads
@@ -47,6 +53,34 @@ dbs:
         frags: 10
 
 The reads can be embedded in a bam file or given as fasta or fastq.
+
+Instead of supplying a reads file and annotation prefix, you can configure a
+map from sample names to reads files:
+
+sample_data:
+    sample1: /path/to/sample1.fastq
+    sample2: /path/to/sample2.fastq
+
+Or, if your files are named in a consistent fashion, you can use a
+wildcard_glob string:
+
+sample_glob: /path/to/{sample}.fastq
+
+Both the sample_data and sample_glob approaches use dynamic_remote_snake to
+check for URLs. (https://github.com/jmeppley/dynamic_remote_snake). So you can
+specify something like:
+
+sample_glob: HTTP://server.domain.org/public/reads/{sample}.fastq
+
+or
+
+sample_glob: SFTP://server.domain.org/path/to/reads/{sample}.fastq
+remote:
+    SFTP:
+        defaults:
+            username: username
+
+(NOTE: SCP/SFTP doesn't support passwords, so use SSH keys for the connection)
 """
 
 import yaml
@@ -67,8 +101,8 @@ config.setdefault('clade_ranks', ['order'])
 #  checks for sample_data map or sample_glob template string
 #    - sample_glob must have a "{sample}" wild card in it
 #    - all files are run through remote_wrapper
-check_sample_data(config)
-
+if 'sample_data' in config or 'sample_glob' in config:
+    check_sample_data(config)
 sample_data = config.get('sample_data', {})
 
 # read file names for start of workflow
@@ -85,6 +119,7 @@ if 'annot_prefix' in config or 'reads_file' in config or len(sample_data) == 0:
 transitions = config.setdefault('transitions',{})
 need_fastq = False
 need_bam = False
+faa_count = 0
 for sample, reads_file in sample_data.items():
     #
     # If the starting file doesn't fit our naming scheme,
@@ -94,7 +129,9 @@ for sample, reads_file in sample_data.items():
     # workflow expects .fasta, so rename .fna, .faa, etc
     if extension in ['fna', 'ffn', 'fa', 'fasta']:
         extension = 'fasta'
-    if extension in ['fasta', 'fastq', 'bam']:
+    elif extension == 'faa':
+        faa_count += 1
+    if extension in ['fasta', 'fastq', 'bam', 'faa']:
         if extension == 'fastq':
             need_fastq = True
         elif extension == 'bam':
@@ -113,14 +150,20 @@ for sample, reads_file in sample_data.items():
 include: "common/stats.snake"
 include: "common/transitions.snake"
 aa_conversion = config.get('aa_conversion', 'sixframe')
-if aa_conversion == 'prodigal':
+if faa_count > 0 and faa_count < len(sample_data):
+    raise Exception("If any input files are protein (.faa), they all must be")
+if faa_count == len(sample_data):
+    include: "annotation/common.genes.snake"
+    converted_suffix = "faa"
+    fastq_query_extension = 'faa'
+elif aa_conversion == 'prodigal':
     include: "annotation/common.prodigal.snake"
     converted_suffix = "pred.genes.faa"
-    fastq_query_extension='faa'
+    fastq_query_extension = 'faa'
 else:
     include: "annotation/common.sixframe.snake"
     converted_suffix = "sixframe.faa"
-    fastq_query_extension='fasta'
+    fastq_query_extension = 'fasta'
 
 if need_fastq:
     include: "common/fastq.snake"
