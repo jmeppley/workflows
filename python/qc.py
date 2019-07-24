@@ -24,6 +24,7 @@ from python.common import get_file_name
 QC_PROTOCOLS = {
     "rename": 'rename.interleaved',
     "interleave": 'interleaved',
+    "ec_only": "corrected.dropse",
     "assembly": '.'.join(['renamed',
                           'interleaved',
                           'noadapt',
@@ -144,73 +145,73 @@ def setup_qc_outputs(config):
                                     config.setdefault('cleaning_protocol',
                                                        'None'))
 
-        # check to see if input is compressed (we can handle .gz)
-        extension = "fastq.gz" if are_files_gzipped(raw_files) else "fastq"
+            # check to see if input is compressed (we can handle .gz)
+            extension = "fastq.gz" if are_files_gzipped(raw_files) else "fastq"
 
-        # do we need to filter reads first?
-        #  WARNING: filtering only works with uncompressed fastq
-        filter_file = data.get('filter', None)
+            # do we need to filter reads first?
+            #  WARNING: filtering only works with uncompressed fastq
+            filter_file = data.get('filter', None)
 
-        # starting files (define as transitions from raw files)
-        new_raw_files = []
-        if len(raw_files) > 2:
-            # The reads are probably split up into lanes, merge into one pair
-            for direction, file_list in setup_merge_by_lanes(raw_files,
-                                                             sample).items():
-                local_raw_file = '{sample}.{direction}.{extension}'\
-                                                        .format(**vars())
-                filter_or_link_transition(file_list,
+            # starting files (define as transitions from raw files)
+            new_raw_files = []
+            if len(raw_files) > 2:
+                # The reads are probably split up into lanes, merge into one pair
+                for direction, file_list in setup_merge_by_lanes(raw_files,
+                                                                 sample).items():
+                    local_raw_file = '{sample}.{direction}.{extension}'\
+                                                            .format(**vars())
+                    filter_or_link_transition(file_list,
+                                              local_raw_file,
+                                              filter_file,
+                                              transitions, filter_dict)
+                    new_raw_files.append(local_raw_file)
+            elif len(raw_files) == 2:
+                for direction, source_file in zip(READ_DIRECTIONS, raw_files):
+                    local_raw_file = '{sample}.{direction}.{extension}'\
+                                                            .format(**vars())
+                    filter_or_link_transition(source_file,
+                                              local_raw_file,
+                                              filter_file,
+                                              transitions, filter_dict)
+                    new_raw_files.append(local_raw_file)
+            else:
+                local_raw_file = '{sample}.{extension}'.format(**vars())
+                filter_or_link_transition(raw_files[0],
                                           local_raw_file,
                                           filter_file,
                                           transitions, filter_dict)
                 new_raw_files.append(local_raw_file)
-        elif len(raw_files) == 2:
-            for direction, source_file in zip(READ_DIRECTIONS, raw_files):
-                local_raw_file = '{sample}.{direction}.{extension}'\
+
+            # everything else should work from the linked files
+            data['raw'] = new_raw_files
+
+            # cleaned suffix
+            cleaned_suffix = get_cleaned_suffix(cleaning_protocol,
+                                                sample, config)
+
+            ## result of QC
+            # the actual QC output depends on the remove_rna flag
+            if config.get('remove_rna', True) in ['True', True]:
+                # if rrna separation requested . . .
+                logger.debug("adding separated rrna reads to output")
+                # add rRNA reads to output
+                for rrna_split in ['SSU', 'LSU']:
+                    outputs.append("{sample}.{cleaned_suffix}{rrna_split}.fastq" \
+                                    .format(**vars()))
+                # set non-rRNA as cleaned target
+                cleaned_raw_reads = '{sample}.{cleaned_suffix}non-rRNA.fastq'\
                                                         .format(**vars())
-                filter_or_link_transition(source_file,
-                                          local_raw_file,
-                                          filter_file,
-                                          transitions, filter_dict)
-                new_raw_files.append(local_raw_file)
-        else:
-            local_raw_file = '{sample}.{extension}'.format(**vars())
-            filter_or_link_transition(raw_files[0],
-                                      local_raw_file,
-                                      filter_file,
-                                      transitions, filter_dict)
-            new_raw_files.append(local_raw_file)
+            else:
+                # otherwise, QC ends at cleaned_suffix
+                cleaned_raw_reads = '{sample}.{cleaned_suffix}fastq'\
+                                                        .format(**vars())
 
-        # everything else should work from the linked files
-        data['raw'] = new_raw_files
-
-        # cleaned suffix
-        cleaned_suffix = get_cleaned_suffix(cleaning_protocol,
-                                            sample, config)
-
-        ## result of QC
-        # the actual QC output depends on the remove_rna flag
-        if config.get('remove_rna', True) in ['True', True]:
-            # if rrna separation requested . . .
-            logger.debug("adding separated rrna reads to output")
-            # add rRNA reads to output
-            for rrna_split in ['SSU', 'LSU']:
-                outputs.append("{sample}.{cleaned_suffix}{rrna_split}.fastq" \
-                                .format(**vars()))
-            # set non-rRNA as cleaned target
-            cleaned_raw_reads = '{sample}.{cleaned_suffix}non-rRNA.fastq'\
-                                                    .format(**vars())
-        else:
-            # otherwise, QC ends at cleaned_suffix
-            cleaned_raw_reads = '{sample}.{cleaned_suffix}fastq'\
-                                                    .format(**vars())
-
-        # this is the alias that will point to the actual QC output
-        cleaned_reads = '{sample}.clean.fastq'.format(**vars())
-        cleaned_read_list.append(cleaned_reads)
-        outputs.append(cleaned_reads)
-        transitions[cleaned_reads] = cleaned_raw_reads
-        data['clean'] = cleaned_reads
+            # this is the alias that will point to the actual QC output
+            cleaned_reads = '{sample}.clean.fastq'.format(**vars())
+            cleaned_read_list.append(cleaned_reads)
+            outputs.append(cleaned_reads)
+            transitions[cleaned_reads] = cleaned_raw_reads
+            data['clean'] = cleaned_reads
 
     return outputs
 

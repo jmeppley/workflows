@@ -1,0 +1,12 @@
+assembly_name: spades_clean
+sample_data:
+    fortyk:
+        clean:
+          - "../../data/other/fortyk.clean.fastq"
+cmsearch:
+    threads: 10
+spades:
+    ram: 10
+samtools:
+    ram: 1G
+    threads: 2

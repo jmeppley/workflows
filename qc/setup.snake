@@ -36,6 +36,9 @@ if sum(1 for s in config['sample_data'] \
         include: 'iu.snake'
     elif protocol == 'rename':
         include: 'rename.snake'
+    elif protocol == 'ec_only':
+        include: 'bfc.snake'
+        include: 'common.snake'
     elif protocol not in ['None', None]:
         raise Exception('QC protocol "{}" is not supported.'.format(protocol))
 
