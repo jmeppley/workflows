@@ -14,7 +14,8 @@ defaults = {
                   'threads':20,
                   'tmp_dir':'.',
                   'kmers':'21,33,55,77,99,127',
-                  'rnakmer':'55'},
+                  'rnakmer':'55',
+                  'params':''},
             }
 apply_defaults(config, defaults)
 
@@ -78,6 +79,7 @@ rule run_spades_metagenomic:
                                 dir=config['spades']['tmp_dir']),
         cont="CONTINUE" if os.path.isdir('spades') else "",
         skip_ec='' if run_ec else '--only-assembler',
+        params=config['spades']['params']
     shell:
         """
         if [ "{params.cont}" == "CONTINUE" ]; then
@@ -86,6 +88,6 @@ rule run_spades_metagenomic:
             spades.py {params.mode} -m {params.ram_limit} -t {threads} \
                       -k {params.kmers} --tmp-dir {params.tmp_dir.name} \
                       --pe1-12 {input} -o spades \
-                      {params.skip_ec} 
+                      {params.skip_ec} {params.params} 
         fi
         """
