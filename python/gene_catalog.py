@@ -19,6 +19,9 @@ except:
     # if running as a script
     from common import parse_stats
 
+REFSEQ='refseq'
+GTDB='GTDB'
+KEGG='kegg'
 
 ####
 # RefSeq
@@ -32,14 +35,18 @@ extra_loaction_info_RE=re.compile(r'^(?:contig)?\d+,\s*\S+_\S+,\s*(\S.+),\s*\d+\
 func_pref_RE = re.compile(r'(?:MULTISPECIES|PREDICTED):\s')
 func_suff_RE = re.compile(r'\s\((?:plastid|plasmid|chloroplast|chromatophore)\)\s*$')
 
-def get_function_trimmed(hit, desc_map):
+def get_function_trimmed(hit, desc_map, db_type):
     """
     Given a RefSeq hit id return a function stripped of boilerplate
     """
-    return  func_pref_RE.sub('',
-             func_suff_RE.sub('',
-              extra_loaction_info_RE.sub(r'\1',
-               desc_RE.sub('',desc_map[hit.hit]))))
+    if db_type is REFSEQ:
+        return  func_pref_RE.sub('',
+                 func_suff_RE.sub('',
+                  extra_loaction_info_RE.sub(r'\1',
+                   desc_RE.sub('',desc_map[hit.hit]))))
+    if db_type is GTDB:
+        return desc_map[hit.hit].split(None, 1)[-1]
+    return "NA"
 
 # drop the accession version suffix
 acc_suff_RE = re.compile(r'\.\d+$')
@@ -88,7 +95,7 @@ def approximate_rank(taxon, use_major_ranks=True):
     else:
         return rank
 
-class RefSeqGeneAnnotator():
+class TaxDBGeneAnnotator():
     def __init__(self, db_location,
                  taxid_delim=None,
                  bad_refs=set(),
@@ -146,13 +153,18 @@ class RefSeqGeneAnnotator():
         rsdb_desc_map = self.rsdb + ".ids"
         self.desc_map = util.parseMapFile(rsdb_desc_map)
 
-    def annotate_genes_rs_prot(self, hit_table, annotation_table):
+    def annotate_genes_rs_prot(self, hit_table, annotation_table,
+                               db_type=REFSEQ):
+        logger.debug("Annotating " + db_type + " taxdb with " + \
+                     hit_table + " and " + \
+                     annotation_table)
         with open(annotation_table, 'w') as tsv_out:
             tsv_out.write('Gene\t' \
                            + '\t'.join(printed_ranks) \
                            + '\tfunction\tmin pct ID\thit count' \
                            + '\ttop hit\ttop pct ID\ttop score\ttop desc\n')
-            for info in self.generate_gene_annotations_rs_prot(hit_table):
+            for info in self.generate_gene_annotations_rs_prot(hit_table,
+                                                               db_type):
                 (gene, lca_ranked, function, min_pctid, hit_count, \
                        top_hit, top_pctid, top_score, top_desc) = info
                 tsv_out.write("%s\t%s\t%s\t%0.1f\t%d\t%s\t%0.1f\t%0.1f\t%s\n" \
@@ -167,7 +179,7 @@ class RefSeqGeneAnnotator():
                     top_desc,
                     ))
 
-    def generate_gene_annotations_rs_prot(self,hit_table):
+    def generate_gene_annotations_rs_prot(self, hit_table, db_type=REFSEQ):
 
         species_index = major_ranks.index('species')
         genus_index = major_ranks.index('genus')
@@ -193,28 +205,37 @@ class RefSeqGeneAnnotator():
                         break
 
             # get a good functional annotation form the best hit(s) (that aren't hypothetical)
-            fns_by_score={}
-            for hit in hits:
-                f=get_function_trimmed(hit,self.desc_map)
-                fns_by_score.setdefault(hit.score,[]).append(f)
+            if db_type is not None:
+                fns_by_score={}
+                for hit in hits:
+                    f=get_function_trimmed(hit, self.desc_map, db_type)
+                    fns_by_score.setdefault(hit.score,[]).append(f)
 
-            for score in sorted(fns_by_score.keys(),reverse=True):
-                # only consider things with useful annotations
-                #useful_functions = set(f for f in fns_by_score[score] if uninformative_RE.search(f) is None)
-                useful_functions = set()
-                for f in fns_by_score[score]:
-                    if uninformative_RE.search(f) is None:
-                        useful_functions.add(f)
-                if len(useful_functions)>0:
-                    functions = useful_functions
-                    break
+                for score in sorted(fns_by_score.keys(),reverse=True):
+                    # only consider things with useful annotations
+                    useful_functions = set()
+                    for f in fns_by_score[score]:
+                        if uninformative_RE.search(f) is None:
+                            useful_functions.add(f)
+                    if len(useful_functions)>0:
+                        functions = useful_functions
+                        break
+                else:
+                    functions=['unknown']
+                function = ";".join(functions)
             else:
-                functions=['unknown']
+                function = 'NA'
 
-            function = ";".join(functions)
+
+            # description of top hit
+            top_desc = self.desc_map[top_hit.hit]
+            if db_type is GTDB:
+                # GTDB headers are too long, take sp name and func
+                top_desc = top_desc.split(";")[-1]
 
             top_hit=hits[0]
-            yield (gene,lca_ranked,function,min_pctid,len(hits),top_hit.hit,top_hit.pctid,top_hit.score,self.desc_map.get(top_hit.hit,None))
+            yield
+            (gene,lca_ranked,function,min_pctid,len(hits),top_hit.hit,top_hit.pctid,top_hit.score,top_desc)
 
         logger.info( "Parsed %d hits for %d genes" % (total_hits, total_genes))
 
@@ -466,8 +487,9 @@ def main():
     parser.add_argument("output_table", metavar="OUT_TABLE",
                         help="The file to write the anntations to")
     parser.add_argument("-t", "--type", default=None, metavar="TYPE",
-                        choices=['refseq','kegg'],
-                        help="The type of database. Either 'refseq' or 'kegg'")
+                        choices=[REFSEQ, KEGG, GTDB],
+                        help="The type of database. Either 'refseq'," + \
+                        "'GTDB', or 'kegg'")
 
     arguments = parser.parse_args()
 
@@ -475,19 +497,20 @@ def main():
     if arguments.type is None:
         if re.search(r'kegg', arguments.lastdb_path,
                      flags=re.I):
-            arguments.type = 'kegg'
+            arguments.type = KEGG
         else:
-            arguments.type = 'refseq'
+            arguments.type = REFSEQ
 
     # annotate!
-    if arguments.type == 'kegg':
+    if arguments.type == KEGG:
         annotator = KeggGeneAnnotator(arguments.lastdb_path)
         annotator.annotate_genes_kg(arguments.hit_table,
                                     arguments.output_table)
     else:
-        annotator = RefSeqGeneAnnotator(arguments.lastdb_path)
+        annotator = TaxDBGeneAnnotator(arguments.lastdb_path)
         annotator.annotate_genes_rs_prot(arguments.hit_table,
-                                         arguments.output_table)
+                                         arguments.output_table,
+                                         arguments.type)
 
 def process_for_mcl(input_file, fasta_file, output_file,
                     format='last',

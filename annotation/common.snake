@@ -3,8 +3,9 @@ from python.annotate import get_db_types, get_db_assignment_params
 #########
 # CONFIGURATION
 #
-# pull out taxdb (usually refseq) and list of gene family dbs from config
-gene_family_dbs, config['taxdb'] = get_db_types(config)
+# pull out lists of configured DBs split into gene faimily DBs and taxonomic
+# DBs
+gene_family_dbs, config['taxdbs'] = get_db_types(config)
 #
 # threads per search are set in the threads: parameter
 # Either use the db name or "default". EG:

@@ -4,15 +4,19 @@ Functions for the annotation workflows
 import os
 
 def get_db_types(config):
+    """ loop over DBs and:
+         * identify all gene family dbs
+         * identify all taxonomic dbs
+    """
     gene_family_dbs = []
-    taxdb = None
+    taxdbs = []
     for db in config['dbs']:
-        db_type = config['dbs'][db].get('type','gene')
+        db_type = config['dbs'][db].get('type', 'gene')
         if db_type[0:3] == 'tax':
-            taxdb=db
+            taxdbs.append(db)
         elif db_type == 'gene':
             gene_family_dbs.append(db)
-    return (gene_family_dbs, taxdb)
+    return (gene_family_dbs, taxdbs)
 
 def get_last_alg(dbformat, extension):
     """

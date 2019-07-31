@@ -86,7 +86,6 @@ include: "common/transitions.snake"
 include: "annotation/common.genes.snake"
 
 # how to search against taxdb
-config['taxdbfmt'] = config['dbs'][config['taxdb']].get('format','lastx')
 
 # End configuration
 ##########
@@ -95,17 +94,25 @@ config['taxdbfmt'] = config['dbs'][config['taxdb']].get('format','lastx')
 #  - The final tabulations
 #  - Stats and histrogram files for genes
 gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs, config, 'faa')
-annotation_file_list = \
-                expand("{prefix}.annot.{taxdb}.{taxdbfmt}.{clade_rank}.vs.{db_dot_fmt}.tsv",
-                       prefix=prefix,
-                       taxdbfmt=config['taxdbfmt'],
-                       taxdb=config['taxdb'],
-                       clade_rank=config['clade_ranks'],
-                       db_dot_fmt=gene_family_db_dot_fmts,) + \
-                expand("stats/{prefix}.{suffix}.{ext}", 
-                       ext=['stats','hist'],
-                       suffix='faa',
-                       prefix=prefix)
+
+annotation_file_list = []
+for taxdb in config['taxdbs']:
+    #taxalg = get_last_alg(config['dbs'][taxdb].get('format','lastp'),
+    #                      fastq_query_extension)
+    taxalg = config['dbs'][taxdb].get('format','lastx')
+    annotation_file_list.extend(
+        expand("{prefix}.annot.{taxdb}.{taxalg}.{clade_rank}.vs.{db_dot_fmt}.tsv",
+               prefix=prefix,
+               taxalg=taxalg,
+               taxdb=taxdb,
+               clade_rank=config['clade_ranks'],
+               db_dot_fmt=gene_family_db_dot_fmts,))
+
+annotation_file_list.extend(
+    expand("stats/{prefix}.{suffix}.{ext}", 
+           ext=['stats','hist'],
+           suffix='faa',
+           prefix=prefix))
 
 logger.debug("Snakefile config:\n" + yaml.dump(config))
 

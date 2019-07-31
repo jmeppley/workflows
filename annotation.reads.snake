@@ -184,30 +184,32 @@ if config.get('remove_rna',True) in ['True', True]:
 else:
     rna_step = ''
 
-# how to search against taxdb
-config['taxalg'] = get_last_alg(config['dbs'][config['taxdb']]\
-                                                .get('format','lastp'),
-                                fastq_query_extension)
-
 # set up list of files to create
 #  - The final tabulations
 #  - Stats and histrogram files for reads and translated seqs
 gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs,
                                                  config,
                                                  fastq_query_extension)
-annotation_file_list = \
-            expand("{prefix}.{rna_step}annot.{taxdb}.{taxalg}.{clade_rank}.vs.{db_dot_fmt}.tsv",
-                   prefix=sample_data,
-                   taxalg=config['taxalg'],
-                   rna_step=rna_step,
-                   taxdb=config['taxdb'],
-                   clade_rank=config['clade_ranks'],
-                   db_dot_fmt=gene_family_db_dot_fmts,) + \
+
+annotation_file_list = []
+for taxdb in config['taxdbs']:
+    taxalg = get_last_alg(config['dbs'][taxdb].get('format','lastp'),
+                          fastq_query_extension)
+    annotation_file_list.extend(
+        expand("{prefix}.{rna_step}annot.{taxdb}.{taxalg}.{clade_rank}.vs.{db_dot_fmt}.tsv",
+               prefix=sample_data,
+               taxalg=taxalg,
+               rna_step=rna_step,
+               taxdb=taxdb,
+               clade_rank=config['clade_ranks'],
+               db_dot_fmt=gene_family_db_dot_fmts,))
+
+annotation_file_list.extend(
             expand("stats/{prefix}.{rna_step}{suffix}.{ext}", 
                    ext=['stats','hist'],
                    suffix=stats_suffixes,
                    rna_step=rna_step,
-                   prefix=sample_data)
+                   prefix=sample_data))
 
 logger.debug("Snakefile config:\n" + yaml.dump(config))
 logger.debug(repr(annotation_file_list))

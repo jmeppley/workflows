@@ -44,8 +44,25 @@ include: "../annotation/silva.snake"
 gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs,
                                                  config,
                                                  'fasta')
-taxalg = get_last_alg(config['dbs'][config['taxdb']].get('format','lastp'),
-                      'fasta')
+
+annot_tabs = []
+tax_counts = []
+for taxdb in config['taxdbs']:
+    taxalg = get_last_alg(config['dbs'][taxdb].get('format','lastp'),
+                          'fasta')
+    annot_tabs.extend(
+        expand("{prefix}.annot.{taxdb}.{taxalg}.{clade}.vs.{db_dot_fmt}.tsv",
+               taxdb=taxdb,
+               taxalg=taxalg,
+               db_dot_fmt=gene_family_db_dot_fmts,
+               prefix=config['annotation_prefixes'],
+               clade=config['clade_ranks']))
+    tax_counts.extend(
+        expand("{prefix}.nocolon.annot.{taxdb}.{taxalg}.{clade}.count.tsv",
+               prefix=config['annotation_prefixes'],
+               taxdb=taxdb,
+               taxalg=taxalg,
+               clade=config['clade_ranks']))
 #
 ####
 
@@ -68,19 +85,8 @@ rule report_all:
         annot_hists=expand("{prefix}.{type}.hist",
                            prefix=config['annotation_prefixes'], 
                            type=['fasta','sixframe.faa']),
-        annot_tabs=\
-            expand("{prefix}.annot.{taxdb}.{taxalg}.{clade}.vs.{db_dot_fmt}.tsv",
-                       taxdb=config['taxdb'],
-                       taxalg=taxalg,
-                       db_dot_fmt=gene_family_db_dot_fmts,
-                       prefix=config['annotation_prefixes'],
-                       clade=config['clade_ranks'],),
-        tax_counts=\
-            expand("{prefix}.nocolon.annot.{taxdb}.{taxalg}.{clade}.count.tsv",
-                   prefix=config['annotation_prefixes'],
-                   taxdb=config['taxdb'],
-                   taxalg=taxalg,
-                   clade=config['clade_ranks']),
+        annot_tabs=annot_tabs,
+        tax_counts=tax_counts,
         # rrna counts
         rrna_counts=\
             expand("{prefix}.rRNA.annot.{db_dot_fmt}.{rank}.count.tsv",

@@ -20,7 +20,14 @@ Annotations:
 
 The initial annoation steps are the same as the annotation.genes.snake workflow.
 
-Example config:
+The taxonomic db (eg /path/to/dbname) must have:
+ * a two column tab separated map from hit id to taxid (/path/to/dbname.tax)
+ * a two column tab separated map from hit id to description
+    (/path/to/dbname.ids)
+ * NCBI-style taxdump files (nodes.dmp and names.dmp in /path/to/)
+
+If the taxonomic db name starts with "rs", "refseq", or "gtdb" (case insensitive),
+protein functions are parsed from the header (.ids) table
 
 """
 import os
@@ -91,7 +98,9 @@ for dbdotfmt in gene_family_db_dot_fmts:
 include: "common/transitions.snake"
 
 # how to search against taxdb
-config['taxdbfmt'] = config['dbs'][config['taxdb']].get('format','lastx')
+tax_db_dot_algs = \
+    ['{}.{}'.format(d, config['dbs'][d].get('format', 'lastx')) \
+     for d in config['taxdbs']]
 
 # End configuration
 ##########
@@ -105,10 +114,9 @@ output_files = config.get('outputs', set())
 # per-database annotation counts
 if run_cross_tab:
     output_files.update(
-        expand("{prefix}.annot.{taxdb}.{taxdbfmt}.{clade_rank}.vs.{db_dot_fmt}.tsv",
+        expand("{prefix}.annot.{tax_db_dot_alg}.{clade_rank}.vs.{db_dot_fmt}.tsv",
                prefix=prefix,
-               taxdbfmt=config['taxdbfmt'],
-               taxdb=config['taxdb'],
+               tax_db_dot_alg=tax_db_dot_algs,
                clade_rank=config['clade_ranks'],
                db_dot_fmt=gene_family_db_dot_fmts,))
 # gene catalog stats
@@ -134,19 +142,32 @@ rule gene_annotation_all:
 # RULES:
 #  This lays out the dependencies and logic of the workflow
 
-rule refseq_annotations:
+# TODO: generalize for GTDB
+rule taxdb_annotations:
     input:
-        hits='{}.vs.RefSeq.lastp'.format(prefix),
-        db=config['dbs'][config['taxdb']]['path'] + ".prj",
-        ids=config['dbs'][config['taxdb']]['path'] + ".ids"
-    output: '{}.annotations.RefSeq'.format(prefix)
-    benchmark: 'benchmarks/{}.annotations.RefSeq'.format(prefix)
+        hits='{}.vs.{{taxdb}}.lastp'.format(prefix),
+        db=lambda w: config['dbs'][w.taxdb]['path'] + ".prj",
+        ids=lambda w: config['dbs'][w.taxdb]['path'] + ".ids"
+    output: '{}.annotations.{{taxdb}}'.format(prefix)
+    benchmark: 'benchmarks/{}.annotations.{{taxdb}}'.format(prefix)
     params:
-        db=config['dbs'][config['taxdb']]['path']
+        db=lambda w: config['dbs'][w.taxdb]['path']
     run:
-        a = gene_catalog.RefSeqGeneAnnotator(get_file_name(params.db))
+        logger.debug("test")
+        a = gene_catalog.TaxDBGeneAnnotator(get_file_name(params.db))
+        if wildcards.taxdb.lower().startswith('rs') or \
+           wildcards.taxdb.lower().startswith('refseq'):
+            db_type = gene_catalog.REFSEQ
+        elif wildcards.taxdb.lower().startswith('gtdb'):
+            db_type = gene_catalog.GTDB
+        else:
+            db_type = None
+        print("Annotating " + db_type + " taxdb with " + \
+                     input.hits)
         a.annotate_genes_rs_prot(get_file_name(input.hits), 
-                                 get_file_name(output))
+                                 get_file_name(output),
+                                 db_type=db_type,
+                                )
 
 rule kegg_annotations:
     input:
@@ -187,6 +208,8 @@ rule final_table:
         # load RefSeq annotations
         annot = pandas.read_csv(ref_seq_table, sep='\t', header=0, index_col=0)
         logger.debug("Annotation table shape is: {}".format(annot.shape))
+
+        # TODO: handle second tax db (pick one?)
 
         # iteratively join other annotations
         for db in sorted(db_file_map.keys()):

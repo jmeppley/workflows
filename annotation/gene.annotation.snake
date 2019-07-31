@@ -23,7 +23,7 @@ gene_family_db_dot_fmts = get_db_dot_fmt_strings(gene_family_dbs, config, 'faa')
 output_tables = \
         expand("{prefix}.annot.{taxdb}.lastp.{clade}.vs.{db_dot_fmt}.tsv",
                 prefix=config['prefix'],
-                taxdb=config['taxdb'],
+                taxdb=config['taxdbs'],
                 db_dot_fmt=gene_family_db_dot_fmts,
                 clade=config['clade_ranks']),
 
