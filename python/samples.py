@@ -67,7 +67,7 @@ def collect_sample_reads(samples_pattern_data, config):
     wildcard_glob:
 
     sample_data:
-        samples_pattern:
+        reads_patterns:
             wildcard_glob: "../data/{sample}_{direction}.fastq"
 
     If the string begins with SFTP, the makefile will use the SFTP remote
@@ -79,7 +79,7 @@ def collect_sample_reads(samples_pattern_data, config):
     You can also use a bash style globto find files and regular expression to get sample names from them:
 
     sample_data:
-        samples_pattern:
+        reads_patterns:
             glob: "../data/*.fastq"
             re: "/([^_]+)_[^/]+\\.fastq"
 
@@ -106,7 +106,7 @@ def collect_sample_reads(samples_pattern_data, config):
     You can specify multiple patterns and mix styles:
 
     sample_data:
-        samples_pattern:
+        reads_patterns:
             - wildcard_glob: "../data/{sample}_{direction}.fastq"
             - glob: "../data/*.fastq"
               re: "/([^_]+)_[^/]+\\.fastq"
