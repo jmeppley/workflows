@@ -50,17 +50,23 @@ rule megahit:
         get_version('megahit')
     params:
         preset=lambda w: w.preset,
-        continue_flags=lambda w: "--continue" \
+        cont=lambda w: "--continue" \
             if os.path.isdir('megahit-{}'.format(w.preset)) else "",
-        #inputs=','.join(config['cleaned_read_list'])
+        rmdir=lambda w: "rmdir megahit-{}".format(w.preset) \
+            if not os.path.isdir('megahit-{}'.format(w.preset)) else "",
         inputs=','.join(cleaned_reads),
         user_opts=config['megahit']['params']
     threads:
         config['megahit']['threads']
     shell:
-        "megahit --12 {params.inputs} --presets {params.preset} -t {threads}\
-         --continue -o megahit-{params.preset} --out-prefix megahit --verbose\
+        """
+        # snakemake generates output dir, but this confuses megahit. 
+        # remove it if were not continuing
+        {params.rmdir}
+        megahit --12 {params.inputs} --presets {params.preset} -t {threads} \
+         {params.cont} -o megahit-{params.preset} --out-prefix megahit \
          {params.user_opts} \
-         > {log} 2>&1"
+         > {log} 2>&1
+        """
 
 

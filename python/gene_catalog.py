@@ -12,12 +12,15 @@ import json
 import pandas
 from Bio import SeqIO
 from edl import taxon as edltaxon, util, hits as edlhits, blastm8, kegg
-from snakemake import logger
 try:
     from python.common import parse_stats
+    from snakemake import logger
 except:
     # if running as a script
     from common import parse_stats
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger()
 
 REFSEQ='refseq'
 GTDB='GTDB'
@@ -39,12 +42,12 @@ def get_function_trimmed(hit, desc_map, db_type):
     """
     Given a RefSeq hit id return a function stripped of boilerplate
     """
-    if db_type is REFSEQ:
+    if db_type == REFSEQ:
         return  func_pref_RE.sub('',
                  func_suff_RE.sub('',
                   extra_loaction_info_RE.sub(r'\1',
                    desc_RE.sub('',desc_map[hit.hit]))))
-    if db_type is GTDB:
+    if db_type == GTDB:
         return desc_map[hit.hit].split(None, 1)[-1]
     return "NA"
 
@@ -97,12 +100,13 @@ def approximate_rank(taxon, use_major_ranks=True):
 
 class TaxDBGeneAnnotator():
     def __init__(self, db_location,
+                 db_type=REFSEQ,
                  taxid_delim=None,
                  bad_refs=set(),
                  genome_clades={},
                  **kwargs):
         self.rsdb=db_location
-        self.parse_db_metadata(taxid_delim)
+        self.parse_db_metadata(taxid_delim, db_type)
         self.set_m8_params(**kwargs)
         self.set_bad_refs(bad_refs)
 
@@ -134,9 +138,9 @@ class TaxDBGeneAnnotator():
                                     **kwargs):
         kwargs.setdefault('index_col',0)
         genome_data=pandas.read_csv(genome_clade_file,**kwargs)
-        set_genome_clades( genome_data[column] )
+        self.set_genome_clades( genome_data[column] )
 
-    def parse_db_metadata(self, taxid_delim):
+    def parse_db_metadata(self, taxid_delim, db_type):
         """
         Given a refseq database in my style, parse the associated map files
         """
@@ -147,7 +151,8 @@ class TaxDBGeneAnnotator():
         self.taxid_map = util.parseMapFile(rsdb_taxid_map,
                 valueDelim=taxid_delim,
                 valueType=int)
-        self.hit_translator = edlhits.getHitTranslator(hitStringMap=self.taxid_map, parseStyle=edlhits.ACCS, taxonomy=self.taxonomy, hitsAreObjects=True)
+        parse_style = edlhits.ACCS if db_type == REFSEQ else edlhits.HITIDS
+        self.hit_translator = edlhits.getHitTranslator(hitStringMap=self.taxid_map, parseStyle=parse_style, taxonomy=self.taxonomy, hitsAreObjects=True)
 
         # descriptions
         rsdb_desc_map = self.rsdb + ".ids"
@@ -155,7 +160,7 @@ class TaxDBGeneAnnotator():
 
     def annotate_genes_rs_prot(self, hit_table, annotation_table,
                                db_type=REFSEQ):
-        logger.debug("Annotating " + db_type + " taxdb with " + \
+        logger.info("Annotating " + db_type + " taxdb with " + \
                      hit_table + " and " + \
                      annotation_table)
         with open(annotation_table, 'w') as tsv_out:
@@ -180,6 +185,8 @@ class TaxDBGeneAnnotator():
                     ))
 
     def generate_gene_annotations_rs_prot(self, hit_table, db_type=REFSEQ):
+        logger.info("Annotating " + db_type + " taxdb with " + \
+                     hit_table)
 
         species_index = major_ranks.index('species')
         genus_index = major_ranks.index('genus')
@@ -227,15 +234,15 @@ class TaxDBGeneAnnotator():
                 function = 'NA'
 
 
+            top_hit=hits[0]
             # description of top hit
             top_desc = self.desc_map[top_hit.hit]
-            if db_type is GTDB:
+            if db_type == GTDB:
                 # GTDB headers are too long, take sp name and func
                 top_desc = top_desc.split(";")[-1]
+                top_desc = re.sub(r'^s__', '', top_desc)
 
-            top_hit=hits[0]
-            yield
-            (gene,lca_ranked,function,min_pctid,len(hits),top_hit.hit,top_hit.pctid,top_hit.score,top_desc)
+            yield (gene,lca_ranked,function,min_pctid,len(hits),top_hit.hit,top_hit.pctid,top_hit.score,top_desc)
 
         logger.info( "Parsed %d hits for %d genes" % (total_hits, total_genes))
 
@@ -500,6 +507,8 @@ def main():
             arguments.type = KEGG
         else:
             arguments.type = REFSEQ
+
+    logger.info("Parsing db type: " + arguments.type)
 
     # annotate!
     if arguments.type == KEGG:

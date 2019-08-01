@@ -2,6 +2,9 @@
 *.pyc
 test/scratch
 test/conda/envs
+test/data/seqdbs/GTDB/lastdb*
+!test/data/seqdbs/GTDB/lastdb.faa
+!test/data/seqdbs/GTDB/lastdb.tax
 test/data/seqdbs/RefSeq/lastdb*
 !test/data/seqdbs/RefSeq/lastdb.faa
 !test/data/seqdbs/RefSeq/lastdb.tax

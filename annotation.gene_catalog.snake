@@ -97,11 +97,22 @@ for dbdotfmt in gene_family_db_dot_fmts:
 # include transitions makefile only after all transitions defined
 include: "common/transitions.snake"
 
-# how to search against taxdb
+# how to search against taxdbs
 tax_db_dot_algs = \
     ['{}.{}'.format(d, config['dbs'][d].get('format', 'lastx')) \
      for d in config['taxdbs']]
 
+# which taxdb to incorporate?
+primary_tax_db = config.get('primary_tax_db', None)
+if primary_tax_db is None:
+    # default to first configured db
+    primary_tax_db = config['taxdbs'][0]
+else:
+    if primary_tax_db not in config['taxdbs']:
+        raise Exception(("The configured primary_tax_db ({}) is not " \
+                         "configued as a taxnomic db ({})") \
+                         .format(primary_tax_db, ", ".join(config['taxdbs'])))
+#
 # End configuration
 ##########
 
@@ -153,7 +164,6 @@ rule taxdb_annotations:
     params:
         db=lambda w: config['dbs'][w.taxdb]['path']
     run:
-        logger.debug("test")
         a = gene_catalog.TaxDBGeneAnnotator(get_file_name(params.db))
         if wildcards.taxdb.lower().startswith('rs') or \
            wildcards.taxdb.lower().startswith('refseq'):
@@ -162,8 +172,6 @@ rule taxdb_annotations:
             db_type = gene_catalog.GTDB
         else:
             db_type = None
-        print("Annotating " + db_type + " taxdb with " + \
-                     input.hits)
         a.annotate_genes_rs_prot(get_file_name(input.hits), 
                                  get_file_name(output),
                                  db_type=db_type,
@@ -188,41 +196,47 @@ def collapse_duplicates(table, col='Gene', sep=','):
     return table.groupby(col).agg(lambda S: sep.join(str(v) for v in S))
 
 rule final_table:
-    input: expand('{prefix}.annotations.{db}', \
-                  prefix=prefix, \
-                  db=config['dbs'])
+    """
+    The collated annotations. Although we might want to run multiple TAX DBs
+    putting them all into one annotation table would make a huge file.
+    """
+
+    input:
+        tax_db='{prefix}.annotations.{db}'.format(prefix=prefix, \
+                                                  db=primary_tax_db),
+        func_dbs=expand('{prefix}.annotations.{db}', \
+                        prefix=prefix, \
+                        db=gene_family_dbs),
     output: '{}.annotations.tab'.format(prefix)
     benchmark: 'benchmarks/{}.annotations.tab'.format(prefix)
     run:
-        # scan table file names so we can start with RefSeq
-        db_file_map = {}
-        ref_seq_table = None
-        for table_file in input:
-            db_name = re.search(r'annotations\.(.+)$', table_file)\
-                        .group(1).strip()
-            if re.search(r'^(RS|RefSeq)$', db_name, re.IGNORECASE):
-                ref_seq_table = table_file
-            else:
-                db_file_map[db_name] = table_file
+        print("Running")
 
-        # load RefSeq annotations
-        annot = pandas.read_csv(ref_seq_table, sep='\t', header=0, index_col=0)
-        logger.debug("Annotation table shape is: {}".format(annot.shape))
+        # load Taxonomic annotations (refseq or GTDB)
+        annot = pandas.read_csv(input.tax_db, sep='\t', header=0, index_col=0)
+        print(annot.shape)
+        logger.info("Annotation table shape is: {}".format(annot.shape))
 
-        # TODO: handle second tax db (pick one?)
-
-        # iteratively join other annotations
-        for db in sorted(db_file_map.keys()):
-            table = pandas.read_csv(db_file_map[db], sep='\t',
+        # load functional annotations (gene families like KEGG or PFAM)
+        for func_annot_table in input.func_dbs:
+            print(repr(func_annot_table))
+            # these should be two column maps from gene ids to gene family ids
+            db_name = func_annot_table.split(".")[-1]
+            print(db_name)
+            # name data column after db
+            table = pandas.read_csv(func_annot_table, sep='\t',
                                       index_col=None,
                                       header=0,
-                                      names=['Gene', db])
+                                      names=['Gene', db_name])
+            print(table.shape)
             # if there are duplicate entries Cfor some genes, separate by
             # semicolon
             table = collapse_duplicates(table, col='Gene', sep=';')
+            print(table.shape)
+
+            # merge with existing annotations (add as new column)
             annot = annot.join(table, how='outer')
-            logger.debug("Annotation table shape is: {}".format(annot.shape))
+            print("Annotation table shape is: {}".format(annot.shape))
 
         # save table to output file
         annot.to_csv(get_file_name(output), sep='\t')
-

@@ -16,6 +16,10 @@ dbs:
         path: ../../data/seqdbs/RefSeq/lastdb
         format: lastp
         type: tax
+    GTDB:
+        path: ../../data/seqdbs/GTDB/lastdb
+        format: lastp
+        type: tax
     KEGG: 
         path: ../../data/seqdbs/KEGG/lastdb
         format: lastp
