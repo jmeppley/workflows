@@ -1,0 +1,84 @@
+from python.common import apply_defaults
+fastp_version = get_version('fastp')
+defaults = {'fastp':{
+    'qualified_quality_phred': 15,
+    'unqualified_percent_limit': 40,
+    'average_qual': 0,
+    'length_required': 40,
+    'detect_adapter_for_pe': True,
+    'cut_front': True,
+    'cut_front_window_size': 1,
+    'cut_front_mean_quality': 10,
+    'cut_tail': True,
+    'cut_tail_window_size': 1,
+    'cut_tail_mean_quality': 10,
+    'cut_right': True,
+    'cut_right_window_size': 4,
+    'cut_right_mean_quality': 20,
+    'trim_poly_x': True,
+    'poly_x_min_len': 10,
+    }}
+apply_defaults(config, defaults)
+
+sub_opt_prefix_dict = {'trim_poly_x': 'poly_x'}
+def get_fastp_opts(config):
+    """ uses config['fastp'] to build command line opts
+        defaults are set above. keys are the cmd line opts without the dashes
+        if a T/F flag is set to false, flags with matching prefix are skipped
+    """
+    # first find things that are explicitly turned off
+    skip_prefixes = []
+    for flag, value in config['fastp'].items():
+        if value is False:
+            skip_prefixes.append(sub_opt_prefix_dict.get(flag))
+
+    def skip_flag(flag):
+        for prefix in skip_prefixes:
+            if flag.startswith(prefix):
+                return True
+        return False
+
+    # combine into one large commend line fragment
+    opt_string = ""
+    for flag, value in config['fastp'].items():
+        if not skip_flag(flag):
+            opt_string += " --" + flag
+            if isinstance(value, bool):
+                continue
+            elif isinstance(value, str):
+                opt_string += ' "' + value + '"'
+            else:
+                opt_string += " " + str(value)
+
+    return opt_string
+
+rule fastp_clean:
+    """
+    one-step cleaning with fastp
+    """
+    input:
+        "{prefix}.{suffix}"
+    output:
+        fastq=temp("{prefix}.cleaned.{suffix}"),
+        html="{prefix}.cleaned.{suffix}.html",
+        json="{prefix}.cleaned.{suffix}.json"
+    wildcard_constraints:
+        suffix=r'(R[12]\.)?fastq'
+    benchmark:
+        "benchmarks/{prefix}.cleaned.{suffix}.time"
+    log:
+        "logs/{prefix}.cleaned.{suffix}.log"
+    version:
+        fastp_version
+    params:
+        interleaved=lambda w: \
+            '--interleaved_in' if re.search(r'R[12]', w.suffix) is None else '',
+        opts=get_fastp_opts(config),
+    threads:
+        1
+    shell:
+        "cat {input} \
+          | fastp --stdin --stdout {params.interleaved} \
+            -h {output.html} -j {output.json} \
+            {params.opts} \
+          > {output} 2> {log}"

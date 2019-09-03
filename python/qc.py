@@ -25,6 +25,17 @@ QC_PROTOCOLS = {
     "rename": 'rename.interleaved',
     "interleave": 'interleaved',
     "ec_only": "corrected.dropse",
+    "assembly_fastp": ".".join(['renamed',
+                                'interleaved',
+                                'cleaned',
+                                'corrected',
+                                'dropse',
+                               ]),
+    "assembly_fastp_no_ec": ".".join(['renamed',
+                                      'interleaved',
+                                      'cleaned',
+                                      'dropse',
+                                     ]),
     "assembly": '.'.join(['renamed',
                           'interleaved',
                           'noadapt',
@@ -48,7 +59,8 @@ QC_PROTOCOLS = {
 }
 
 # list of protocols with no error correction
-NON_EC_PROTOCOLS = ['joining', 'assembly_no_ec', 'join_and_standards']
+NON_EC_PROTOCOLS = ['joining', 'assembly_no_ec', 
+                    'assembly_fastp_no_ec', 'join_and_standards']
 JOINING_PROTOCOLS = ['joining', 'join_and_standards']
 
 READ_DIRECTIONS = ['R1', 'R2']

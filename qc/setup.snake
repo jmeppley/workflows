@@ -22,15 +22,15 @@ if sum(1 for s in config['sample_data'] \
         # all three joining programs are interchangeable
         joining_program = config.get('joining_program','pear')
         include: '{joining_program}.snake'.format(**vars())
-    elif protocol == 'assembly':
+    elif protocol.startswith('assembly'):
         include: 'rename.snake'
-        include: 'bbduk.snake'
-        include: 'bfc.snake'
-        include: 'tmatic.snake'
-    elif protocol == 'assembly_no_ec':
-        include: 'rename.snake'
-        include: 'bbduk.snake'
-        include: 'tmatic.snake'
+        if protocol.startswith('assembly_fastp'):
+            include: 'fastp.snake'
+        else:
+            include: 'bbduk.snake'
+            include: 'tmatic.snake'
+        if not protocol.endswith('no_ec'):
+            include: 'bfc.snake'
     elif protocol.startswith('anvio'):
         include: 'rename.snake'
         include: 'iu.snake'
