@@ -8,7 +8,7 @@ check_sample_data(config):
 """
 import re
 import os
-from jme.drs import remote_wrapper, get_dl_snakefile
+from jme.dynamic_remote_snake.remote import remote_wrapper
 
 def check_sample_data(config):
     """ if sample_data not explicitly listed in config, work from glob """

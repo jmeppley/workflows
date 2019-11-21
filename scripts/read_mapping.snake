@@ -45,7 +45,7 @@ workflows_dir = os.path.dirname(os.path.dirname(workflow.snakefile))
 sys.path.append(workflows_dir)
 from python.mapping import check_sample_data
 
-from jme.drs import remote_wrapper, get_dl_snakefile
+from jme.dynamic_remote_snake.remote import remote_wrapper, get_dl_snakefile
 include: get_dl_snakefile()
 
 references_file = remote_wrapper(config['references_file'], config)
@@ -73,7 +73,7 @@ rule count_table:
         hit_tables=' '.join(["=".join(kv) for kv in search_results.items()]),
         cutoff=config.get('cutoff', 0)
     shell: "count_taxa.py {params.hit_tables} -p hitid -a portion -F 0 -f sam \
-            -o {output} -c {params.cutoff} -v 22> {log}"
+            -o {output} -c {params.cutoff} -v 2> {log}"
 
 rule save_header:
     " grabs the header of a single sam file "

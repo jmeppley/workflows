@@ -7,7 +7,7 @@ import re
 import os
 import glob
 import snakemake
-from jme.drs import remote_wrapper
+from jme.dynamic_remote_snake.remote import remote_wrapper
 
 def process_sample_data(sample_data, config):
     """

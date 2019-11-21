@@ -14,7 +14,8 @@ Another use if for when the input file is in another part of the file system. We
 We can also concat multiple files into one here by giving list of files
 """
 logger.debug("BUILDING TRANSITIONS")
-from jme.drs import remote_wrapper, URL_REXP
+from jme.dynamic_remote_snake.remote import remote_wrapper, get_dl_snakefile
+from jme.stagecache.util import URL_REXP
 
 # To prevent trying to copy or link from a file to itself
 #  remove redundant transistions here (prefilter URLs so we don't trip os.path)
@@ -49,7 +50,9 @@ pattern = "(" + "|".join(transitions.keys()) + ")"
 wildcard_constraints:
     transition_file_name=pattern
 
-include: os.environ['CONDA_PREFIX'] + "/share/drs/snake/download.snake"
+logger.debug("Dynamic Remote Snakefile: " + get_dl_snakefile())
+
+include: get_dl_snakefile()
 #include: '/home/jmeppley/work/dynamic_remote_snake/download.snake'
 
 # transition rule will only match one of the configured files

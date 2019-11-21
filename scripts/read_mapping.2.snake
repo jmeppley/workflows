@@ -53,7 +53,7 @@ sys.path.append(workflows_dir)
 from python.common import get_file_name
 from python.mapping import check_sample_data
 
-from jme.drs import remote_wrapper, get_dl_snakefile
+from jme.dynamic_remote_snake.remote import remote_wrapper, get_dl_snakefile
 include: get_dl_snakefile()
 
 references_file = remote_wrapper(config['references_file'], config)

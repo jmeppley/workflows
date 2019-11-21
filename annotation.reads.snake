@@ -88,7 +88,7 @@ import os
 from python.common import get_version
 from python.annotate import get_db_dot_fmt_strings, get_last_alg
 from python.mapping import check_sample_data
-from jme.drs import remote_wrapper
+from jme.dynamic_remote_snake.remote import remote_wrapper
 
 #########
 # CONFIGURATION
