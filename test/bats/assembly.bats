@@ -87,6 +87,8 @@ setup() {
 }
 
 @test "Assemble with megahit and fastp" {
+    which fastp || skip "fastp is not installed"
+
     rm -rf test/scratch/iu-megahit
     mkdir -p test/scratch/iu-megahit
     cd test/scratch/iu-megahit
