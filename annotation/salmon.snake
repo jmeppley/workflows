@@ -50,10 +50,17 @@ def get_sample_reads_option(w):
     # single files need to be split apart
     return '-1 {file}.1.fastq -2 {file}.2.fastq'.format(file=sample_reads)
 
+def get_salmon_json():
+    """ If version is pre 1.0, look for header.json, else info.json """
+    first_digit = re.sub(r'^[^0-9]+', '', config['salmon_version'])[0]
+    if first_digit == '0':
+        return "salmon/{contigs}.index/header.json"
+    return "salmon/{contigs}.index/info.json"
+
 rule index_contigs_salmon:
     """ process a set of transcripts for salmon quanitfication """
     input: "{contigs}.fasta"
-    output: "salmon/{contigs}.index/header.json"
+    output: get_salmon_json()
     log: "logs/salmon.{contigs}.index"
     benchmark: "benchmarks/salmon.{contigs}.index.time"
     params: 
@@ -95,7 +102,7 @@ rule split_reads_for_quant:
 rule quant_reads_salmon:
     """ quantify a set of reads a gainst a salmon index """
     input:
-        index="salmon/{contigs}.index/header.json",
+        index=get_salmon_json(),
         reads=get_sample_reads,
     output:
         quant="salmon/{sample}.vs.{contigs}.quant/quant.sf",
