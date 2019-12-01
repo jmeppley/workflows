@@ -87,9 +87,9 @@ setup() {
 }
 
 @test "Assemble with megahit and fastp" {
-    rm -rf test/scratch/iu-megahit
-    mkdir -p test/scratch/iu-megahit
-    cd test/scratch/iu-megahit
+    rm -rf test/scratch/fp-megahit
+    mkdir -p test/scratch/fp-megahit
+    cd test/scratch/fp-megahit
 
     run bash -c "snakemake -j 10 -s ../../../assembly.metagenomic.snake -p --configfile ../../data/configs/megahit.yaml --config cleaning_protocol=assembly_fastp --verbose > assembly.log 2>&1"
     [ "$status" -eq 0 ]

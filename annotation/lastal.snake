@@ -29,7 +29,7 @@ rule get_db_id_map:
     output: "{db_path}.ids"
     resources:
         disk=1
-    shell: r"grep '^>' {input} | perl -pe 's/^>(\S+)\s+/\1\t/' > {output}"
+    shell: r"grep '^>' {input} | sed -r 's/^>(\S+)\s+/\1\t/' > {output}"
 
 rule lastal:
     """

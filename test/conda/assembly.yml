@@ -15,6 +15,7 @@ dependencies:
  - bbmap
  - bfc
  - trimmomatic
+ - fastp
  - bwa 
  - samtools
  - infernal
