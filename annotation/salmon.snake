@@ -52,9 +52,14 @@ def get_sample_reads_option(w):
 
 def get_salmon_json():
     """ If version is pre 1.0, look for header.json, else info.json """
-    first_digit = re.sub(r'^[^0-9]+', '', config['salmon_version'])[0]
-    if first_digit == '0':
-        return "salmon/{contigs}.index/header.json"
+    try:
+        first_digit = re.sub(r'^[^0-9]+', '', config['salmon_version'])[0]
+        if first_digit == '0':
+            return "salmon/{contigs}.index/header.json"
+    except:
+        logger.warning("Cannot get first digit of salmon version: " +
+                       config['salmon_version'])
+        pass
     return "salmon/{contigs}.index/info.json"
 
 rule index_contigs_salmon:
