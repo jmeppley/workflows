@@ -9,6 +9,9 @@ defaults = {
         'threads': 20,
         'illumina_clip': "2:30:10",
         'minlen': 50,
+        'leading': 10,
+        'trailing': 10,
+        'sliding_window': "4:20",
     }}
 apply_defaults(config, defaults)
 
@@ -37,7 +40,8 @@ rule trimmomatic_trim:
         trim_params=" ".join([
             "{}:{}".format(p.upper(),config['trimmomatic'][p]) \
             for p in ['leading', 'trailing', 'slidingwindow', 'minlen'] \
-            if p in config['trimmomatic']
+            if p in config['trimmomatic'] \
+            and config['trimmomatic'][p] not in [None, 'None', ""]
         ])
         #trim_params="LEADING:{leading} TRAILING:{trailing} \
         #   SLIDINGWINDOW:{sliding_window} MINLEN:{minlen}")
