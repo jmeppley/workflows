@@ -44,12 +44,11 @@ def process_sample_data(sample_data, config):
 
             for sample, reads in collect_sample_reads(pattern_data, config).items():
                 sample_data.setdefault(sample, {})[read_key] = reads
-                for key, value in other_read_data:
+                for key, value in other_read_data.items():
                     if key == 'filter':
                         # this will need to be a template, eg: {sample}.list
                         value = value.format(sample=sample)
-                    else:
-                        sample_data[key] = value
+                    sample_data[sample][key] = value
 
         # Now get rid of any patterns from config
         del sample_data['reads_patterns']

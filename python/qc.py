@@ -200,6 +200,7 @@ def setup_qc_outputs(config):
             # cleaned suffix
             cleaned_suffix = get_cleaned_suffix(cleaning_protocol,
                                                 sample, config)
+            logger.debug("Cleaned Suffix: " + cleaned_suffix)
 
             ## result of QC
             # the actual QC output depends on the remove_rna flag
@@ -217,6 +218,7 @@ def setup_qc_outputs(config):
                 # otherwise, QC ends at cleaned_suffix
                 cleaned_raw_reads = '{sample}.{cleaned_suffix}fastq'\
                                                         .format(**vars())
+            logger.debug("Cleaned Reads: " + cleaned_raw_reads)
 
             # this is the alias that will point to the actual QC output
             cleaned_reads = '{sample}.clean.fastq'.format(**vars())
