@@ -87,7 +87,7 @@ rule frag_hmm_db:
         outname="{path}/frag_{frags}/{hmm_file}.{ext}"
     shell: "fragment_records.py -N {wildcards.frags} \
              -P '^HMMER' -E -Z 4 -i {input} -o {params.outname}"
-    
+
 # This second rule uses the first db fragment as the stated input,
 #  but it creates a link to fragment N
 rule frag_hmm_db_others:
@@ -100,4 +100,3 @@ rule frag_hmm_db_others:
     params:
         input="{path}/frag_{frags}/{hmm_file}.0{N}.{ext}"
     shell: "ln -s $(realpath --relative-to=$(dirname {output}) {params.input}) {output}"
-
