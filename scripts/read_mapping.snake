@@ -111,7 +111,7 @@ rule search_reads:
     shell: "bwa mem {params.pairing} -t {threads} {params.db} {input.reads} \
             > {output} 2> {log}"
 
-rule index_refereces:
+rule index_references:
     """ prepare refereces for mapping with BWA """
     input: references_file
     output: 'references.bwadb.bwt'
