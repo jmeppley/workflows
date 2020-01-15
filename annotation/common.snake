@@ -1,4 +1,5 @@
 from python.annotate import get_db_types, get_db_assignment_params
+from jme.dynamic_remote_snake.remote import get_dl_snakefile
 
 #########
 # CONFIGURATION

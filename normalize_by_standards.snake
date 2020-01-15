@@ -34,6 +34,7 @@ from python.common import get_version
 from python.qc import setup_qc_outputs, get_cleaned_suffix
 from python.standards import get_best_fit, calculate_factors
 from snakemake.logging import logger
+from jme.dynamic_remote_snake.remote import remote_wrapper
 
 include: 'common/stats.snake'
 
@@ -43,8 +44,9 @@ include: 'common/stats.snake'
 #   --config spike_amounts_table=spikes.txt
 spike_amounts_table = config.setdefault('spike_amounts_table',
                                         "spike_amounts.tsv")
-standards_fasta = config.setdefault("standards_fasta",
-                                    "standards.fasta")
+config['standards_fasta'] = remote_wrapper( \
+    config.get("standards_fasta", "standards.fasta"), \
+    config)
 
 # parses config to setup input reads
 outputs = config.setdefault('outputs',set())
@@ -56,11 +58,11 @@ cleaning_protocol = config.setdefault('cleaning_protocol', 'join_and_standards')
 # includes rules needed for joining, cleaning, and finding standards in reads
 include: "qc/setup.snake"
 
-# check that the spiked standards fasta exists and has data:
-if not os.path.exists(standards_fasta) or os.stat(standards_fasta).st_size == 0:
-    raise Exception("The 'standards_fasta' database must be a text file with "
-                    "sequences in fasta format. The file is empty or missing:\n{}" \
-                    .format(standards_fasta))
+## check that the spiked standards fasta exists and has data:
+#if not os.path.exists(standards_fasta) or os.stat(standards_fasta).st_size == 0:
+#    raise Exception("The 'standards_fasta' database must be a text file with "
+#                    "sequences in fasta format. The file is empty or missing:\n{}" \
+#                    .format(standards_fasta))
 
 # check that the spiked amounts table exists and has data:
 if not os.path.exists(spike_amounts_table) or os.stat(spike_amounts_table).st_size == 0:
