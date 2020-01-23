@@ -10,7 +10,7 @@ rule compile_lastdb:
         '{db_path}.faa',
     output: "{db_path}.prj"
     threads:
-        lambda wildcards: config.get('lastal',{}).get('threads',10)
+        config.get('lastal',{}).get('threads',10)
     resources:
         disk=1
     params:
@@ -48,7 +48,7 @@ rule lastal:
     version:
         get_version('lastal')
     threads:
-        lambda wildcards: config.get('lastal',{}).get('threads',10)
+        config.get('lastal',{}).get('threads',10)
     resources:
         disk=1
     params:
