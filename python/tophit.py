@@ -94,18 +94,21 @@ def get_top_hit_outputs(config):
         hit_filter = get_filter_string(config.get('filter', DEFAULT_FILTER))
         db_strings[dbase] = \
                 'vs.{dbase}.{search_alg}.{hit_filter}'.format(**vars())
+        added_files = []
         topalg = config.get('top_alg', 'tophit')
-        config['outputs'].add('counts.{dbase}.{topalg}.all.hitids'.format(**vars()))
         if 'rrna_subset' in config['dbs'][dbase]:
             rrna_subsets = config['dbs'][dbase]['rrna_subset']
             if not isinstance(rrna_subsets, list):
                 rrna_subsets = rrna_subsets.split(";")
             for rrna_subset in rrna_subsets:
-                # also do counts of requested rRNA subset(s)
-                config['outputs'] \
-                        .add('counts.{dbase}.{topalg}.{rrna_subset}.hitids' \
-                             .format(**vars()))
-        logger.debug('added counts.{dbase}.{topalg}.hitids to outputs'.format(**vars()))
+                # only do counts of requested rRNA subset(s)
+                target_file = 'counts.{dbase}.{topalg}.{rrna_subset}.hitids' \
+                              .format(**vars())
+                added_files.append(target_file)
+        else:
+            added_files.append('counts.{dbase}.{topalg}.all.hitids'.format(**vars()))
+        config['outputs'].update(added_files)
+        logger.debug('added:  ' + ", ".join(added_files))
 
     return needs_qc
 
