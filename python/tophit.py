@@ -96,12 +96,15 @@ def get_top_hit_outputs(config):
                 'vs.{dbase}.{search_alg}.{hit_filter}'.format(**vars())
         topalg = config.get('top_alg', 'tophit')
         config['outputs'].add('counts.{dbase}.{topalg}.all.hitids'.format(**vars()))
-        if config.get('remove_rna'):
-            # also do counts of requested rRNA subset
-            rrna_subset = config.get('rrna_subset', 'non-rRNA')
-            config['outputs'] \
-                    .add('counts.{dbase}.{topalg}.{rrna_subset}.hitids' \
-                         .format(**vars()))
+        if 'rrna_subset' in config['dbs'][dbase]:
+            rrna_subsets = config['dbs'][dbase]['rrna_subset']
+            if not isinstance(rrna_subsets, list):
+                rrna_subsets = rrna_subsets.split(";")
+            for rrna_subset in rrna_subsets:
+                # also do counts of requested rRNA subset(s)
+                config['outputs'] \
+                        .add('counts.{dbase}.{topalg}.{rrna_subset}.hitids' \
+                             .format(**vars()))
         logger.debug('added counts.{dbase}.{topalg}.hitids to outputs'.format(**vars()))
 
     return needs_qc

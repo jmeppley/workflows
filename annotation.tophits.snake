@@ -13,12 +13,21 @@ Do the following for each set of sequences:
 Optional: rRNA filtering
 
 To also cout a specific subset of reads based on RFAM model filtering,
-turn on rrna filtering (remove_rrna=True) and specify one of (non-rRNA 
-(default), rRNA-only, SSU, or LSU). An example config snippet:
+turn on rrna filtering by adding an 'rrna_subset' value to any
+db definition. Can be one of: (non-rRNA, rRNA-only, SSU, or LSU).
+
+An example config snippet:
 
 ```
-remove_rna: True
-rrna_subset: SSU
+dbs:
+    Silva:
+        path: /path/to/Silva.bwadb
+        format: bwa
+        rrna_subset: SSU
+    RefSeq:
+        path: /path/to/REfSeq.lastdb
+        format: lastp
+        rrna_subset: non-rRNA
 ```
 
 Finally
@@ -29,6 +38,32 @@ import re
 from python.common import get_version
 from python.tophit import get_top_hit_outputs, get_rna_filtered_reads, get_get_ids_cmd
 from snakemake.logging import logger
+
+# include lastal rules if any db is lastdb
+# include rna rules if any db wants a subset
+use_lastal = False
+use_rrna = False
+for db_info in config['dbs'].values():
+    if re.search('last', db_info.get('format', "")):
+        use_lastal = True
+    if 'rrna_subset' in db_info:
+        use_rrna = True
+
+if use_lastal:
+    include: "annotation/lastal.snake"
+    include: "common/fastq.snake"
+
+if use_rrna:
+    include: "qc/sort.rna.snake"
+    include: "common/fastq.snake"
+    ruleorder: filter_nonrrna_or_rrna > fastq_to_fasta
+    # remove_rna flag conflicts with tophit approach
+    config['remove_rna'] = False
+else:
+    # if the dbs don't specify anything default to just using non-rRNA
+    config.setdefault('remove_rna', False)
+
+
 
 needs_qc = get_top_hit_outputs(config)
 if needs_qc:
@@ -45,19 +80,7 @@ for db_info in config['dbs'].values():
         include: "annotation/bwa.snake"
         break
 
-# include lastal rules if any db is lastdb
-for db_info in config['dbs'].values():
-    if re.search('last', db_info.get('format', "")):
-        include: "annotation/lastal.snake"
-        include: "common/fastq.snake"
-        break
-
 include: "common/transitions.snake"
-
-if config.get('remove_rna', True) in ['True', True]:
-    include: "qc/sort.rna.snake"
-    include: "common/fastq.snake"
-    ruleorder: filter_nonrrna_or_rrna > fastq_to_fasta
 
 wildcard_constraints:
     search=r'vs\..+',
@@ -122,12 +145,14 @@ rule count_hits:
         '{sample}.{search}.{top}.{rna}.hitid.counts'
     benchmark:
         "benchmarks/{sample}.{search}.{top}.{rna}.count.time"
+    params:
+        col=lambda w: 2 if re.search('sam', w.search) else 1
     log:
         "logs/{sample}.{search}.{top}.{rna}.count.log"
     version:
         get_version("count_hits.py")
     shell:
-        "count_hits.py -v -i {input} -H 1 \
+        "count_hits.py -v -i {input} -H {params.col} \
         > {output} 2> {log}"
 
 rule filter_hits:
