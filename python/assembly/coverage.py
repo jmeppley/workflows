@@ -24,7 +24,7 @@ def get_coverage_stats(contig_depth_file,
     # read counts
     logger.info("Parsing read count file: {}"
                 .format(contig_read_counts_file))
-    read_count_table = pandas.read_table(contig_read_counts_file,
+    read_count_table = pandas.read_csv(contig_read_counts_file,
                                          delim_whitespace=True,
                                          names=['ReadCount',
                                                 'Contig'])\
