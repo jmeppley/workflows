@@ -1,0 +1,28 @@
+channels: 
+- conda-forge
+- bioconda
+- jmeppley
+dependencies:
+- python=3
+- snakemake-minimal
+- pysftp
+- psutil
+- paramiko
+- coreutils
+- pandas
+- biopython
+- flash
+- pear
+- trimmomatic
+- sed
+- bbmap
+- prinseq
+- seqtk
+- infernal
+- last
+- bwa
+- samtools
+- py-metagenomics
+- batch_launcher
+- coreutils
+- dynamic_remote_snake
