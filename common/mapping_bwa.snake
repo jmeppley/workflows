@@ -38,9 +38,9 @@ rule map_sample_reads:
     map cleaned reads onto contigs
     """
     input:
-        "mapping/{contigs}.index.bwa.bwt",
+        db="mapping/{contigs}.index.bwa.bwt",
         # prefer the raw reads, but cleaned are OK
-        lambda w: get_sample_reads_for_mapping(w, config)
+        fastq=lambda w: get_sample_reads_for_mapping(w, config)
     output:
         temp("mapping/{sample}.reads.vs.{contigs}.sam")
     log:
@@ -51,7 +51,7 @@ rule map_sample_reads:
     threads: config['bwa']['threads']
     shell:
         "bwa mem -p -t {threads} \
-          mapping/{wildcards.contigs}.index.bwa {input[1]} \
+          mapping/{wildcards.contigs}.index.bwa {input.fastq} \
             2> {log} \
             > {output}"
 

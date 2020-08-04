@@ -59,7 +59,7 @@ QC_PROTOCOLS = {
 }
 
 # list of protocols with no error correction
-NON_EC_PROTOCOLS = ['joining', 'assembly_no_ec', 
+NON_EC_PROTOCOLS = ['joining', 'assembly_no_ec',
                     'assembly_fastp_no_ec', 'join_and_standards']
 JOINING_PROTOCOLS = ['joining', 'join_and_standards']
 
@@ -224,6 +224,9 @@ def setup_qc_outputs(config):
             outputs.append(cleaned_reads)
             transitions[cleaned_reads] = cleaned_raw_reads
             data['clean'] = cleaned_reads
+
+            # samples.get_sample_reads_for_mapping needs this
+            data['clean_realpath'] = cleaned_raw_reads
 
     return outputs
 

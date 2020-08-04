@@ -7,6 +7,7 @@ import re
 import os
 import glob
 import snakemake
+from snakemake import logger
 from jme.dynamic_remote_snake.remote import remote_wrapper
 
 def process_sample_data(sample_data, config):
@@ -226,17 +227,23 @@ def get_sample_reads_for_mapping(wildcards, config):
             # return clean reads if explicitly requested
             return config['sample_data'][sample]['clean']
 
-        try:
+        if 'clean_realpath' in config['sample_data'][sample]:
+            clean_reads = config['sample_data'][sample]['clean_realpath']
+        elif 'clean' in config['sample_data'][sample]:
+            clean_reads = config['sample_data'][sample]['clean']
+        else:
+            clean_reads = None
+
+        if clean_reads:
+            logger.debug(f'Clean Reads for {sample}: {clean_reads}')
             # can we find the renamed and interleaved reads?
-            renamed_root = re.search(r'^.+\.renamed(?:\.interleaved)?',
-                                     config['sample_data']\
-                                                    [sample]\
-                                                    ['clean']
-                                    ).group()
-            return renamed_root + ".fastq"
-        except:
-            # OK, that didn't work
-            pass
+            match = re.search(r'^.+\.interleaved',
+                              clean_reads)
+            if match:
+                logger.debug("found interleaved reads")
+                return match.group() + ".fastq"
+            else:
+                logger.debug("can't find interleaved reads")
 
         # let's try simply using raw or clean reads
         if 'raw' in config['sample_data'][sample]:
