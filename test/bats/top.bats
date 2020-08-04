@@ -1,7 +1,7 @@
 setup() {
     eval "$(conda shell.bash hook)"
     mkdir -p test/conda/envs
-    ENV=illumina.qc
+    ENV=tophit.qc
     ENV_DIR=`pwd`/test/conda/envs/$ENV
     ENV_FILE=test/conda/${ENV}.yml
     if [ "$ENV_FILE" -nt "$ENV_DIR" ]; then
