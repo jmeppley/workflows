@@ -1,0 +1,51 @@
+include: "ids.snake"
+rule compile_diamond_db
+    """
+    Compile fasta file into diamond database
+
+    This only works if db and fasta file names conform to the expectations of
+    the py-metagenomics databases:
+
+    fasta: XXX.faa 
+    db:    XXX.faa.dmnd
+    """
+    input:
+        '{db_path}.faa',
+    output: "{db_path}.faa.dmnd"
+    resources:
+        disk=2
+    shell: "diamond makedb --in {input} --db {input}"
+
+rule diamond:
+    """
+    Look for matches in a diamond DB
+    """
+    input:
+        lambda w: "{file_root}.{ext}".format(file_root=w.file_root,
+                ext="faa" if w.alg=='p' else 'fasta'),
+        lambda w: config['dbs'][w.db]['path'] + ".prj"
+    output:
+        "{file_root}.vs.{db}.dmnd{alg,[xp]}"
+    benchmark:
+        "benchmarks/diamond.{file_root}.vs.{db}.{alg}.time"
+    log:
+        "logs/diamond.{file_root}.vs.{db}.{alg}.log"
+    version:
+        get_version('diamond')
+    threads:
+        lambda wildcards: config.get('diamond',{}).get('threads',10)
+    resources:
+        disk=1
+    params:
+        db_path=lambda w: config['dbs'][w.db]['path'],
+        fshift=lambda w: "-F 15" if w.alg=='x' else "",
+        opts=config.get('diamond', {}).get('options', ""),
+        keep=config.get('last_filter','-F 5'),
+    shell:
+        "diamond -p {threads} {params.fshift} -f 6 \
+         {params.opts} --db {params.db_path} --in {input[0]} \
+         | {DROP_COMMENTS} \
+         | filter_blast_m8.py -f blast {params.keep} \
+         > {output}"
+
+

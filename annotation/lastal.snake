@@ -1,35 +1,34 @@
 DROP_COMMENTS = "perl -ne 'if (m/^[^#]/) { print; }'"
 
+include: "ids.snake"
+
 rule compile_lastdb:
     """
-    Compile fasta file into lastb
-    This currenlty only works for protein dbs. Would a second rule for nucl
-    work?
+    Compile fasta file into lastdb
+
+    This only works if db and fasta file names conform to the expectations of
+    the py-metagenomics dabases. For lastdb this is
+
+    AA fasta: XXX.faa 
+    AA db:    XXX.faa.ldb/lastdb
+
+    (faa would change for a nucl db to one of fa, fasta, fna, or ffn)
     """
     input:
-        '{db_path}.faa',
-    output: "{db_path}.prj"
+        '{file_root}.{fasta_ext}',
+    output: "{file_root}.{fasta_ext}.{ldb}/lastdb.prj"
+    wildcard_constraints:
+        ldb='ldb8?',
+        fasta_ext='(faa|ffn|fna|fasta|fa)'
     threads:
         lambda wildcards: config.get('lastal',{}).get('threads',10)
     resources:
-        disk=1
+        disk=2
     params:
-        lastdb=lambda w: 'lastdb8' \
-                    if os.path.dirname(w.db_path)[-1]=='8' \
-                    else 'lastdb'
-    shell: "{params.lastdb} -P {threads} -v -p {wildcards.db_path} {input}"
-
-rule get_db_id_map:
-    """
-    Compile fasta file into lastb
-    This currenlty only works for protein dbs. Would a second rule for nucl
-    work?
-    """
-    input: '{db_path}.faa'
-    output: "{db_path}.ids"
-    resources:
-        disk=1
-    shell: r"grep '^>' {input} | sed -r 's/^>(\S+)\s+/\1\t/' > {output}"
+        lastdb=lambda w: 'lastdb8' if w.ldb == 'ldb8' else 'lastdb',
+        db="{file_root}.faa.{ldb}/lastdb",
+        prot=lambda w: '-p' if w.fasta_ext == 'faa' else ''
+    shell: "{params.lastdb} -P {threads} -v {params.prot} {params.db} {input}"
 
 rule lastal:
     """

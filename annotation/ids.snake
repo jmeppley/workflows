@@ -1,0 +1,13 @@
+rule get_fasta_id_map:
+    """
+    pull out fasta headers into a map from ID to Description
+    """
+    input: '{file_root}.{fasta_ext}'
+    output: "{file_root}.{fasta_ext}.{db_string}.ids"
+    wildcard_constraints:
+        fasta_ext='(faa|ffn|fna|fasta|fa)',
+        db_string='(bwa/bwadb|ldb8?/lastdb|dmnd)'
+    resources:
+        disk=1
+    shell: r"grep '^>' {input} | sed -r 's/^>(\S+)\s+/\1\t/' > {output}"
+

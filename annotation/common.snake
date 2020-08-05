@@ -55,7 +55,7 @@ def get_hit_table_filter(wildcards):
         else:
             fmt='hmmsearchdom' if re.search(r'^tbl\b', wildcards.ext) \
                                         else 'blast'
-    
+
         # the filter cutoffs
         filter_opts = " ".join("--{} {}".format(f,v) \
                                for f,v in db_config['cutoffs'].items())
@@ -66,7 +66,7 @@ def get_hit_table_filter(wildcards):
 
 def get_read_name_filter(wildcards):
     """
-    Figure out if we need to translate read names. Usually this takes gene 
+    Figure out if we need to translate read names. Usually this takes gene
     names back to reads.
 
     Return the sed command to rename fasta records if needed or return cat
@@ -88,13 +88,13 @@ rule assign_taxa:
     input:
         "{prefix}.vs.{db}.{lastalg}"
     output:
-        temp("{prefix}.annot.{db}.{lastalg,(last[nxp]|sam)}.{rank,[^.]+}.tsv")
+        temp("{prefix}.annot.{db}.{lastalg,((dmnd|b?last)[nxp]|sam)}.{rank,[^.]+}.tsv")
     benchmark:
         "benchmarks/{prefix}.assign_taxa.{rank}.{db}.{lastalg}.time"
     params:
         taxdump=lambda w: os.path.split(config['dbs'][w.db]['path'])[0],
         taxmap=lambda w: config['dbs'][w.db]['path'] + ".tax",
-        format=lambda w: 'blast' if re.search(r'^b?last[pnx]$', w.lastalg)\
+        format=lambda w: 'blast' if re.search(r'^(dmnd|b?last)[pnx]$', w.lastalg)\
                                  else w.lastalg,
         # Filter reading frame suffixes if translated with transeq or prodigal
         filter=get_hit_filter,

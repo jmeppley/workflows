@@ -38,6 +38,11 @@ def get_last_alg(dbformat, extension):
             search_alg = 'lastn'
     elif dbformat == 'bwadb':
         search_alg = 'bwa.sam'
+    elif dbformat == 'dmnd':
+        if extension == 'faa':
+            search_alg = 'dmndp'
+        else:
+            search_alg = 'dmndx'
     else:
         raise Exception(("I'm sorry, but the database format '{}' is not yet "
                          "supported").format(dbformat))

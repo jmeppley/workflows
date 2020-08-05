@@ -61,7 +61,7 @@ if config.get('remove_rna', True) in ['True', True]:
 
 wildcard_constraints:
     search=r'vs\..+',
-    alg=r'(last[xnp]|blast[xnp]|sam)',
+    alg=r'(dmnd[xp]|last[xnp]|blast[xnp]|sam)',
     top=r'(tophit|toporg)'
 
 rule all:
