@@ -1,5 +1,6 @@
 include: "ids.snake"
-rule compile_diamond_db
+
+rule compile_diamond_db:
     """
     Compile fasta file into diamond database
 
@@ -23,7 +24,7 @@ rule diamond:
     input:
         lambda w: "{file_root}.{ext}".format(file_root=w.file_root,
                 ext="faa" if w.alg=='p' else 'fasta'),
-        lambda w: config['dbs'][w.db]['path'] + ".prj"
+        lambda w: config['dbs'][w.db]['path'] + ".dmnd"
     output:
         "{file_root}.vs.{db}.dmnd{alg,[xp]}"
     benchmark:
@@ -39,11 +40,12 @@ rule diamond:
     params:
         db_path=lambda w: config['dbs'][w.db]['path'],
         fshift=lambda w: "-F 15" if w.alg=='x' else "",
+        prog=lambda w: "blastx" if w.alg=='x' else "blastp",
         opts=config.get('diamond', {}).get('options', ""),
         keep=config.get('last_filter','-F 5'),
     shell:
-        "diamond -p {threads} {params.fshift} -f 6 \
-         {params.opts} --db {params.db_path} --in {input[0]} \
+        "diamond {params.prog} -p {threads} {params.fshift} -f 6 \
+         {params.opts} --db {params.db_path} --query {input[0]} \
          | {DROP_COMMENTS} \
          | filter_blast_m8.py -f blast {params.keep} \
          > {output}"

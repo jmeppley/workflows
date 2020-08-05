@@ -1,5 +1,8 @@
 *.sw[op]
 *.pyc
+*.dmnd
+*.ldb8/
+*.ldb/
 test/scratch
 test/conda/envs
 test/data/seqdbs/GTDB/lastdb*

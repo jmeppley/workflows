@@ -22,6 +22,7 @@ dependencies:
 - last
 - bwa
 - samtools
+- diamond
 - py-metagenomics
 - batch_launcher
 - coreutils

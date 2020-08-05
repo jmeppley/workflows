@@ -52,6 +52,13 @@ for db_info in config['dbs'].values():
         include: "common/fastq.snake"
         break
 
+# include lastal rules if any db is lastdb
+for db_info in config['dbs'].values():
+    if re.search('(diamond|dmnd)', db_info.get('format', "")):
+        include: "annotation/diamond.snake"
+        include: "common/fastq.snake"
+        break
+
 include: "common/transitions.snake"
 
 if config.get('remove_rna', True) in ['True', True]:
@@ -78,7 +85,7 @@ rule filter_m8:
         opts=lambda w: \
             " ".join(["-{} {}".format(o,v) \
                       for o,v in filter_params_rexp.findall(w.params)]),
-        fmt=lambda w: 'blast' if re.search('last', w.alg) else w.alg,
+        fmt=lambda w: 'blast' if re.search('(last|dmnd)', w.alg) else w.alg,
     benchmark:
         'benchmarks/{file_root}.{alg}.filter.{params}.time'
     version:
@@ -98,7 +105,7 @@ rule assign_top_hits:
     version:
         get_version('assign_top_hit.py')
     params:
-        fmt=lambda w: 'blast' if re.search('last', w.alg) else w.alg,
+        fmt=lambda w: 'blast' if re.search('(dmnd|last)', w.alg) else w.alg,
     shell:
         "assign_top_hit.py -f {params.fmt} -C {wildcards.top} \
         -o .{wildcards.top} {input}"

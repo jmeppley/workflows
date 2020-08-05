@@ -23,10 +23,10 @@ salmon:
     quant_options: '--gcBias --seqBias'
 dbs:
     SilvaSSU:
-        path: ../../data/seqdbs/Silva/SSU/bwadb
+        path: ../../data/seqdbs/Silva/SSU.fasta.bwa/bwadb
         format: bwadb
         type: rrna
     SilvaLSU:
-        path: ../../data/seqdbs/Silva/LSU/bwadb
+        path: ../../data/seqdbs/Silva/LSU.fasta.bwa/bwadb
         format: bwadb
         type: rrna

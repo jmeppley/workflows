@@ -38,7 +38,7 @@ def get_last_alg(dbformat, extension):
             search_alg = 'lastn'
     elif dbformat == 'bwadb':
         search_alg = 'bwa.sam'
-    elif dbformat == 'dmnd':
+    elif dbformat in ['dmnd','diamond']:
         if extension == 'faa':
             search_alg = 'dmndp'
         else:

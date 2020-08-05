@@ -158,7 +158,8 @@ rule taxdb_annotations:
     input:
         hits='{}.vs.{{taxdb}}.lastp'.format(prefix),
         db=lambda w: config['dbs'][w.taxdb]['path'] + ".prj",
-        ids=lambda w: config['dbs'][w.taxdb]['path'] + ".ids"
+        ids=lambda w: config['dbs'][w.taxdb]['path'] + ".ids",
+        tax=lambda w: config['dbs'][w.taxdb]['path'] + ".tax"
     output: '{}.annotations.{{taxdb}}'.format(prefix)
     benchmark: 'benchmarks/{}.annotations.{{taxdb}}'.format(prefix)
     params:
@@ -181,7 +182,8 @@ rule kegg_annotations:
     input:
         hits='{}.vs.KEGG.lastp'.format(prefix),
         db=config['dbs']['KEGG']['path'] + '.prj',
-        ids=config['dbs']['KEGG']['path'] + ".ids"
+        ids=config['dbs']['KEGG']['path'] + ".ids",
+        tax=config['dbs']['KEGG']['path'] + ".tax"
     output: '{}.annotations.KEGG'.format(prefix)
     benchmark: 'benchmarks/{}.annotations.KEGG'.format(prefix)
     params:
