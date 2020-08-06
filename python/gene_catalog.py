@@ -54,7 +54,11 @@ def get_function_trimmed(hit, desc_map, db_type):
             "",
             func_suff_RE.sub(
                 "",
-                extra_loaction_info_RE.sub(r"\1", desc_RE.sub("", desc_map[hit.hit])),
+                extra_loaction_info_RE.sub(
+                    r"\1",
+                    desc_RE.sub(
+                        "",
+                        desc_map[hit.hit])),
             ),
         )
     if db_type == GTDB:
@@ -85,7 +89,8 @@ def get_lca(hits, translate=lambda x: [x]):
 
 
 # Simplify the list of ranks
-printed_ranks = [edltaxon.ranks[i] for i in [3, 7, 11, 17, 21, 24]] + ["domain"]
+printed_ranks = [edltaxon.ranks[i]
+                 for i in [3, 7, 11, 17, 21, 24]] + ["domain"]
 major_ranks = [edltaxon.ranks[i] for i in [2, 3, 7, 11, 17, 21, 24, 27, 28]]
 
 
@@ -154,7 +159,10 @@ class TaxDBGeneAnnotator:
     def set_genome_clades(self, genome_clades):
         self.genome_clades = genome_clades
 
-    def set_genome_clades_from_file(self, genome_clade_file, column="Clade", **kwargs):
+    def set_genome_clades_from_file(self,
+                                    genome_clade_file,
+                                    column="Clade",
+                                    **kwargs):
         kwargs.setdefault("index_col", 0)
         genome_data = pandas.read_csv(genome_clade_file, **kwargs)
         self.set_genome_clades(genome_data[column])
@@ -182,7 +190,10 @@ class TaxDBGeneAnnotator:
         rsdb_desc_map = self.rsdb + ".ids"
         self.desc_map = util.parseMapFile(rsdb_desc_map)
 
-    def annotate_genes_rs_prot(self, hit_table, annotation_table, db_type=REFSEQ):
+    def annotate_genes_rs_prot(self,
+                               hit_table,
+                               annotation_table,
+                               db_type=REFSEQ):
         logger.info(
             "Annotating "
             + db_type
@@ -198,7 +209,8 @@ class TaxDBGeneAnnotator:
                 + "\tfunction\tmin pct ID\thit count"
                 + "\ttop hit\ttop pct ID\ttop score\ttop desc\n"
             )
-            for info in self.generate_gene_annotations_rs_prot(hit_table, db_type):
+            for info in self.generate_gene_annotations_rs_prot(hit_table,
+                                                               db_type):
                 (
                     gene,
                     lca_ranked,
@@ -214,7 +226,8 @@ class TaxDBGeneAnnotator:
                     "%s\t%s\t%s\t%0.1f\t%d\t%s\t%0.1f\t%0.1f\t%s\n"
                     % (
                         gene,
-                        "\t".join([lca_ranked.get(r, "") for r in printed_ranks]),
+                        "\t".join([lca_ranked.get(r, "")
+                                   for r in printed_ranks]),
                         function,
                         min_pctid,
                         hit_count,
@@ -234,68 +247,72 @@ class TaxDBGeneAnnotator:
 
         total_genes = 0
         total_hits = 0
-        blast_m8 = blastm8.M8Stream(hit_table)
-        for gene, hits in blastm8.filterM8Stream(
-            blast_m8, self.m8_params, returnLines=False
-        ):
-            hits = list(hits)
-            total_hits += len(hits)
-            total_genes += 1
-            min_pctid = min([h.pctid for h in hits])
-            lca = get_lca(hits, self.hit_translator.translateHit)
-            lca_rank = approximate_rank(lca)
-            lca_ranked = {"domain": lca.getAncestorClosestToRank("domain").name}
-            if lca_rank in major_ranks:
-                for r in range(phylum_index, species_index - 1, -1):
-                    lca_ranked[major_ranks[r]] = lca.getAncestorClosestToRank(
-                        major_ranks[r]
-                    ).name
-                    if r <= major_ranks.index(lca_rank):
-                        break
+        with blastm8.InputFile(hit_table) as blast_m8:
+            for gene, hits in blastm8.filterM8Stream(
+                blast_m8, self.m8_params, return_lines=False
+            ):
+                hits = list(hits)
+                total_hits += len(hits)
+                total_genes += 1
+                min_pctid = min([h.pctid for h in hits])
+                lca = get_lca(hits, self.hit_translator.translateHit)
+                lca_rank = approximate_rank(lca)
+                lca_ranked = {"domain":
+                              lca.getAncestorClosestToRank("domain").name}
+                if lca_rank in major_ranks:
+                    for r in range(phylum_index, species_index - 1, -1):
+                        lca_ranked[major_ranks[r]] = \
+                                lca.getAncestorClosestToRank(
+                                    major_ranks[r]
+                                ).name
+                        if r <= major_ranks.index(lca_rank):
+                            break
 
-            # get a good functional annotation form the best hit(s) (that aren't hypothetical)
-            if db_type is not None:
-                fns_by_score = {}
-                for hit in hits:
-                    f = get_function_trimmed(hit, self.desc_map, db_type)
-                    fns_by_score.setdefault(hit.score, []).append(f)
+                # get a good functional annotation form the best hit(s)
+                #  (that aren't hypothetical)
+                if db_type is not None:
+                    fns_by_score = {}
+                    for hit in hits:
+                        f = get_function_trimmed(hit, self.desc_map, db_type)
+                        fns_by_score.setdefault(hit.score, []).append(f)
 
-                for score in sorted(fns_by_score.keys(), reverse=True):
-                    # only consider things with useful annotations
-                    useful_functions = set()
-                    for f in fns_by_score[score]:
-                        if uninformative_RE.search(f) is None:
-                            useful_functions.add(f)
-                    if len(useful_functions) > 0:
-                        functions = useful_functions
-                        break
+                    for score in sorted(fns_by_score.keys(), reverse=True):
+                        # only consider things with useful annotations
+                        useful_functions = set()
+                        for f in fns_by_score[score]:
+                            if uninformative_RE.search(f) is None:
+                                useful_functions.add(f)
+                        if len(useful_functions) > 0:
+                            functions = useful_functions
+                            break
+                    else:
+                        functions = ["unknown"]
+                    function = ";".join(functions)
                 else:
-                    functions = ["unknown"]
-                function = ";".join(functions)
-            else:
-                function = "NA"
+                    function = "NA"
 
-            top_hit = hits[0]
-            # description of top hit
-            top_desc = self.desc_map[top_hit.hit]
-            if db_type == GTDB:
-                # GTDB headers are too long, take sp name and func
-                top_desc = top_desc.split(";")[-1]
-                top_desc = re.sub(r"^s__", "", top_desc)
+                top_hit = hits[0]
+                # description of top hit
+                top_desc = self.desc_map[top_hit.hit]
+                if db_type == GTDB:
+                    # GTDB headers are too long, take sp name and func
+                    top_desc = top_desc.split(";")[-1]
+                    top_desc = re.sub(r"^s__", "", top_desc)
 
-            yield (
-                gene,
-                lca_ranked,
-                function,
-                min_pctid,
-                len(hits),
-                top_hit.hit,
-                top_hit.pctid,
-                top_hit.score,
-                top_desc,
-            )
+                yield (
+                    gene,
+                    lca_ranked,
+                    function,
+                    min_pctid,
+                    len(hits),
+                    top_hit.hit,
+                    top_hit.pctid,
+                    top_hit.score,
+                    top_desc,
+                )
 
-        logger.info("Parsed %d hits for %d genes" % (total_hits, total_genes))
+            logger.info("Parsed %d hits for %d genes" % (total_hits,
+                                                         total_genes))
 
 
 ko_hit_org_RE = re.compile(r"^([a-z]+):")
@@ -303,7 +320,7 @@ ko_hit_org_RE = re.compile(r"^([a-z]+):")
 
 class KeggGeneAnnotator:
 
-    kegg20160201 = "/mnt/lysine/jmeppley/servers/galaxy/py-metagenomics/databases/lastdb/KEGG/KeggGene.pep.20160201/lastdb"
+    kegg20160201 = "/mnt/delong/seqdbs/KEGG/KeggGene.pep.20160201/lastdb"
 
     def __init__(self, db_location=kegg20160201):
         self.keggdb = db_location
@@ -330,26 +347,27 @@ class KeggGeneAnnotator:
         write_tsv(annotation_table, annot_tuples, header=header)
 
     def generate_gene_annotations_kg(self, hit_table):
-        blast_m8 = blastm8.M8Stream(hit_table)
-        for read, hits in blastm8.filterM8Stream(
-            blast_m8, self.m8_params, returnLines=False
-        ):
-            hits = list(hits)
-            kos_so_far = []
-            org_scores = {}
-            for h in hits:
-                org = ko_hit_org_RE.search(h.hit).group(1)
-                score = h.score
-                if org_scores.get(org, -1) > score:
-                    # only take top scoring hits from each organism
-                    continue
-                else:
-                    org_scores[org] = score
+        with blastm8.InputFile(hit_table) as blast_m8:
+            for read, hits in blastm8.filterM8Stream(
+                blast_m8, self.m8_params, return_lines=False
+            ):
+                hits = list(hits)
+                kos_so_far = []
+                org_scores = {}
+                for h in hits:
+                    org = ko_hit_org_RE.search(h.hit).group(1)
+                    score = h.score
+                    if org_scores.get(org, -1) > score:
+                        # only take top scoring hits from each organism
+                        continue
+                    else:
+                        org_scores[org] = score
 
-                kos_so_far.extend(self.ko_map.get(h.hit, []))
-            # collect uniq hits, dropping "None" or None
-            uniq_kos = set([k for k in kos_so_far if k not in [None, "None", ""]])
-            yield (read, ";".join(uniq_kos))
+                    kos_so_far.extend(self.ko_map.get(h.hit, []))
+                # collect uniq hits, dropping "None" or None
+                uniq_kos = set([k for k in kos_so_far
+                                if k not in [None, "None", ""]])
+                yield (read, ";".join(uniq_kos))
 
 
 def write_tsv(out_file, data_tuples, sep="\t", header=None):
@@ -403,7 +421,7 @@ def parse_bio_clusters(bio_json, out_tab):
 
 
 def parse_mmseq_clusters(mm_tab, out_tab):
-    """ reformat mmseqs cluster table to our style 
+    """ reformat mmseqs cluster table to our style
         input: every line maps rep to member
         output: every non-single cluster listed starting w/rep
     """
@@ -465,7 +483,8 @@ def parse_cdhit_clusters(clstr_file, cluster_file):
                 else:
                     cluster.append(gene)
             if cluster_rep is not None:
-                TAB.write("{}\t{}\n".format(cluster_rep, "\t".join(g for g in cluster)))
+                TAB.write("{}\t{}\n".format(cluster_rep,
+                                            "\t".join(g for g in cluster)))
 
 
 def merge_cluster_coverages(cluster_file, coverage_tables):
@@ -489,14 +508,16 @@ def merge_cluster_coverages(cluster_file, coverage_tables):
         if cluster_coverages is None:
             cluster_coverages = _cluster_coverages
         else:
-            cluster_coverages = cluster_coverages.join(_cluster_coverages, how="outer")
+            cluster_coverages = cluster_coverages.join(_cluster_coverages,
+                                                       how="outer")
     return cluster_coverages
 
 
 # deprecated
 def normalize_coverages(input, contig_col="Contig", cov_col="MeanCov"):
     """
-    Loop over read stats files and create a normalization factor for each assembly (number of reads/10M)
+    Loop over read stats files and create a normalization factor for
+    each assembly (number of reads/10M)
 
     input: the input object from snakemake with two member file lists:
     input.read_stats: the cleaned read stats from all assemblies
@@ -556,13 +577,19 @@ def main():
     description = "annotate genes from refseq or kegg hits"
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
-        "hit_table", metavar="HIT_TABLE", help="The table of hits in blast format"
+        "hit_table",
+        metavar="HIT_TABLE",
+        help="The table of hits in blast format"
     )
     parser.add_argument(
-        "lastdb_path", metavar="LASTDB_PATH", help="The path given to lastal"
+        "lastdb_path",
+        metavar="LASTDB_PATH",
+        help="The path given to lastal"
     )
     parser.add_argument(
-        "output_table", metavar="OUT_TABLE", help="The file to write the anntations to"
+        "output_table",
+        metavar="OUT_TABLE",
+        help="The file to write the anntations to"
     )
     parser.add_argument(
         "-t",
@@ -587,7 +614,8 @@ def main():
     # annotate!
     if arguments.type == KEGG:
         annotator = KeggGeneAnnotator(arguments.lastdb_path)
-        annotator.annotate_genes_kg(arguments.hit_table, arguments.output_table)
+        annotator.annotate_genes_kg(arguments.hit_table,
+                                    arguments.output_table)
     else:
         annotator = TaxDBGeneAnnotator(arguments.lastdb_path)
         annotator.annotate_genes_rs_prot(
@@ -604,7 +632,9 @@ def process_for_mcl(
     # fake all self bits
     self_bits = {r.id: 2 * len(r) for r in SeqIO.parse(fasta_file, "fasta")}
     with open(output_file, "wt") as OUTPUT:
-        for seq, hits in blastm8.filterM8Stream(inputm8, params, returnLines=False):
+        for seq, hits in blastm8.filterM8Stream(inputm8,
+                                                params,
+                                                returnLines=False):
             for hit in hits:
                 if hit.hit == seq:
                     # we've faked the self bits for now
@@ -632,7 +662,9 @@ def get_longest_seq(clusters, genes, format="fasta"):
     with open(clusters) as CLUSTERS:
         for line in CLUSTERS:
             member_genes = line.rstrip().split("\t")
-            yield sorted(member_genes, reverse=True, key=lambda g: gene_lengths[g])[0]
+            yield sorted(member_genes,
+                         reverse=True,
+                         key=lambda g: gene_lengths[g])[0]
 
 
 if __name__ == "__main__":

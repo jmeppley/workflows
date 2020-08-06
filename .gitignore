@@ -3,6 +3,7 @@
 *.dmnd
 *.ldb8/
 *.ldb/
+*.headers
 test/scratch
 test/conda/envs
 test/data/seqdbs/GTDB/lastdb*
