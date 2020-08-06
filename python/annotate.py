@@ -101,6 +101,13 @@ def get_db_assignment_params(wildcards, config):
         return '-p pfam -C all'
     return '-C first -p hitid'
 
+def get_path_file(config, db):
+    """ return the ko map for KEGG, NONE for antying else
+        if we add support for a new orthology, well need to add it here """
+    db_info = config['dbs'][db]
+    if db_info.get('assign_type', 'hitid').lower() == 'kegg':
+        return db_info['path'] + ".kos"
+    return []
 
 def get_db_frag(config, db, N):
     full_hmm = config['dbs'][db]['path']
@@ -122,3 +129,11 @@ def get_db_frag_template(full_hmm, n_frags):
 def get_db_frags(full_hmm, n_frags):
     template = get_db_frag_template(full_hmm, n_frags)
     return [template.format(N) for N in range(1, n_frags+1)]
+
+def get_tax_files(config, database):
+    db_path = config['dbs'][database]['path']
+    db_dir = os.path.dirname(db_path)
+    return [db_path + '.tax',
+            db_dir + '/nodes.dmp',
+            db_dir + '/names.dmp']
+

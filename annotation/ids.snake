@@ -22,15 +22,32 @@ rule link_fasta_id_map:
     shell:
         "ln -s $(realpath --relative-to=$(dirname {output}) {input}) {output}"
 
-rule link_tax_id_map:
+rule link_db_metadata_map:
     """
     Create smlink to taxid map from formatted db loc
     """
-    input: '{file_root}.{fasta_ext}.tax'
-    output: "{file_root}.{fasta_ext}.{db_string}.tax"
+    input: '{file_root}.{ext}'
+    output: "{file_root}.{fasta_ext}.{db_string}.{ext}"
     wildcard_constraints:
         fasta_ext='(faa|ffn|fna|fasta|fa)',
-        db_string='(bwa/bwadb|ldb8?/lastdb|dmnd)'
+        db_string='(bwa/bwadb|ldb8?/lastdb|dmnd)',
+        ext='(tax|kos)'
     shell:
         "ln -s $(realpath --relative-to=$(dirname {output}) {input}) {output}"
+
+rule link_db_taxdump:
+    """
+    Create smlink to taxdump  from formatted db loc
+    """
+    input: '{db_dir}/{dmpfile}.dmp'
+    output: "{db_dir}/{file_root}.{fasta_ext}.{db_string}/{dmpfile}.dmp"
+    wildcard_constraints:
+        file_root='[^/]+',
+        fasta_ext='(faa|ffn|fna|fasta|fa)',
+        db_string='(bwa|ldb8?)',
+        dmpfile='n(am|od)es'
+    shell:
+        "ln -s $(realpath --relative-to=$(dirname {output}) {input}) {output}"
+
+
 
