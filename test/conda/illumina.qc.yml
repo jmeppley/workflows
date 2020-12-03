@@ -22,5 +22,4 @@ dependencies:
 - last
 - py-metagenomics
 - batch_launcher
-- coreutils
 - dynamic_remote_snake

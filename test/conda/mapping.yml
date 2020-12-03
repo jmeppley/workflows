@@ -4,6 +4,9 @@ channels:
     - jmeppley
 dependencies:
     - snakemake-minimal
+    - trimmomatic
+    - coreutils
+    - prinseq
     - pysftp
     - bwa
     - kallisto
