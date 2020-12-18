@@ -13,15 +13,15 @@ prodigal:
 aa_conversion: prodigal
 dbs:
     RefSeq: 
-        path: ../../data/seqdbs/RefSeq/lastdb
+        path: ../../data/seqdbs/RefSeq/proteins.faa.ldb8/lastdb
         format: lastp
         type: tax
     GTDB:
-        path: ../../data/seqdbs/GTDB/lastdb
+        path: ../../data/seqdbs/GTDB/proteins.faa.ldb8/lastdb
         format: lastp
         type: tax
     KEGG: 
-        path: ../../data/seqdbs/KEGG/lastdb
+        path: ../../data/seqdbs/KEGG/proteins.faa.ldb8/lastdb
         format: lastp
         assign_type: kegg
     COG:

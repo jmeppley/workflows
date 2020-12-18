@@ -1,0 +1,53 @@
+rule get_fasta_id_map:
+    """
+    pull out fasta headers into a map from ID to Description
+    """
+    input: '{file_root}.{fasta_ext}'
+    output: "{file_root}.{fasta_ext}.headers"
+    wildcard_constraints:
+        fasta_ext='(faa|ffn|fna|fasta|fa)',
+    resources:
+        disk=1
+    shell: r"grep '^>' {input} | sed -r 's/^>(\S+)\s+/\1\t/' > {output}"
+
+rule link_fasta_id_map:
+    """
+    Create smlink to headers from formatted db loc
+    """
+    input: '{file_root}.{fasta_ext}.headers'
+    output: "{file_root}.{fasta_ext}.{db_string}.ids"
+    wildcard_constraints:
+        fasta_ext='(faa|ffn|fna|fasta|fa)',
+        db_string='(bwa/bwadb|ldb8?/lastdb|dmnd)'
+    shell:
+        "ln -s $(realpath --relative-to=$(dirname {output}) {input}) {output}"
+
+rule link_db_metadata_map:
+    """
+    Create smlink to taxid map from formatted db loc
+    """
+    input: '{file_root}.{ext}'
+    output: "{file_root}.{fasta_ext}.{db_string}.{ext}"
+    wildcard_constraints:
+        fasta_ext='(faa|ffn|fna|fasta|fa)',
+        db_string='(bwa/bwadb|ldb8?/lastdb|dmnd)',
+        ext='(tax|kos)'
+    shell:
+        "ln -s $(realpath --relative-to=$(dirname {output}) {input}) {output}"
+
+rule link_db_taxdump:
+    """
+    Create smlink to taxdump  from formatted db loc
+    """
+    input: '{db_dir}/{dmpfile}.dmp'
+    output: "{db_dir}/{file_root}.{fasta_ext}.{db_string}/{dmpfile}.dmp"
+    wildcard_constraints:
+        file_root='[^/]+',
+        fasta_ext='(faa|ffn|fna|fasta|fa)',
+        db_string='(bwa|ldb8?)',
+        dmpfile='n(am|od)es'
+    shell:
+        "ln -s $(realpath --relative-to=$(dirname {output}) {input}) {output}"
+
+
+

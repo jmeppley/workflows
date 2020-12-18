@@ -1,4 +1,5 @@
-from python.annotate import get_db_types, get_db_assignment_params
+from python.annotate import get_db_types, get_db_assignment_params, \
+                            get_tax_files, get_path_file
 
 #########
 # CONFIGURATION
@@ -55,7 +56,7 @@ def get_hit_table_filter(wildcards):
         else:
             fmt='hmmsearchdom' if re.search(r'^tbl\b', wildcards.ext) \
                                         else 'blast'
-    
+
         # the filter cutoffs
         filter_opts = " ".join("--{} {}".format(f,v) \
                                for f,v in db_config['cutoffs'].items())
@@ -66,7 +67,7 @@ def get_hit_table_filter(wildcards):
 
 def get_read_name_filter(wildcards):
     """
-    Figure out if we need to translate read names. Usually this takes gene 
+    Figure out if we need to translate read names. Usually this takes gene
     names back to reads.
 
     Return the sed command to rename fasta records if needed or return cat
@@ -86,15 +87,16 @@ rule assign_taxa:
     Turn a hit table of reads vs RefSeq into a table of read taxon assignments
     """
     input:
-        "{prefix}.vs.{db}.{lastalg}"
+        hits="{prefix}.vs.{db}.{lastalg}",
+        tax_files=lambda w: get_tax_files(config, w.db),
     output:
-        temp("{prefix}.annot.{db}.{lastalg,(last[nxp]|sam)}.{rank,[^.]+}.tsv")
+        temp("{prefix}.annot.{db}.{lastalg,((dmnd|b?last)[nxp]|sam)}.{rank,[^.]+}.tsv")
     benchmark:
         "benchmarks/{prefix}.assign_taxa.{rank}.{db}.{lastalg}.time"
     params:
         taxdump=lambda w: os.path.split(config['dbs'][w.db]['path'])[0],
         taxmap=lambda w: config['dbs'][w.db]['path'] + ".tax",
-        format=lambda w: 'blast' if re.search(r'^b?last[pnx]$', w.lastalg)\
+        format=lambda w: 'blast' if re.search(r'^(dmnd|b?last)[pnx]$', w.lastalg)\
                                  else w.lastalg,
         # Filter reading frame suffixes if translated with transeq or prodigal
         filter=get_hit_filter,
@@ -103,7 +105,7 @@ rule assign_taxa:
     resources:
         disk=1
     shell:
-         "cat {input} \
+         "cat {input.hits} \
           | {params.filter} \
           | assign_taxa.py -o {output} -r {wildcards.rank} \
             -f {params.format} -F 0 -C first -p accs \
@@ -116,7 +118,8 @@ rule assign_paths:
     The first hit with the best evalue is used. About 0.05% to 0.1% of reads had ambiguous hits in test data.
     """
     input:
-        "{prefix}.vs.{db}.{ext}"
+        hits="{prefix}.vs.{db}.{ext}",
+        kos=lambda w: get_path_file(config, w.db)
     output:
         temp("{prefix}.annot.gene_family.{db,[^.]+}.{ext}.tsv")
     benchmark:
@@ -135,7 +138,7 @@ rule assign_paths:
         # Filter reading frame suffixes if translated with transeq or prodigal
         filter=get_hit_filter,
     shell:
-         "cat {input} \
+         "cat {input.hits} \
           | {params.filter} \
           | assign_paths.py --sort evalue -f {params.format} {params.params} \
             -o {output}"

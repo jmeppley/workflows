@@ -38,7 +38,9 @@ import pandas
 from Bio import SeqIO
 from python import gene_catalog
 from python.common import get_version, apply_defaults, get_file_name, TRUTH 
-from python.annotate import get_db_dot_fmt_strings
+from python.annotate import get_db_dot_fmt_strings, \
+                            get_tax_files, \
+                            get_path_file
 
 #########
 # CONFIGURATION
@@ -158,7 +160,8 @@ rule taxdb_annotations:
     input:
         hits='{}.vs.{{taxdb}}.lastp'.format(prefix),
         db=lambda w: config['dbs'][w.taxdb]['path'] + ".prj",
-        ids=lambda w: config['dbs'][w.taxdb]['path'] + ".ids"
+        ids=lambda w: config['dbs'][w.taxdb]['path'] + ".ids",
+        tax=lambda w: get_tax_files(config, w.taxdb),
     output: '{}.annotations.{{taxdb}}'.format(prefix)
     benchmark: 'benchmarks/{}.annotations.{{taxdb}}'.format(prefix)
     params:
@@ -181,7 +184,8 @@ rule kegg_annotations:
     input:
         hits='{}.vs.KEGG.lastp'.format(prefix),
         db=config['dbs']['KEGG']['path'] + '.prj',
-        ids=config['dbs']['KEGG']['path'] + ".ids"
+        ids=config['dbs']['KEGG']['path'] + ".ids",
+        kos=get_path_file(config, 'KEGG')
     output: '{}.annotations.KEGG'.format(prefix)
     benchmark: 'benchmarks/{}.annotations.KEGG'.format(prefix)
     params:

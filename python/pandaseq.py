@@ -7,10 +7,13 @@ MEthods particular to pandase
 import re
 from snakemake.logging import logger
 
-overlap_RE = re.compile(r'^\S+\s+INFO\s+BESTOLP\s+(\S+?)(?:\:(?:\d{1,2})|(?:\:[NACTG]+))?\s+(\S+)')
-error_RE = re.compile(r'^\S+\s+ERR\s+(\S+)\s+(\S+)(?:\:\d)?\s+')
-debug_RE = re.compile(r'^\S+\s+DBG')
-read_index_dir_RE = re.compile(r'(#(\d+|[ACTGN]+))?(/[12])?')
+overlap_RE = re.compile(
+    r"^\S+\s+INFO\s+BESTOLP\s+(\S+?)(?:\:(?:\d{1,2})|(?:\:[NACTG]+))?\s+(\S+)"
+)
+error_RE = re.compile(r"^\S+\s+ERR\s+(\S+)\s+(\S+)(?:\:\d)?\s+")
+debug_RE = re.compile(r"^\S+\s+DBG")
+read_index_dir_RE = re.compile(r"(#(\d+|[ACTGN]+))?(/[12])?")
+
 
 def scan_pandaseq_log(pandaseq_log_fie, msg_stream, keep_debug=False):
     """
@@ -47,7 +50,7 @@ def scan_pandaseq_log(pandaseq_log_fie, msg_stream, keep_debug=False):
                 overlap_count += 1
                 read = match.group(1)
                 score = match.group(2)
-                if score == '-1':
+                if score == "-1":
                     unpaired.add(read)
                 continue
 
@@ -62,8 +65,9 @@ def scan_pandaseq_log(pandaseq_log_fie, msg_stream, keep_debug=False):
                 continue
 
         if keep_debug:
-            msg_stream.write("%d overlap lines in %d total lines" % \
-                                                    (overlap_count, line_count))
+            msg_stream.write(
+                "%d overlap lines in %d total lines" % (overlap_count, line_count)
+            )
         unpaired_count = len(unpaired)
         msg = """
 #===============================
@@ -72,20 +76,19 @@ def scan_pandaseq_log(pandaseq_log_fie, msg_stream, keep_debug=False):
 #  Paired:    %d
 #  Unpaired:  %d
 #  Errors (LOWQ => under quality threshold. These are normal): %s
-#===============================\n""" % \
-                        (overlap_count,
-                         overlap_count - unpaired_count - \
-                            sum(error_counts.values()),
-                         unpaired_count,
-                         sum(error_counts.values()))
+#===============================\n""" % (
+            overlap_count,
+            overlap_count - unpaired_count - sum(error_counts.values()),
+            unpaired_count,
+            sum(error_counts.values()),
+        )
         msg_stream.write(msg)
 
-        error_counts['reads'] = overlap_count
-        error_counts['paired'] = overlap_count-unpaired_count
-        error_counts['unpaired'] = unpaired_count
+        error_counts["reads"] = overlap_count
+        error_counts["paired"] = overlap_count - unpaired_count
+        error_counts["unpaired"] = unpaired_count
 
-        logger.debug("%d errors, %d unpaired" % (sum(error_counts.values()),
-                                                 unpaired_count))
+        logger.debug(
+            "%d errors, %d unpaired" % (sum(error_counts.values()), unpaired_count)
+        )
         return (unpaired, error_counts)
-
-
