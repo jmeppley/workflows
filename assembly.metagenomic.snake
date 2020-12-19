@@ -94,9 +94,7 @@ logger.debug("Snakefile config:\n" + yaml.dump(config))
 # Start with the final product(s):
 rule all:
     input:
-        config['outputs'],
         "contigs.report",
-        "contigs.filter.fasta",
 
 rule contigs_fasta:
     """
@@ -165,7 +163,9 @@ rule final_report:
         contig_filtered_stats="contigs.final.stats.txt",
         histograms=expand("histograms/contigs_gt_{cutoff}/{metric}.hist", \
                           cutoff=contig_cutoffs, \
-                          metric=report_metrics)
+                          metric=report_metrics),
+        other_outputs=config['outputs'],
+        filter_fasta="contigs.filter.fasta"
     output:
         "contigs.report"
     run:
