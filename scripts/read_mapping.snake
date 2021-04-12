@@ -71,8 +71,9 @@ rule count_table:
     log: "logs/count_table.log"
     params:
         hit_tables=' '.join(["=".join(kv) for kv in search_results.items()]),
-        cutoff=config.get('cutoff', 0)
-    shell: "count_taxa.py {params.hit_tables} -p hitid -a portion -F 0 -f sam \
+        agg=config.get('count_agg_method', 'portion'),
+        cutoff=config.get('count_cutoff_pct', 0)
+    shell: "count_taxa.py {params.hit_tables} -p hitid -a portion -f sam \
             -o {output} -c {params.cutoff} -v 2> {log}"
 
 rule save_header:
@@ -87,7 +88,10 @@ rule filter_hits:
     benchmark: "benchmarks/{sample}.filter_blast_m8.time"
     log: "logs/{sample}.filter.log"
     threads: 1
-    shell: "filter_blast_m8.py -v -f sam -F 0 {input} > {output} 2> {log}"
+    params:
+        filtm8=config.get('filter_sam_flags', '-F 0'),
+    shell: "filter_blast_m8.py -v -f sam {params.filtm8} {input} \
+             > {output} 2> {log}"
 
 def pairing_for_sample(wildcards):
     """ return appropriate pairing flag for wildcards.sample """
@@ -107,8 +111,10 @@ rule search_reads:
     log: "logs/{sample}.bwa.mem.log"
     params:
         db='references.bwadb',
+        samview=config.get('samtools_view_flags', '-F 2308'),
         pairing=pairing_for_sample
     shell: "bwa mem {params.pairing} -t {threads} {params.db} {input.reads} \
+             | samtools view {params.samview} - \
             > {output} 2> {log}"
 
 rule index_references:

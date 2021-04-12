@@ -27,5 +27,5 @@ lastal:
     threads:   5
 dbs:
     RefSeq: 
-        path: ../../data/seqdbs/RefSeq/lastdb
+        path: ../../data/seqdbs/RefSeq/proteins.faa.ldb/lastdb
         format: lastp

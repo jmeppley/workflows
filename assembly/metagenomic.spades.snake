@@ -43,10 +43,10 @@ rule merge_reads_for_spades:
     output: temp("all_cleaned_reads.fastq")
     benchmark: "benchmarks/all_cleaned_reads.merged.time"
     params:
-        count=len(config['cleaned_read_list']),
+        read_count=len(config['cleaned_read_list']),
     shell: 
         """
-        if [ "{params.count}" == "1" ]; then
+        if [ "{params.read_count}" == "1" ]; then
             # just link if it's one file
             ln -s {input} {output}
         else

@@ -11,12 +11,12 @@ prodigal:
     threads: 20
 dbs:
     RefSeq: 
-        path: ../../data/seqdbs/RefSeq/lastdb
-        format: lastp
+        path: ../../data/seqdbs/RefSeq/proteins.faa
+        format: diamond
         type: tax
     KEGG: 
-        path: ../../data/seqdbs/KEGG/lastdb
-        format: lastp
+        path: ../../data/seqdbs/KEGG/proteins.faa
+        format: diamond
         assign_type: kegg
     COG:
         path: ../../data/seqdbs/COG/COG.partial.hmm

@@ -11,6 +11,12 @@ top_alg: tophit
 lastal:
     threads:   5
 dbs:
-    RefSeq: 
-        path: ../../data/seqdbs/RefSeq/lastdb
+    RefSeq:
+        path: ../../data/seqdbs/RefSeq/proteins.faa.ldb/lastdb
         format: lastp
+    RefSeq8:
+        path: ../../data/seqdbs/RefSeq/proteins.faa.ldb8/lastdb
+        format: lastp
+    RefSeqD:
+        path: ../../data/seqdbs/RefSeq/proteins.faa
+        format: diamond

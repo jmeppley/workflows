@@ -1,19 +1,19 @@
 """
 Functions used in the assembly workflows
 """
-from python.assembly.stats import \
-        get_contig_stats, \
-        generate_histogram, \
-        get_contig_length_summary_stats
+from python.assembly.stats import (
+    get_contig_stats,
+    generate_histogram,
+    get_contig_length_summary_stats,
+)
 
-from python.assembly.coverage import \
-        get_annot_coverage_stats, \
-        get_coverage_stats
+from python.assembly.coverage import get_annot_coverage_stats, get_coverage_stats
 
-from python.assembly.annotation import \
-        filter_annotations, \
-        drop_all_rna_overlaps, \
-        filter_and_extract_rRNA
+from python.assembly.annotation import (
+    filter_annotations,
+    drop_all_rna_overlaps,
+    filter_and_extract_rRNA,
+)
 
 
 """

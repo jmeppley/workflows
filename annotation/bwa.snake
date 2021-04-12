@@ -3,6 +3,8 @@ BWA_VERSION = \
                     version_flag="", 
                     regular_expression=re.compile(r'Version:\s*(\S[^\n\r]+\S)'))
 
+include: "ids.snake"
+
 rule map_genes_to_bwadb:
     """
     map genes to BWA db. 
@@ -27,21 +29,24 @@ rule map_genes_to_bwadb:
         "bwa mem -t {threads} {params.db_path} {input.fasta} 2> {log}  > {output}"
 
 rule index_bwadb:
-    """ prepare DB for mapping with BWA """
-    input:
-        "{bwadb_name}.fasta"
-    output:
-        "{bwadb_name}/bwadb.bwt"
-    log:
-        "logs/bwadb.{bwadb_name}.index.log"
-    benchmark:
-        "benchmarks/bwadb.{bwadb_name}.index.time"
-    version: BWA_VERSION
-    shell:
-        "bwa index -p {wildcards.bwadb_name}/bwadb {input} > {log} 2>&1 "
+    """ prepare DB for mapping with BWA
 
-rule bwa_index_file:
-    """ generate tab file mapping hit ids to descriptions """
-    input: "{file_root}.fasta"
-    output: "{file_root}/bwadb.ids"
-    shell: r"grep '^>' {input} | sed -r 's/^>(\S+)\s+/\1\t/' > {output}"
+    This only works if db and fasta file names conform to the expectations of
+    the py-metagenomics databases:
+
+    fasta: XXX.fasta 
+    bwadb: XXX.fasta.bwa/bwadb
+    """
+    input: "{file_root}.{fasta_ext}"
+    output: "{file_root}.{fasta_ext}.bwa/bwadb.bwt"
+    wildcard_constraints:
+        fasta_ext='(ffn|fna|fasta|fa)'
+    log:
+        "logs/bwadb.{file_root}.{fasta_ext}.bwa.index.log"
+    benchmark:
+        "benchmarks/bwadb.{file_root}.{fasta_ext}.bwa.index.time"
+    version: BWA_VERSION
+    params:
+        db="{file_root}.{fasta_ext}.bwa/bwadb"
+    shell:
+        "bwa index -p {params.db} {input} > {log} 2>&1 "
