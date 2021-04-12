@@ -22,7 +22,7 @@ rule map_genes_to_bwadb:
         "benchmarks/{file_root}.vs.{db}.bwa.sam.time"
     version: BWA_VERSION
     threads:
-        lambda w: config.get('bwa',{}).get('threads',20)
+        config.get('bwa',{}).get('threads',20)
     params:
         db_path=lambda w: config['dbs'][w.db]['path'],
     shell:
