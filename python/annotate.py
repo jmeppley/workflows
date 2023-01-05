@@ -2,6 +2,8 @@
 Functions for the annotation workflows
 """
 import os
+from snakemake import logger
+#from jme.dynamic_remote_snake.remote import remote_wrapper
 
 
 def get_db_types(config):
@@ -12,11 +14,24 @@ def get_db_types(config):
     gene_family_dbs = []
     taxdbs = []
     for db in config["dbs"]:
-        db_type = config["dbs"][db].get("type", "gene")
+        db_data = config['dbs'][db]
+        db_type = db_data.get('type', 'gene')
         if db_type[0:3] == "tax":
             taxdbs.append(db)
         elif db_type == "gene":
             gene_family_dbs.append(db)
+
+        # future support for cached DBs
+        #if 'path' in db_data:
+        #    format = db_data.get('format','tbl')
+        #    if format.startswith('last'):
+        #        atype = 'lastdb'
+        #    else:
+        #        atype = 'file'
+        #    logger.debug("checking for remote version of {}({})".format(
+        #        db_data['path'], atype))
+        #    db_data['path'] = remote_wrapper(db_data['path'], config,
+        #                                     atype=atype)
     return (gene_family_dbs, taxdbs)
 
 

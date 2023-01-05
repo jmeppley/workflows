@@ -69,6 +69,8 @@ rule count_table:
     output: 'reference.hit_counts.tsv'
     benchmark: "benchmarks/count_table.time"
     log: "logs/count_table.log"
+    resources:
+        disk=1,
     params:
         hit_tables=' '.join(["=".join(kv) for kv in search_results.items()]),
         agg=config.get('count_agg_method', 'portion'),
@@ -80,6 +82,8 @@ rule save_header:
     " grabs the header of a single sam file "
     input: search_result_template.format(sample=next(iter(config['sample_data'])))
     output: "example.sam.header"
+    resources:
+        disk=1,
     shell: 'grep "^@" {input} > {output}'
 
 rule filter_hits:
@@ -88,6 +92,8 @@ rule filter_hits:
     benchmark: "benchmarks/{sample}.filter_blast_m8.time"
     log: "logs/{sample}.filter.log"
     threads: 1
+    resources:
+        disk=1,
     params:
         filtm8=config.get('filter_sam_flags', '-F 0'),
     shell: "filter_blast_m8.py -v -f sam {params.filtm8} {input} \
@@ -109,6 +115,8 @@ rule search_reads:
     threads: 10
     benchmark: "benchmarks/{sample}.bwa.mem.time"
     log: "logs/{sample}.bwa.mem.log"
+    resources:
+        disk=1,
     params:
         db='references.bwadb',
         samview=config.get('samtools_view_flags', '-F 2308'),
@@ -117,7 +125,7 @@ rule search_reads:
              | samtools view {params.samview} - \
             > {output} 2> {log}"
 
-rule index_refereces:
+rule index_references:
     """ prepare refereces for mapping with BWA """
     input: references_file
     output: 'references.bwadb.bwt'
