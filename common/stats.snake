@@ -1,3 +1,4 @@
+logger.debug("INIT STATS")
 
 # adds fastq stats files to output
 # (only runs if config[discover_fastx_for_stats] is set to True)
@@ -5,9 +6,10 @@
 #  finds fasta and fastq outputs,
 #  adds stats/hist files to outputs of this workflow
 # (It adds some serious startup time)
+import sys
+
 from python.common import get_version, add_stats_outputs
-logger.debug("INIT STATS")
-add_stats_outputs(workflow.snakefile, config) 
+add_stats_outputs(workflow.main_snakefile, config) 
 
 try:
     hist_version = get_version('histograms.py')
@@ -83,5 +85,3 @@ rule prinseq_any:
           echo -e "stats_info\tbases\t0\nstats_info\treads\t0" > {output}
         fi
         """
-
-

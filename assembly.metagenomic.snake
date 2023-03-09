@@ -39,7 +39,7 @@ config.setdefault('transitions', {})
 include: "common/stats.snake"
 #
 # for mapping reads back to contigs
-include: "common/mapping_bwa.snake"
+#include: "common/mapping_bwa.snake"
 
 ## set up any QC
 # don't separate rRNA

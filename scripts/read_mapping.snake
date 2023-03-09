@@ -90,7 +90,9 @@ rule filter_hits:
     threads: 1
     params:
         filtm8=config.get('filter_sam_flags', '-F 0'),
-    shell: "filter_blast_m8.py -v -f sam {params.filtm8} {input} \
+        samview=config.get('samtools_view_flags', '-F 2308'),
+    shell: "samtools view {params.samview} {input} \
+            | filter_blast_m8.py -v -f sam {params.filtm8} \
              > {output} 2> {log}"
 
 def pairing_for_sample(wildcards):
@@ -111,10 +113,8 @@ rule search_reads:
     log: "logs/{sample}.bwa.mem.log"
     params:
         db='references.bwadb',
-        samview=config.get('samtools_view_flags', '-F 2308'),
         pairing=pairing_for_sample
     shell: "bwa mem {params.pairing} -t {threads} {params.db} {input.reads} \
-             | samtools view {params.samview} - \
             > {output} 2> {log}"
 
 rule index_refereces:

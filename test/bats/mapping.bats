@@ -16,22 +16,22 @@ setup() {
     rm -rf test/scratch/map1
     mkdir -p test/scratch/map1
     cd test/scratch/map1
-    run bash -c "snakemake -s ../../../scripts/read_mapping.snake --config references_file=../../data/other/all_genes.clustered.faa sample_glob=../../data/raw_reads/2014_{sample}.fastq -p -k -j 2 > map.log 2>&1"
+    run bash -c "snakemake -s ../../../scripts/read_mapping.snake --config references_file=../../data/contigs/contigs.aloha.fa sample_glob=../../data/raw_reads/2014_{sample}.fastq -p -k -j 2 > map.log 2>&1"
     [ "$status" -eq 0 ]
-    run bash -c "snakemake -s ../../../scripts/read_mapping.snake --config references_file=../../data/other/all_genes.clustered.faa sample_glob=../../data/raw_reads/2014_{sample}.fastq -p -k -j 2 -n 2>&1 | grep Nothing"
+    run bash -c "snakemake -s ../../../scripts/read_mapping.snake --config references_file=../../data/contigs/contigs.aloha.fa sample_glob=../../data/raw_reads/2014_{sample}.fastq -p -k -j 2 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "Nothing to be done." ]
+    [ "${lines[0]:0:18}" == "Nothing to be done" ]
 }
 
 @test "Map with bwa and simply count " {
     rm -rf test/scratch/map2
     mkdir -p test/scratch/map2
     cd test/scratch/map2
-    run bash -c "snakemake -s ../../../scripts/read_mapping.2.snake --config references_file=../../data/other/all_genes.clustered.faa sample_glob=../../data/raw_reads/2014_{sample}.fastq -p -k -j 2 > map.log 2>&1"
+    run bash -c "snakemake -s ../../../scripts/read_mapping.2.snake --config references_file=../../data/contigs/contigs.aloha.fa sample_glob=../../data/raw_reads/2014_{sample}.fastq -p -k -j 2 > map.log 2>&1"
     [ "$status" -eq 0 ]
-    run bash -c "snakemake -s ../../../scripts/read_mapping.2.snake --config references_file=../../data/other/all_genes.clustered.faa sample_glob=../../data/raw_reads/2014_{sample}.fastq -p -k -j 2 -n 2>&1 | grep Nothing"
+    run bash -c "snakemake -s ../../../scripts/read_mapping.2.snake --config references_file=../../data/contigs/contigs.aloha.fa sample_glob=../../data/raw_reads/2014_{sample}.fastq -p -k -j 2 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "Nothing to be done." ]
+    [ "${lines[0]:0:18}" == "Nothing to be done" ]
 }
 
 @test "Map with kallisto" {
@@ -42,5 +42,5 @@ setup() {
     [ "$status" -eq 0 ]
     run bash -c "snakemake -s ../../../scripts/read_mapping.kallisto.snake --config references_file=../../data/other/assembled_transcripts.fasta sample_glob=../../data/raw_reads/{sample}_merge.fastq -p -k -j 2 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "Nothing to be done." ]
+    [ "${lines[0]:0:18}" == "Nothing to be done" ]
 }

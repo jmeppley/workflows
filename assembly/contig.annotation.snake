@@ -1,3 +1,5 @@
+logger.debug("Loading: " + str(workflow.snakefile))
+
 """
 Rules that take a contigs.fasta file and generate a bunch of information about
 the assembly
@@ -19,7 +21,7 @@ from python.assembly import get_contig_stats, \
 """
 # Some extra hoops to jump through because the contigs stats aren't a proper 
 #  script yet
-snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
+snakefile_path=os.path.dirname(os.path.abspath(workflow.main_snakefile))
 config['pymg_dir'] = os.path.join(snakefile_path, 'tools', 'pymg')
 sys.path.append(config['pymg_dir'])
 from edl import __version__ as PYMG_VERSION

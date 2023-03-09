@@ -9,7 +9,7 @@ We are starting with the old recipe from illuminaPrep:
 import os
 import sys
 
-snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
+snakefile_path=os.path.dirname(os.path.abspath(workflow.main_snakefile))
 sys.path[0]=os.path.join(snakefile_path,'..','python')
 from common import get_version, parse_stats
 from annotate import get_db_dot_fmt_strings, get_last_alg

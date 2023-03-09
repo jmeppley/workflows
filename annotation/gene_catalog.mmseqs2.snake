@@ -55,11 +55,10 @@ rule cluster_faa:
                         .format(cluster_suffix)
     threads: config['mmseqs2']['threads']
     params:
-        tmp_dir=tmp_dir.name,
         output="all_genes.faa.{}.result".format(cluster_suffix)
     shell:
         "mmseqs {config[mmseqs2][program]} \
-            {input} {params.output} {params.tmp_dir} \
+            {input} {params.output} {tmp_dir.name} \
             {config[mmseqs2][options]} --threads {threads}"
 
 rule formatdb_for_mmseqs:

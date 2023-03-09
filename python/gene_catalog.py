@@ -628,19 +628,19 @@ def process_for_mcl(
 ):
     """ generates a table of graph edges from an all v all """
     params = blastm8.FilterParams(format=format, pctid=pctid)
-    inputm8 = blastm8.M8Stream(input_file)
     # fake all self bits
     self_bits = {r.id: 2 * len(r) for r in SeqIO.parse(fasta_file, "fasta")}
-    with open(output_file, "wt") as OUTPUT:
-        for seq, hits in blastm8.filterM8Stream(inputm8,
-                                                params,
-                                                returnLines=False):
-            for hit in hits:
-                if hit.hit == seq:
-                    # we've faked the self bits for now
-                    continue
+    with blastm8.InputFile(input_file) as inputm8:
+        with open(output_file, "wt") as OUTPUT:
+            for seq, hits in blastm8.filterM8Stream(inputm8,
+                                                    params,
+                                                    return_lines=False):
+                for hit in hits:
+                    if hit.hit == seq:
+                        # we've faked the self bits for now
+                        continue
 
-                process_hit(hit, OUTPUT, self_bits, minbit)
+                    process_hit(hit, OUTPUT, self_bits, minbit)
 
 
 def process_hit(hit, output_handle, self_bits, minbit):

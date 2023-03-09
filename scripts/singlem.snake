@@ -3,7 +3,7 @@ import pandas
 
 # import python modules from workflows repo
 import os, sys
-workflows_dir = os.path.dirname(os.path.dirname(workflow.snakefile))
+workflows_dir = os.path.dirname(os.path.dirname(workflow.main_snakefile))
 sys.path.append(workflows_dir)
 
 from scripts import singlem

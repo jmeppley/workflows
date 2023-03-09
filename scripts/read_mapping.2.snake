@@ -48,7 +48,7 @@ SFTP only works with keys (no password).
 
 # get remote file tools
 import os, sys, pandas
-workflows_dir = os.path.dirname(os.path.dirname(workflow.snakefile))
+workflows_dir = os.path.dirname(os.path.dirname(workflow.main_snakefile))
 sys.path.append(workflows_dir)
 from python.common import get_file_name
 from python.mapping import check_sample_data

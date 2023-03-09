@@ -41,7 +41,7 @@ setup() {
     [ "$status" -eq 0 ]
     run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config genes_file=../../../data/other/all_genes.clustered.faa -p -k -j 20 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "Nothing to be done." ]
+    [ "${lines[0]:0:18}" == "Nothing to be done" ]
     [ -e all_genes.clustered.annotations.pfam ]
     run bash -c "grep ';' all_genes.clustered.annotations.tab | grep -c Bacteria"
     [ "$status" -eq 0 ]
@@ -73,7 +73,7 @@ setup() {
     [ "$status" -eq 0 ]
     run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=cdhit discover_fastx_for_stats=True -p -k -j 20 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "Nothing to be done." ]
+    [ "${lines[0]:0:18}" == "Nothing to be done" ]
 }
 
 @test "Compile and annotate gene catalog: mmseqs2" {
@@ -82,7 +82,7 @@ setup() {
     [ "$status" -eq 0 ]
     run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=mmseqs2 -p -k -j 20 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "Nothing to be done." ]
+    [ "${lines[0]:0:18}" == "Nothing to be done" ]
 }
 
 @test "Compile and annotate gene catalog: vsearch" {
@@ -91,7 +91,7 @@ setup() {
     [ "$status" -eq 0 ]
     run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=vsearch -p -k -j 20 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "Nothing to be done." ]
+    [ "${lines[0]:0:18}" == "Nothing to be done" ]
 }
 
 @test "Compile and annotate gene catalog: cdhit-est" {
@@ -100,7 +100,7 @@ setup() {
     [ "$status" -eq 0 ]
     run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=cdhitest -p -k -j 20 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "Nothing to be done." ]
+    [ "${lines[0]:0:18}" == "Nothing to be done" ]
 }
 
 @test "Compile and annotate gene catalog: mcl on faa" {
@@ -109,7 +109,7 @@ setup() {
     [ "$status" -eq 0 ]
     run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=mcl cluster_type=faa -p -k -j 20 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "Nothing to be done." ]
+    [ "${lines[0]:0:18}" == "Nothing to be done" ]
 }
 
 @test "Compile and annotate gene catalog: mcl on ffn" {
@@ -118,6 +118,5 @@ setup() {
     [ "$status" -eq 0 ]
     run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=mcl -p -k -j 20 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "Nothing to be done." ]
+    [ "${lines[0]:0:18}" == "Nothing to be done" ]
 }
-

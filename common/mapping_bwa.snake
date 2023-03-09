@@ -1,3 +1,5 @@
+logger.debug("Loading: " + str(workflow.snakefile))
+
 from edl import __version__ as PYMG_VERSION
 SAMTOOLS_VERSION = get_version('samtools', lines=0)
 BWA_VERSION = \
@@ -19,7 +21,7 @@ from python.samples import get_sample_reads_for_mapping
 # map reads to contigs with BWA:
 #  4 rules
 
-rule index_contigs:
+rule index_contigs_bwa:
     """ prepare contigs for mapping with BWA """
     input:
         "{contigs}.fasta"
