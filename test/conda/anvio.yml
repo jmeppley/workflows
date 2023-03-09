@@ -10,7 +10,7 @@ dependencies:
  - gsl
  - anvio-minimal
  - pandas
- - biopython
+ - biopython<=1.75
  - bbmap
  - bfc
  - trimmomatic

@@ -10,7 +10,7 @@ dependencies:
  - paramiko
  - coreutils
  - pandas
- - biopython
+ - biopython<=1.75
  - bbmap
  - bfc
  - trimmomatic

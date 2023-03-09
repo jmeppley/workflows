@@ -4,7 +4,7 @@ channels:
  - jmeppley
 dependencies:
  - python=3
- - snakemake-minimal<=5.18.1
+ - snakemake-minimal<8
  - pysftp
  - psutil
  - paramiko
@@ -15,7 +15,7 @@ dependencies:
  - seqtk
  - prinseq
  - pandas
- - biopython
+ - biopython<=1.75
  - emboss
  - infernal
  - prodigal

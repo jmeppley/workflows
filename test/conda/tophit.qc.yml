@@ -4,13 +4,13 @@ channels:
 - jmeppley
 dependencies:
 - python=3
-- snakemake-minimal<=5.18.1
+- snakemake-minimal<8
 - pysftp
 - psutil
 - paramiko
 - coreutils
 - pandas
-- biopython
+- biopython<=1.75
 - flash
 - pear
 - trimmomatic

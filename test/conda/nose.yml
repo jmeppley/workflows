@@ -6,6 +6,6 @@ dependencies:
  - python=3
  - nose
  - pandas
- - biopython
+ - biopython<=1.75
  - snakemake-minimal
  - py-metagenomics
