@@ -1,10 +1,11 @@
 """
 Sets up the environment and includes necessary snakefiles for running QC
 """
+logger.debug("LOADING: " + workflow.snakefile)
+
 from python.qc import JOINING_PROTOCOLS
 
 if config.get('remove_rna', True) in ['True', True]:
-    include: "../common/fastq.snake"
     include: "sort.rna.snake"
 
 # if any samples are filtered

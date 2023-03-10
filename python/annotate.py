@@ -64,7 +64,7 @@ def get_db_dot_fmt_strings(db_list, config, query_extension="fasta"):
     for d in db_list:
         db_data = config["dbs"][d]
         format = db_data.get("format", "tbl")
-        if format.startswith("last"):
+        if format.startswith("last") or format in {'dmnd', 'diamond'}:
             format = get_last_alg(format, query_extension)
         if "frags" in db_data and int(db_data["frags"]) > 1:
             format = format + ".dbatch"

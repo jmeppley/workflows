@@ -1,3 +1,5 @@
+logger.debug("LOADING: " + workflow.snakefile)
+
 rule get_fasta_id_map:
     """
     pull out fasta headers into a map from ID to Description
@@ -27,7 +29,7 @@ rule link_db_metadata_map:
     Create smlink to taxid map from formatted db loc
     """
     input: '{file_root}.{ext}'
-    output: "{file_root}.{fasta_ext}.{db_string}.{ext}"
+    output: "{file_root}.{db_string}.{ext}"
     wildcard_constraints:
         fasta_ext='(faa|ffn|fna|fasta|fa)',
         db_string='(bwa/bwadb|ldb8?/lastdb|dmnd)',

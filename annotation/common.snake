@@ -19,6 +19,7 @@ default_threads=config.setdefault('threads',{}).get('default', 3)
 # End configuration
 ##########
 include: "lastal.snake"
+include: 'diamond.snake'
 include: "hmmer.snake"
 
 def get_hit_filter(wildcards):

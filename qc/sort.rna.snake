@@ -1,3 +1,5 @@
+logger.debug("LOADING: " + workflow.snakefile)
+
 include: "../annotation/cmsearch.snake"
 include: "../common/fastq.snake"
 

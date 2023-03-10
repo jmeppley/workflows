@@ -54,6 +54,11 @@ rule merge_reads_for_spades:
         fi
         """
 
+TMP_DIR = tempfile.TemporaryDirectory( \
+                        suffix='tmp', \
+                        prefix='spades', \
+                        dir=config['spades']['tmp_dir'])
+
 rule run_spades_metagenomic:
     """
     $(CONTIGS_LOCAL): $(R1_FASTQ) $(R2_FASTQ) | $(OUTPUT_DIR)
@@ -73,10 +78,6 @@ rule run_spades_metagenomic:
         kmers=lambda w: config['spades']['kmers'] if w.product=='contigs' \
                             else config['spades']['rnakmer'],
         ram_limit=config['spades']['ram'],
-        tmp_dir=tempfile.TemporaryDirectory( \
-                                suffix='tmp', \
-                                prefix='spades', \
-                                dir=config['spades']['tmp_dir']),
         cont="CONTINUE" if os.path.isdir('spades') else "",
         skip_ec='' if run_ec else '--only-assembler',
         params=config['spades']['params']
@@ -86,7 +87,7 @@ rule run_spades_metagenomic:
             spades.py --continue -o spades
         else
             spades.py {params.mode} -m {params.ram_limit} -t {threads} \
-                      -k {params.kmers} --tmp-dir {params.tmp_dir.name} \
+                      -k {params.kmers} --tmp-dir {TMP_DIR.name} \
                       --pe1-12 {input} -o spades \
                       {params.skip_ec} {params.params} 
         fi

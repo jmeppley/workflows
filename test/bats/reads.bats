@@ -19,7 +19,7 @@ setup() {
     [ "$status" -eq 0 ]
     run bash -c "snakemake -s ../../../annotation.reads.snake --configfile ../../data/configs/reads.annot.prod.yaml -p -k -j 2 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "Nothing to be done." ]
+    [ "${lines[0]:0:18}" == "Nothing to be done" ]
 }
 
 @test "Annotate reads from a bam file with sixframe translation" {
@@ -30,7 +30,7 @@ setup() {
     [ "$status" -eq 0 ]
     run bash -c "snakemake -s ../../../annotation.reads.snake --configfile ../../data/configs/reads.annot.six.yaml -p -k -j 2 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "Nothing to be done." ]
+    [ "${lines[0]:0:18}" == "Nothing to be done" ]
 }
 
 @test "Annotate genes from multiple faa files" {
@@ -41,7 +41,7 @@ setup() {
     [ "$status" -eq 0 ]
     run bash -c "snakemake -s ../../../annotation.reads.snake --configfile ../../data/configs/reads.annot.faa.yaml -p -k -j 2 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "Nothing to be done." ]
+    [ "${lines[0]:0:18}" == "Nothing to be done" ]
 }
 
 @test "Annotate reads from multiple fastq files" {
@@ -52,6 +52,5 @@ setup() {
     [ "$status" -eq 0 ]
     run bash -c "snakemake -s ../../../annotation.reads.snake --configfile ../../data/configs/reads.annot.glob.yaml -p -k -j 2 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "Nothing to be done." ]
+    [ "${lines[0]:0:18}" == "Nothing to be done" ]
 }
-

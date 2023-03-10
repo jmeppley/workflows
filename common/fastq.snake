@@ -1,11 +1,16 @@
+logger.debug("LOADING: " + workflow.snakefile)
 
-rule fastq_to_fasta:
-    input: "{file_root}.fastq"
-    output: temp("{file_root}.fasta")
-    benchmark: "benchmarks/{file_root}.fasta.time"
-    version: get_version("seqtk", "", lines=2)
-    resources:
-        disk=2
-    shell:
-        "seqtk seq -A {input} > {output}"
+logger.debug(repr(rules))
+
+if 'fastq_to_fasta' not in workflow._rules:
+    # this may be included multiple times and can collide with itself
+    rule fastq_to_fasta:
+        input: "{file_root}.fastq"
+        output: temp("{file_root}.fasta")
+        benchmark: "benchmarks/{file_root}.fasta.time"
+        version: get_version("seqtk", "", lines=2)
+        resources:
+            disk=2
+        shell:
+            "seqtk seq -A {input} > {output}"
 
