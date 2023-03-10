@@ -20,7 +20,7 @@ setup() {
     [ "$status" -eq 0 ]
     run bash -c "snakemake -s ../../../annotation.tophits.snake --configfile ../../data/configs/reads.top.RS.yaml -p -k -n 2>&1 | grep '^Nothing'"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "Nothing to be done." ]
+    [ "${lines[0]:0:18}" == "Nothing to be done" ]
 }
 
 @test "Check tophit outputs" {
@@ -44,7 +44,7 @@ setup() {
     [ "$status" -eq 0 ]
     run bash -c "snakemake -s ../../../annotation.tophits.snake --configfile ../../data/configs/reads.top.QC.RS.yaml -p -k -n 2>&1 | grep '^Nothing'"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "Nothing to be done." ]
+    [ "${lines[0]:0:18}" == "Nothing to be done" ]
 }
 
 @test "Check tophit QC outputs" {
@@ -57,5 +57,3 @@ setup() {
     run bash -c "diff <(sort test/scratch/topqc/ALOHA_XVII_1_15_DNA.vs.RefSeq.lastx._B50_F0.tophit.all.hitid.counts) test/bats/outputs/topqc/ALOHA_XVII_1_15_DNA.vs.RefSeq.lastx._B50_F0.tophit.all.hitid.counts.sort | grep -c '^<'"
     [ "${lines[0]}" -lt 80 ]
 }
-
-
