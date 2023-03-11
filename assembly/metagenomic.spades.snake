@@ -65,7 +65,8 @@ rule run_spades_metagenomic:
         $(SPADES) -m $(SPADES_RAM) -o $(OUTPUT_DIR)/spades --pe1-1 $(R1_FASTQ) 
         --pe1-2 $(R2_FASTQ) --only-assembler --meta
     """
-    input: rules.merge_reads_for_spades.output
+    input:
+        reads=rules.merge_reads_for_spades.output,
     output: "spades/{product}.fasta"
     wildcard_constraints:
         product=r'(contigs|transcripts)',
@@ -74,21 +75,20 @@ rule run_spades_metagenomic:
     version: get_version('spades.py')
     threads: int(config['spades']['threads'])
     params:
-        mode=lambda w: {'contigs':'--meta','transcripts':'--rna'}[w.product],
+        mode=lambda w: '--meta' if w.product=='contigs' \
+                            else '--rna',
         kmers=lambda w: config['spades']['kmers'] if w.product=='contigs' \
                             else config['spades']['rnakmer'],
         ram_limit=config['spades']['ram'],
-        cont="CONTINUE" if os.path.isdir('spades') else "",
         skip_ec='' if run_ec else '--only-assembler',
         params=config['spades']['params']
-    shell:
-        """
-        if [ "{params.cont}" == "CONTINUE" ]; then
+    shell: """
+        if [ -e spades/params.txt ]; then 
             spades.py --continue -o spades
         else
             spades.py {params.mode} -m {params.ram_limit} -t {threads} \
                       -k {params.kmers} --tmp-dir {TMP_DIR.name} \
-                      --pe1-12 {input} -o spades \
+                      --pe1-12 {input.reads} -o spades \
                       {params.skip_ec} {params.params} 
         fi
         """
