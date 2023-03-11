@@ -20,7 +20,7 @@ setup() {
     [ "$status" -eq 0 ]
     run bash -c "snakemake -s ../../../annotation.genes.snake --configfile ../../data/configs/genes.annot.yaml -p -k -j 2 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "Nothing to be done." ]
+    [ "${lines[0]:0:18}" == "Nothing to be done" ]
 }
 
 @test "Annotate existing gene catalog" {
@@ -31,5 +31,5 @@ setup() {
     [ "$status" -eq 0 ]
     run bash -c "snakemake -s ../../../annotation.gene_catalog.snake --configfile ../../data/configs/genes.annot.yaml -p -k -j 2 -n 2>&1 | grep Nothing"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "Nothing to be done." ]
+    [ "${lines[0]:0:18}" == "Nothing to be done" ]
 }
