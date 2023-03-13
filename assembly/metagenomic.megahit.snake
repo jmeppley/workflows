@@ -52,8 +52,6 @@ rule megahit:
         preset=lambda w: w.preset,
         cont=lambda w: "--continue" \
             if os.path.isdir('megahit-{}'.format(w.preset)) else "",
-        rmdir=lambda w: "rmdir megahit-{}".format(w.preset) \
-            if not os.path.isdir('megahit-{}'.format(w.preset)) else "",
         inputs=','.join(cleaned_reads),
         user_opts=config['megahit']['params']
     threads:
@@ -62,9 +60,14 @@ rule megahit:
         """
         # snakemake generates output dir, but this confuses megahit. 
         # remove it if were not continuing
-        {params.rmdir}
+        if [ -e megahit-{params.preset}/options.json ]; then
+            CONT_PARAM="--continue"
+        else
+            CONT_PARAM=""
+            rm -r megahit-{params.preset}
+        fi
         megahit --12 {params.inputs} --presets {params.preset} -t {threads} \
-         {params.cont} -o megahit-{params.preset} --out-prefix megahit \
+         $CONT_PARAM -o megahit-{params.preset} --out-prefix megahit \
          {params.user_opts} \
          > {log} 2>&1
         """

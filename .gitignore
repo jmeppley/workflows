@@ -4,6 +4,7 @@
 *.ldb8/
 *.ldb/
 *.headers
+.ipynb_checkpoints/
 test/scratch
 test/conda/envs
 test/data/seqdbs/GTDB/lastdb*
@@ -18,3 +19,5 @@ test/data/seqdbs/KEGG/lastdb*
 !test/data/seqdbs/KEGG/lastdb.kos
 test/data/seqdbs/Silva/LSU
 test/data/seqdbs/Silva/SSU
+test/data/seqdbs/Silva/LSU.fasta.bwa
+test/data/seqdbs/Silva/SSU.fasta.bwa
