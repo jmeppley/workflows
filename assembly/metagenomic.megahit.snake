@@ -50,8 +50,6 @@ rule megahit:
         get_version('megahit')
     params:
         preset=lambda w: w.preset,
-        cont=lambda w: "--continue" \
-            if os.path.isdir('megahit-{}'.format(w.preset)) else "",
         inputs=','.join(cleaned_reads),
         user_opts=config['megahit']['params']
     threads:
