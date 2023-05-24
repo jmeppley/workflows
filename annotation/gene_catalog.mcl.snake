@@ -8,7 +8,7 @@ defaults = {
         'options': '-I 2',
         'filters': {'pctid': .95, 'minbit': .5},
         'output_str': 'mcl.I2',
-        'use_last8': True,
+        'use_last8': False,
         'last_opts': "",
     },
 }

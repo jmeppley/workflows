@@ -46,10 +46,9 @@ assembly_renaming_map = {x['assembly']:x['regex'] \
 clustering_method = config.get('clustering_method', 'cdhitest')
 cluster_suffix = clustering_method
 #  clustering snake file should override the variable cluster_suffix
-include: "gene_catalog.{}.snake".format(clustering_method)
-#
 # are we clustering faa or ffn? The cluster method should determine this
 cluster_type = config.get("cluster_type", 'ffn')
+include: "gene_catalog.{}.snake".format(clustering_method)
 #
 # Define some trasitions to break the workflow up into segments
 transitions = config.setdefault('transitions',{})
