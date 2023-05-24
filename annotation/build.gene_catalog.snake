@@ -7,8 +7,17 @@ Starting point:
 Workflow:
  * collect all faa and fna annotations
  * pull out just coding sequences from fna files
- * cluster all nucl CDS at 95%
+ * cluster all genes
+   - by default use cd-hit-est (nucl) at 95%
+   - optins for cd-hit, mmseqs2, vsearch, mcl
  * pull out faa version of cluster reps
+
+
+Clustering subworkflows:
+ * work from all_genes.{faa,ffn} (depending on config[cluster_type]
+ * generate all_genes.{faa,ffn}.{cluster_type}
+   - eg: all_genes.faa.cdhit
+ * this gets linked back to the starting file for annotation
 """
 
 from python.common import parse_stats
@@ -34,9 +43,9 @@ if "assembly_list" not in config:
 assembly_renaming_map = {x['assembly']:x['regex'] \
                          for x in config.get('assembly_renaming', [])}
 # chose clustering method
-#  clustering snake file should define the variable cluster_suffix
 clustering_method = config.get('clustering_method', 'cdhitest')
 cluster_suffix = clustering_method
+#  clustering snake file should override the variable cluster_suffix
 include: "gene_catalog.{}.snake".format(clustering_method)
 #
 # are we clustering faa or ffn? The cluster method should determine this
@@ -47,9 +56,9 @@ transitions = config.setdefault('transitions',{})
 # the first part creates the clustered faa (prefix defined in parent makefile)
 transitions[prefix + '.faa'] = \
             'all_genes.{}.{}.faa'.format(cluster_type, cluster_suffix)
-# the clustered output is ambiguously named, so lets add ffn or faa to the end
+# the clustered output has different names from different methods
 transitions['all_genes.{0}.{1}.{0}'.format(cluster_type, cluster_suffix)] = \
-            'all_genes.{}.{}'.format(cluster_type, cluster_suffix)
+            CLUSTER_REPS
 #
 # End configuration
 ##########
@@ -198,15 +207,27 @@ rule get_fasta_id_list:
          > {output}
         """
 
-rule get_cluster_rep_faa:
-    input:
-        "all_genes.ffn.{cd_hit_output_str}.ffn.idlist",
-        "all_genes.faa"
-    output:
-        "all_genes.ffn.{cd_hit_output_str}.faa"
-    benchmark:
-        "benchmarks/all_genes.ffn.{cd_hit_output_str}.faa.time"
-    shell: "screen_list.py -l {input[0]} -k {input[1]} > {output}"
+# bild reps fasta file for the encoding we did not cluster on
+if cluster_type == "ffn":
+    rule get_cluster_rep_faa:
+        input:
+            "all_genes.ffn.{cluster_suffix}.ffn.idlist",
+            "all_genes.faa"
+        output:
+            "all_genes.ffn.{cluster_suffix}.faa"
+        benchmark:
+            "benchmarks/all_genes.ffn.{cluster_suffix}.faa.time"
+        shell: "screen_list.py -l {input[0]} -k {input[1]} > {output}"
+elif cluster_type == "faa":
+    rule get_cluster_rep_ffn:
+        input:
+            "all_genes.faa.{cluster_suffix}.faa.idlist",
+            "all_genes.ffn"
+        output:
+            "all_genes.faa.{cluster_suffix}.ffn"
+        benchmark:
+            "benchmarks/all_genes.faa.{cluster_suffix}.ffn.time"
+        shell: "screen_list.py -l {input[0]} -k {input[1]} > {output}"
 
 ## We also need to collect the contig coverages
 rule assembly_gene_coverages:

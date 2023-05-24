@@ -4,7 +4,7 @@ channels:
  - jmeppley
 dependencies:
  - python=3
- - snakemake-minimal
+ - snakemake-minimal < 6.0
  - pysftp
  - psutil
  - paramiko
@@ -30,6 +30,5 @@ dependencies:
  - vsearch
  - mcl
  - mmseqs2
- - py-metagenomics
+ - py-metagenomics <= 1.1.2
  - dynamic_remote_snake
-

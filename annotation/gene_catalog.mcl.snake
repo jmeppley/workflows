@@ -16,6 +16,8 @@ apply_defaults(config, defaults)
 config['mcl']['use_last8'] = config['mcl']['use_last8'] in TRUTH
 cluster_suffix = config['mcl']['output_str']
 
+CLUSTER_REPS = f'all_genes.{cluster_type}.{cluster_suffix}'
+
 wildcard_constraints:
     cluster_suffix=cluster_suffix
 
