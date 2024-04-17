@@ -342,38 +342,49 @@ def parse_bio_clusters(bio_json, out_tab):
                 TAB.write("{}\t{}\n".format(rep,
                                             "\t".join(other_genes)))
 
-def parse_mmseq_clusters(mm_tab, out_tab):
-    """ reformat mmseqs cluster table to our style 
+def parse_mmseq_clusters(mm_tab, out_tab, debug=False):
+    """ reformat mmseqs cluster table to our style                                                  
         input: every line maps rep to member
-        output: every non-single cluster listed starting w/rep
+        output: every non-single cluster listed starting w/rep                                      
     """
-    with open(out_tab, 'wt') as TAB:
-        with open(mm_tab) as MM:
-            prev_rep = None
+    if debug:
+        counts = Counter()
+    with open(out_tab, 'wt') as TAB:                                                                
+        with open(mm_tab) as MM:                                                                    
+            prev_rep = None                                                                         
             gene_count = 0
             cluster_count = 0
-            for line in MM:
-                rep, gene = line.strip().split('\t')
-                if rep != prev_rep:
+            for line in MM: 
+                if debug:
+                    counts['inlines'] += 1
+                rep, gene = line.strip().split('\t')                                                
+                if rep != prev_rep:      
+                    if debug:
+                        counts['new_reps'] += 1
                     if rep != gene:
                         raise Exception("expected first gene to be same "
-                                        " as rep. {} != {}".format(rep, gene))
-                    gene_count = 1
+                                        " as rep. {} != {}".format(rep, gene))                      
+                    gene_count = 0                                                              
                     prev_rep = rep
-                    continue
-                gene_count += 1
-                if gene_count == 2:
-                    # start writing, by ending previous line
+                    # end prev cluster by ending previous line                                        
                     if cluster_count != 0:
+                        if debug:
+                            counts['clusters_written'] += 1
                         TAB.write('\n')
                     cluster_count += 1
-                    # ... and writing the rep
-                    TAB.write(rep)
                 # ... add this gene
-                TAB.write('\t' + gene)
-            # end final cluster
-            TAB.write('\n')
-
+                gene_count += 1
+                if gene_count > 1:
+                    TAB.write('\t')
+                TAB.write(gene)
+                if debug:
+                    counts['genes_written'] += 1
+            # end final cluster                                                                     
+            if debug:
+                counts['clusters_written'] += 1
+            TAB.write('\n')     
+    if debug:
+        print(counts, cluster_count)
 
 def parse_cdhit_clusters(clstr_file, cluster_file):
     """ reformat cdhit's .clstr file into simple table """

@@ -12,6 +12,23 @@ Workflow:
    - optins for cd-hit, mmseqs2, vsearch, mcl
  * pull out faa version of cluster reps
 
+Collecting genes:
+ * two ways to specify assemblies
+   - list in config:
+        assembly_list:
+            - /path/to/assembly1
+            - /path/to/assemblys21
+            ...
+   - configure path to file listing folders with config[assembly_file]
+ * genes are found in {assembly_path}/{config[gene_file_root]}.{ext}
+   - gene_file_root defaults to contigs.all.annotations
+   - ext is faa and ffn (both versions should exist!)
+ * gene coverages compiled from assembly sample coverages
+  - either {assembly_path}/contigs.final.stats.txt
+  - or {assembly_path}/contigs.all.coverages.{sample}.{tsv,txt}
+ * assembly paths are encoded into temporary file names, so long paths
+   may cause errors. Try making a local folder of symlinks to reduce path size
+
 
 Clustering subworkflows:
  * work from all_genes.{faa,ffn} (depending on config[cluster_type]
@@ -20,8 +37,9 @@ Clustering subworkflows:
  * this gets linked back to the starting file for annotation
 """
 
+from collections import Counter
 from python.common import parse_stats
-from python.gene_catalog import merge_cluster_coverages
+from python.gene_catalog import parse_clusters
 from urllib.parse import quote_plus, unquote_plus
 
 #########
@@ -30,8 +48,19 @@ from urllib.parse import quote_plus, unquote_plus
 # assemblies located in paths
 # listed in config[assembly_list] or file config[assembly_list_file]
 if "assembly_list" not in config:
-    with open(config['assembly_list_file']) as LIST:
-        config['assembly_list'] = [l.strip() for l in LIST.readlines()]
+    # If config file doesn't explicitly list assemblies
+    if 'assembly_list_file' in config:
+        # user can supply a file listing them
+        with open(config['assembly_list_file']) as LIST:
+            config['assembly_list'] = [l.strip() for l in LIST.readlines()]
+    else:
+        # Glob is not supported because it would require a fiundamental change
+        # to the way get_all_gene_call_files works
+        # I think I could have an alternate way to set gene_call_files
+        # (instead of get_all_gene_call_files()) where I use the glob
+        # but I'd want to make sure every assembly has both ffn and faa
+        raise Exception("assembly_glob is not yet supported. Please list "
+                        "assemblies manually for now")
 
 # some assemblies need to be renamed to fit in the big catalog
 # listed in config as list of 2-entry dicts:
@@ -62,6 +91,10 @@ transitions['all_genes.{0}.{1}.{0}'.format(cluster_type, cluster_suffix)] = \
 # End configuration
 ##########
 
+LOCAL_DIR = 'gene_files'
+GENE_PATH_PREFIX = config.setdefault('gene_path_prefix', '')
+GENE_FILE_ROOT = config.get('gene_file_root', 'contigs.all.annotations')
+
 ##########
 # set up list of files to create
 #  - The final tabulations
@@ -78,7 +111,7 @@ config['outputs'] = set(catalog_stats_files)
 
 #########
 # Helper functions
-def get_unique_local_file(file_name, local_dir):
+def get_unique_local_file(file_name, local_dir, transition=True):
     " return a unique local file name and set up transition "
     name_string = os.path.basename(file_name)
     config['file_count'][name_string] = config.setdefault('file_count', {})\
@@ -87,11 +120,12 @@ def get_unique_local_file(file_name, local_dir):
         str(config['file_count'][name_string]) + "_" + \
         name_string
 
-    config['transitions'][local_name] = file_name
+    if transition:
+        config['transitions'][local_name] = file_name
     return local_name
                                                    
 def get_all_gene_call_files(ext, config,
-                            local_dir='gene_files'):
+                            local_dir=LOCAL_DIR):
     """
     Find the contig.annotations.{wildcards.ext} for each assembly
 
@@ -103,20 +137,44 @@ def get_all_gene_call_files(ext, config,
     Uses transitions{} to make a link from the source file to a local alias
     """
     # hack for sliding in fixed gene calls
-    path_prefix = config.setdefault('gene_path_prefix', '')
-    gene_file_root = config.get('gene_file_root', 'contigs.all.annotations')
     if 'gene_path_prefix' in config and ext=='fna':
         ext='ffn'
 
     for assembly_path in config['assembly_list']:
-        file_name = os.path.join(path_prefix + assembly_path, 
-                                 '{}.{}'.format(gene_file_root, ext))
+        file_name = os.path.join(GENE_PATH_PREFIX + assembly_path, 
+                                 '{}.{}'.format(GENE_FILE_ROOT, ext))
+
+        """
+        # if the ffn file is missing but the fna and faa exist
+        # then we can create the ffn file
+        make_ffn = False
+        if not os.path.exists(file_name):
+            if ext == 'ffn':
+                if (
+                    os.path.exists(re.sub(r'\.ffn$', '.faa', file_name))
+                    and
+                    os.path.exists(re.sub(r'\.ffn$', '.fna', file_name))
+                ):
+                    make_ffn = True
+        """
 
         if assembly_path in assembly_renaming_map:
             file_name = "renamed_dir" + file_name
 
-        yield (quote_plus(assembly_path), 
-               get_unique_local_file(file_name, local_dir))
+        """
+        if make_ffn:
+            # this suffix invokes a rule that will make a temporary ffn file from fna
+            # and faa if the ffn is missing and the other two exist
+            file_name = file_name + ".from.fna"
+            add_transition=False
+        else:
+            add_transition=True
+        """
+
+        yield (
+            quote_plus(assembly_path),
+            get_unique_local_file(file_name, local_dir,),
+        )
 
 
 def get_assembly_coverage_files(wildcards):
@@ -141,7 +199,14 @@ def get_assembly_coverage_files(wildcards):
 
             yield file_name
 
-def get_assembly_read_stats(wildcards):
+def get_assembly_report_file(wildcards):
+    """
+    Find all the contig.coverages.{sample}.txt for an assembly
+    """
+    assembly_path = unquote_plus(wildcards.assembly)
+    return f"{assembly_path}/contigs.report"
+
+def get_assembly_read_stats_old(wildcards):
     """
     Find all the cleaned reads stats files for an assembly
     """
@@ -172,6 +237,8 @@ rule rename_contigs_and_genes:
     benchmark: 'benchmarks/rename_annotations{assembly}/{annotation_file}.{ext}.time'
     wildcard_constraints:
         ext='(faa|fna|ffn|txt)'
+    resources:
+        disk=1
     params:
         regex=lambda w: assembly_renaming_map[re.sub('^' + \
                             config['gene_path_prefix'], '', \
@@ -180,12 +247,55 @@ rule rename_contigs_and_genes:
             < {input} \
             > {output}"
 
+def rem_lead_slsh(path):
+    if path.startswith("/"):
+        return path[1:]
+    return path
+
+LOCAL_FFN_TEMPLATE = f'{LOCAL_DIR}/sample_{{sample_no}}_{GENE_FILE_ROOT}.ffn'
+
+def get_source_faa_fna_for_ffn(wildcards):
+    """ This is a hack that uses the transitions dict to
+    find the assembly dir """
+    outfile = LOCAL_FFN_TEMPLATE.format(**wildcards)
+    missing_ffn = config['transitions'][outfile]
+    faa = re.sub('\.ffn$', '.faa', missing_ffn)
+    fna = re.sub('\.ffn$', '.fna', missing_ffn)
+    return (faa, fna)
+
+rule make_ffn_from_fna_and_faa:
+    """ 
+    Normally, the local ffn file is a link to the file generated by the
+    assembly, but in some cases, the assembly only has an faa and fna file
+
+    (The fna file contains non-coding genes, too)
+
+    If the ffn file is missing, we can create by filtering the fna with faa
+    headers.
+    """
+    input: get_source_faa_fna_for_ffn
+    output: temp(LOCAL_FFN_TEMPLATE)
+    benchmark: 'benchmarks/make_ffn/sample_{sample_no}.time'
+    resources:
+        disk=1
+    shell:
+        """screen_list.py -k \
+            -l <(grep "^>" {input[0]} \
+                 | perl -pe 's/^>(\\S+).*$/\\1/') \
+            -f fasta {input[1]} \
+            > {output}"""
+
+# link to the FFN file if it exists. Only make it if it's missing!
+ruleorder: transition_link_or_cat > make_ffn_from_fna_and_faa
+
 rule collect_gene_calls:
     input: lambda w: gene_call_files[w.ext].values()
     output: "all_genes.{ext}"
     benchmark: 'benchmarks/all_genes.{ext}.time'
     wildcard_constraints:
         ext=r'(ffn|faa)'
+    resources:
+        disk=1
     shell:
         """
         cat {input} > {output}
@@ -197,6 +307,8 @@ rule get_fasta_id_list:
     benchmark: 'benchmarks/{file_root}.{ext}.idlist.time'
     wildcard_constraints:
         ext=r'(fna|ffn|faa|fasta|fa)'
+    resources:
+        disk=1
     shell:
         r"""
         grep "^>" {input} \
@@ -214,6 +326,8 @@ if cluster_type == "ffn":
             "all_genes.faa"
         output:
             "all_genes.ffn.{cluster_suffix}.faa"
+        resources:
+            disk=1
         benchmark:
             "benchmarks/all_genes.ffn.{cluster_suffix}.faa.time"
         shell: "screen_list.py -l {input[0]} -k {input[1]} > {output}"
@@ -224,6 +338,8 @@ elif cluster_type == "faa":
             "all_genes.ffn"
         output:
             "all_genes.faa.{cluster_suffix}.ffn"
+        resources:
+            disk=1
         benchmark:
             "benchmarks/all_genes.faa.{cluster_suffix}.ffn.time"
         shell: "screen_list.py -l {input[0]} -k {input[1]} > {output}"
@@ -237,20 +353,43 @@ rule assembly_gene_coverages:
     """
     input:
         contig_covs=get_assembly_coverage_files,
-        read_stats=get_assembly_read_stats,
+        report=get_assembly_report_file,
         genes=lambda w: gene_call_files['faa'][w.assembly],
     output:
         table=temp('coverages/{assembly}.coverages.tsv'),
     benchmark: 'benchmarks/{assembly}.coverages.time'
+    resources:
+        disk=1
     run:
         # get number of reads in assembly
+        # (divide by 1e9 so final data is in coverage per billion reads)
         read_counts = 0
-        for stats_file in input.read_stats:
-            reads = parse_stats(stats_file)['reads'] / 10000000
-            read_counts += reads
+        with open(str(input.report)) as lines:
+            line_iter = iter(lines)
+            line = next(line_iter)
+            while not line.strip().startswith('reads:'):
+                line = next(line_iter)
+
+            for line in line_iter:
+                if line.lstrip().startswith("###"):
+                    break
+                m = re.search(
+                    r'^\s*(\S+)\s+clean\s+reads:\s*(\d+)',
+                    line,
+                )
+                if m:
+                    sample, read_count = m.groups()
+                    read_counts += int(read_count)
+
+        if read_counts == 0:
+            ## something went wrong!
+            print("report files: " + repr(input.report))
+            raise Exception("No read counts found for assembly: " + \
+                            str(wildcards.assembly))
 
         # get dict of contig coverages
         coverages = None
+        coverages_per_bil = None
         if len(input.contig_covs) == 0:
             raise Exception("Cannot find coverage file for " +
                             assembly_path)
@@ -262,28 +401,45 @@ rule assembly_gene_coverages:
                                          index_col=0,
                                          header=0,
                                          usecols=[contig_col, cov_col],
-                                        )[cov_col] / read_counts
+                                        )[cov_col]
             if coverages is None:
                 coverages = _coverages
+                coverages_per_bil = _coverages / read_counts
             else:
                 coverages = coverages + _coverages
+                coverages_per_bil = coverages_per_bil + _coverages / read_counts
 
         # transfer contig coverages to genes
         contig_rexp = re.compile(r'_\d+$')
-        def get_gene_cov(gene):
+        def get_gene_cov(gene, covs):
             " get contig name from gene and look up cov "
-            return coverages.get(contig_rexp.sub('', gene), 0)
-        gene_coverages = \
-            pandas.DataFrame(
-                {gene.id:{'Coverage':get_gene_cov(gene.id)} \
-                          for gene in SeqIO.parse(input.genes, 'fasta')}
-            ).T
-        gene_coverages.to_csv(output.table)
+            return covs.get(contig_rexp.sub('', gene), 0)
+
+        if len(coverages) == 0 or os.path.getsize(input.genes) == 0:
+            # there is no data in this sample!
+            with open(output.table, 'wt') as dummy_table:
+                dummy_table.write(""",Coverage\n""")
+        else:
+            gene_coverages = \
+                pandas.DataFrame(
+                    {gene.id:{'Coverage':get_gene_cov(gene.id, coverages_per_bil),
+                             } \
+                              for gene in SeqIO.parse(input.genes, 'fasta')}
+                ).T
+            gene_coverages.query("Coverage > 0").to_csv(output.table)
 
 rule gene_coverage_table:
     """
     collect assembly gene coverages
     use clusters to combine into one big coverage table for clusters
+
+    This rule now outputs the table in "long" or "COO" format that is more
+    efficient for sparse matrices. The gene_coverage_table_wide rule
+    converts it to the traditional "wide" table.
+
+    NOTE: the "sums" output is a total of normalized coverages. It's a proxy
+    for overall abundance of each gene familiy but is dependent on the wieghts
+        we apply to each sample.
     """
     input: 
         gene_covs=expand('coverages/{assembly}.coverages.tsv',
@@ -292,13 +448,169 @@ rule gene_coverage_table:
     output:
         table='{}.sample.coverage.tsv'.format(prefix),
         sums=temp('{}.coverage.tsv'.format(prefix))
+    resources:
+        disk=1
     benchmark: 'benchmarks/{}.sample.coverage.tsv.time'.format(prefix)
     run:
-        gene_cov_dict = {a:'coverages/{}.coverages.tsv'.format(a) \
-                         for a in gene_call_files['faa']}
-        coverages = merge_cluster_coverages(input.clusters,
-                                            gene_cov_dict)
+        # old way: merge into a "wide" format table
+        #gene_cov_dict = {a:'coverages/{}.coverages.tsv'.format(a) \
+        #                 for a in gene_call_files['faa']}
+        #coverages = merge_cluster_coverages(input.clusters,
+        #                                    gene_cov_dict)
+        #coverages.to_csv(output.table)
+        #coverages.sum(axis=1).to_csv(output.sums)
 
-        coverages.to_csv(output.table)
-        coverages.sum(axis=1).to_csv(output.sums)
+        # new way: "long" format requires no merging, just concatenation
+        cluster_map = parse_clusters(input.clusters)
+
+        rep_sums = {}
+        with open(output.table, 'wt') as out_table:
+            for assembly in gene_call_files['faa']:
+                asm_path = unquote_plus(assembly)
+                asm_cov_file = f'coverages/{assembly}.coverages.tsv'
+                asm_covs = pandas.read_csv(asm_cov_file, index_col=0)
+                asm_covs['cl_rep'] = [ \
+                    cluster_map.get(g, g) \
+                    for g in asm_covs.index \
+                ]
+                asm_sums = asm_covs.groupby('cl_rep').agg(sum)
+                for rep, cov_norm in asm_sums.reset_index().values:
+                    out_table.write(f'{asm_path}\t{rep}\t{cov_norm}\n')
+                    rep_sums[rep] = rep_sums.get(rep, 0) + cov_norm
+
+        with open(output.sums, 'wt') as out_table:
+            for cl_rep, cov_sum in rep_sums.items():
+                out_table.write(f'{cl_rep}\t{cov_sum}\n')
+
+
+def get_wide_from_long_sparse(long_df, index=None, columns=None, values=None):
+    """ Turn a long format DataFrame into a sparse wide format DataFrame 
+        By default, the first column holds column names and the second hold row  names
+          and the 3rd column holds cell values
+
+        This is similar to the pivot() operation, but will work on large spase
+        datasets that might otherwise overflow.
+    """
+    from scipy import sparse
+    if index is None:
+        index = long_df.columns[1]
+    if columns is None:
+        columns = long_df.columns[0]
+    if values is None:
+        values = long_df.columns[2]
+
+    # enumerate unique row and column names
+    rows = tuple(set(long_df[index].values))
+    cols = tuple(set(long_df[columns].values))
+    row_idxs = {g:i for i,g in enumerate(rows)}
+    col_idxs = {g:i for i,g in enumerate(cols)}
+    
+    # translate Nx3 table into 3 indexed lists (needed for COO instantiation)
+    I, J, data = zip(*((row_idxs[s], col_idxs[g], v) 
+                       for s, g, v
+                       in long_df[[index, columns, values]].values
+                      )
+                    )
+    
+    # make COO sparse matrix
+    smat = sparse.coo_matrix((data, (I, J)), 
+                             shape=(len(rows), len(cols))
+                            )
+    
+    # make DataFrame from sparse matrix
+    return pandas.DataFrame.sparse.from_spmatrix(smat, columns=cols, index=rows)
+
+rule gene_coverage_table_wide:
+    """
+    convert the "long" format coverage table into "wide" format
+    """
+    input: 
+        long='{}.sample.coverage.tsv'.format(prefix)
+    output:
+        wide='{}.sample.coverage.wide.tsv'.format(prefix)
+    resources:
+        disk=1
+    benchmark:
+        'benchmarks/{}.sample.coverage.wide.tsv.time'.format(prefix)
+    run:
+        # load the long format table
+        df_long = pandas.read_csv( \
+            'all_genes.clustered.sample.coverage.tsv', \
+            sep='\t',  \
+            names=['assembly', 'cluster', 'abundance'], \
+            header=None, \
+            index_col=None, \
+        )
+
+        df_wide = get_wide_from_long_sparse(df_long)
+
+        df_wide.to_csv(output.wide, sep='\t')
  
+## Collect per-assembly stats into a big table
+import subprocess
+import io
+
+REPORT_TO_YAML_TEMPLATE="""
+N=$(grep -n -m 1 "^#" {report_file} | perl -pe 's/:#.+//')
+let N=N-1
+head -n $N {report_file}
+"""
+
+def parse_report_file(report_file):
+    # read the first N lines of the report file as YAML
+    cmd = REPORT_TO_YAML_TEMPLATE.format(report_file=report_file)
+    p = subprocess.run(cmd, shell=True, capture_output=True)
+    report_data = yaml.load(io.BytesIO(p.stdout), yaml.SafeLoader)
+
+    # it should be a dict with 3 entries
+    assert 'all_contigs' in report_data
+    assert isinstance(report_data['all_contigs'], dict)
+    assert 'filtered_contigs' in report_data
+    assert isinstance(report_data['filtered_contigs'], dict)
+    assert 'reads' in report_data
+    assert isinstance(report_data['reads'], dict)
+    
+    # let's return a dict with:
+    
+    #  - all_contigs data as is
+    all_data = dict(report_data['all_contigs'])
+
+    #  - filtered_contigs data prefixed with "filter_"
+    all_data.update(
+        ("filtered_" + key, value)
+        for key, value in  report_data['filtered_contigs'].items()
+    )
+    
+    #  - read and base totals from `reads`
+    counts = Counter()
+    for key, value in report_data['reads'].items():
+        m = re.search(
+            r'.+(clean|raw)\s+(?:R[12]\s+)?(reads|bases)',
+            key
+        )
+        assert m is not None
+        state, unit = m.groups()
+        counts[f'{state}_{unit}'] += value
+        # count clean reads entries to get the number of runs in assembly
+        if state == 'clean' and unit == 'reads':
+            counts['seq_runs'] += 1
+    all_data.update(counts)
+
+    return all_data
+
+rule assembly_stats:
+    input:
+        reports=[unquote_plus(assembly) + "/contigs.report" \
+                 for assembly in gene_call_files['faa']]
+    output: prefix + '.reports.tsv'
+    resources:
+        disk=1
+    run:
+        report_df = pandas.DataFrame(
+                {os.path.dirname(r):parse_report_file(r)
+                 for r in input.reports}
+        ).T
+        report_df.index.name = 'assembly_dir'
+        report_df['sample'] = [os.path.basename(ad) for ad in report_df.index]
+        report_df.to_csv(str(output), sep='\t')
+

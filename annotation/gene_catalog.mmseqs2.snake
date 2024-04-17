@@ -26,8 +26,8 @@ CLUSTER_REPS = MMSEQS_TEMPLATE + "_rep_seq.fasta"
 rule cluster_with_mmseq:
     input: f"all_genes.{cluster_type}"
     output:
-        tsv=MMSEQS_TEMPLATE + "_cluster.tsv",
         reps=MMSEQS_TEMPLATE + "_rep_seq.fasta",
+        tsv=MMSEQS_TEMPLATE + "_cluster.tsv",
         seqs=temp(MMSEQS_TEMPLATE + "_all_seqs.fasta"),
     log: MMSEQS_TEMPLATE + ".log"
     benchmark: f'benchmarks/all_genes.{cluster_type}.{cluster_suffix}.time'
