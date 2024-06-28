@@ -106,6 +106,10 @@ catalog_stats_files = \
                        suffix=['faa','ffn'],
                        prefix="all_genes")
 config['outputs'] = set(catalog_stats_files)
+# the new coverages file
+config['outputs'].add( \
+    '{}.sample.annot_coverage.tsv'.format(prefix)
+)
 #
 #########
 
@@ -177,27 +181,33 @@ def get_all_gene_call_files(ext, config,
         )
 
 
+
+
+def get_assembly_annot_coverage_files(wildcards):
+    """
+    Find all the contigs.all.annotations.coverages.tsv for the assembly
+    """
+    assembly_path = unquote_plus(wildcards.assembly)
+    # look for per-sample coverage files
+    file_name = os.path.join(assembly_path,
+                             'contigs.all.annotations.coverages.tsv')
+    if assembly_path in assembly_renaming_map:
+        file_name = "renamed_dir" + file_name
+
+    return file_name
+
 def get_assembly_coverage_files(wildcards):
     """
     Find all the contig.coverages.{sample}.txt for an assembly
     """
     assembly_path = unquote_plus(wildcards.assembly)
-    # find a coverage file
-    # Try a combined coverage file
-    master_file = os.path.join(assembly_path,
-                            'contigs.final.stats.txt')
-    if os.path.exists(master_file):
+    # look for per-sample coverage files
+    for file_name in glob.glob(os.path.join(assembly_path,
+                            'contigs.all.coverages.*.t??')):
         if assembly_path in assembly_renaming_map:
-            master_file = "renamed_dir" + master_file
-        yield master_file
-    else:
-        # look for per-sample coverage files
-        for file_name in glob.glob(os.path.join(assembly_path,
-                                'contigs.all.coverages.*.t??')):
-            if assembly_path in assembly_renaming_map:
-                file_name = "renamed_dir" + file_name
+            file_name = "renamed_dir" + file_name
 
-            yield file_name
+        yield file_name
 
 def get_assembly_report_file(wildcards):
     """
@@ -345,26 +355,10 @@ elif cluster_type == "faa":
         shell: "screen_list.py -l {input[0]} -k {input[1]} > {output}"
 
 ## We also need to collect the contig coverages
-rule assembly_gene_coverages:
-    """
-    For each assembly:
-        map contig coverage onto individual genes
-        normalize by total raeds in assembly
-    """
-    input:
-        contig_covs=get_assembly_coverage_files,
-        report=get_assembly_report_file,
-        genes=lambda w: gene_call_files['faa'][w.assembly],
-    output:
-        table=temp('coverages/{assembly}.coverages.tsv'),
-    benchmark: 'benchmarks/{assembly}.coverages.time'
-    resources:
-        disk=1
-    run:
+def get_read_counts_from_report(report_file):
         # get number of reads in assembly
-        # (divide by 1e9 so final data is in coverage per billion reads)
         read_counts = 0
-        with open(str(input.report)) as lines:
+        with open(report_file) as lines:
             line_iter = iter(lines)
             line = next(line_iter)
             while not line.strip().startswith('reads:'):
@@ -383,9 +377,105 @@ rule assembly_gene_coverages:
 
         if read_counts == 0:
             ## something went wrong!
-            print("report files: " + repr(input.report))
-            raise Exception("No read counts found for assembly: " + \
-                            str(wildcards.assembly))
+            raise Exception("No read counts found in report file:\n" +
+                            str(report_file))
+
+        return read_counts
+
+rule assembly_gene_coverages_from_annots:
+    """
+    For each assembly:
+        get the calculated total coverage for each gene
+        normalize by total raeds in assembly
+    """
+    input:
+        annot_covs=get_assembly_annot_coverage_files,
+        report=get_assembly_report_file,
+        genes=lambda w: gene_call_files['faa'][w.assembly],
+    output:
+        table=temp('coverages/{assembly}.annot_coverages.tsv'),
+    benchmark: 'benchmarks/{assembly}.coverages.time'
+    resources:
+        disk=1
+    run:
+        # (divide by 1e9 so final data is in coverage per billion reads)
+        read_counts = get_read_counts_from_report(str(input.report)) / 1e9
+
+        # get pandas.Series of gene coverages
+        coverages_per_bil = \
+            pandas.read_csv(str(input.annot_covs),
+                                     sep='\t',
+                                     index_col=0,
+                                     header=0,
+                                     usecols=['gene', 'total'],
+                                    )['total'] / read_counts
+
+        if len(coverages_per_bil) == 0 or os.path.getsize(input.genes) == 0:
+            # there is no data in this sample!
+            with open(output.table, 'wt') as dummy_table:
+                dummy_table.write(""",Coverage\n""")
+        else:
+            gene_coverages = \
+                pandas.DataFrame(
+                    {gene.id:{'Coverage':coverages_per_bil.get(gene.id, 0),
+                             } \
+                              for gene in SeqIO.parse(input.genes, 'fasta')}
+                ).T
+            gene_coverages.query("Coverage > 0").to_csv(output.table)
+
+rule gene_coverage_table_from_annots:
+    """
+    collect assembly gene coverages
+    use clusters to combine into one big coverage table for clusters
+
+    pull from the annotation coverages table.
+
+    This rule now outputs the table in "long" or "COO" format that is more
+    efficient for sparse matrices.
+    """
+    input: 
+        gene_covs=expand('coverages/{assembly}.annot_coverages.tsv',
+                         assembly=gene_call_files['faa']),
+        clusters=prefix + ".clusters"
+    output:
+        table='{}.sample.annot_coverage.tsv'.format(prefix),
+    resources:
+        disk=1
+    benchmark: 'benchmarks/{}.sample.annot_coverage.tsv.time'.format(prefix)
+    run:
+        cluster_map = parse_clusters(input.clusters)
+
+        with open(output.table, 'wt') as out_table:
+            for assembly in gene_call_files['faa']:
+                asm_path = unquote_plus(assembly)
+                asm_cov_file = f'coverages/{assembly}.annot_coverages.tsv'
+                asm_covs = pandas.read_csv(asm_cov_file, index_col=0)
+                asm_covs['cl_rep'] = [ \
+                    cluster_map.get(g, g) \
+                    for g in asm_covs.index \
+                ]
+                asm_sums = asm_covs.groupby('cl_rep').agg(sum)
+                for rep, cov_norm in asm_sums.reset_index().values:
+                    out_table.write(f'{asm_path}\t{rep}\t{cov_norm}\n')
+
+rule assembly_gene_coverages_from_contigs:
+    """
+    For each assembly:
+        map contig coverage onto individual genes
+        normalize by total raeds in assembly
+    """
+    input:
+        contig_covs=get_assembly_coverage_files,
+        report=get_assembly_report_file,
+        genes=lambda w: gene_call_files['faa'][w.assembly],
+    output:
+        table=temp('coverages/{assembly}.coverages.tsv'),
+    benchmark: 'benchmarks/{assembly}.coverages.time'
+    resources:
+        disk=1
+    run:
+        # (divide by 1e9 so final data is in coverage per billion reads)
+        read_counts = get_read_counts_from_report(str(input.report)) / 1e9
 
         # get dict of contig coverages
         coverages = None
@@ -394,7 +484,7 @@ rule assembly_gene_coverages:
             raise Exception("Cannot find coverage file for " +
                             assembly_path)
         contig_col = config.get('contig_col', 'Contig')
-        cov_col = config.get('cov_col', 'MeanCov')
+        cov_col = config.get('cov_col', 'Q2Q3Cov')
         for cov_file in input.contig_covs:
             _coverages = pandas.read_csv(cov_file,
                                          sep='\t',
@@ -428,10 +518,12 @@ rule assembly_gene_coverages:
                 ).T
             gene_coverages.query("Coverage > 0").to_csv(output.table)
 
-rule gene_coverage_table:
+rule gene_coverage_table_from_contigs:
     """
     collect assembly gene coverages
     use clusters to combine into one big coverage table for clusters
+
+    pull from the contig coverages table.
 
     This rule now outputs the table in "long" or "COO" format that is more
     efficient for sparse matrices. The gene_coverage_table_wide rule
