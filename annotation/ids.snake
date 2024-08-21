@@ -14,7 +14,7 @@ rule link_fasta_id_map:
     """
     Create smlink to headers from formatted db loc
     """
-    input: '{file_root}.{fasta_ext}.headers'
+    input: ancient('{file_root}.{fasta_ext}.headers')
     output: "{file_root}.{fasta_ext}.{db_string}.ids"
     wildcard_constraints:
         fasta_ext='(faa|ffn|fna|fasta|fa)',
@@ -48,6 +48,3 @@ rule link_db_taxdump:
         dmpfile='n(am|od)es'
     shell:
         "ln -s $(realpath --relative-to=$(dirname {output}) {input}) {output}"
-
-
-
