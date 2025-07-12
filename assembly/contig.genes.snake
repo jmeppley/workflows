@@ -10,7 +10,8 @@ from snakemake import logger
 apply_defaults(config, {'prodigal': {'options': '-p meta -c'}})
 
 # need rRNA hits to filter on
-include: "../annotation/cmsearch.snake"
+if "cmsearch_default_all" not in rules._rules:
+    include: "../annotation/cmsearch.snake"
 
 rule prodigal:
     """ get gene predictions form prodigal (defaults above to -p meta -c) """
