@@ -12,6 +12,8 @@ rule rename_raw_reads:
         name_map="{prefix}.renamed.{dir}.tsv"
     log:
         "logs/{prefix}.renamed.{dir}.log"
+    resources:
+        disk=1
     benchmark:
         "benchmarks/{prefix}.renamed.{dir}.time"
     params:

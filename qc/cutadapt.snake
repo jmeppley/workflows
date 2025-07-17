@@ -8,6 +8,8 @@ rule trim_bbduk_adapters:
         "{prefix}.fastq"
     output:
         temp("{prefix}.noadapt.fastq")
+    resources:
+        disk=1
     benchmark:
         "benchmarks/{prefix}.noadapt.fastq.time"
     log:

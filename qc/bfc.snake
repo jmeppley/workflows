@@ -19,6 +19,8 @@ rule bfc_error_correction:
         get_version('bfc','-v')
     threads:
         config.get('bfc',{}).get('threads',5)
+    resources:
+        disk=1
     shell:
         """bfc {config[bfc][params]} \
               -t {threads} {input} 2> {log} \

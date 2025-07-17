@@ -37,6 +37,8 @@ rule trim_bbduk_adapters_paired:
         "benchmarks/{prefix}.{suffix}.noadapt_paired.fastq.time"
     log:
         "logs/{prefix}.{suffix}.noadapt_paired.log"
+    resources:
+        disk=1
     version:
         bbduk_version
     threads:
@@ -72,6 +74,8 @@ rule trim_bbduk_adapters:
             'interleaved' if re.search(r'R[12]', w.suffix) is None else '',
         adapter_file=config['bbduk']['resource_dir'] \
                         + "/adapters.fa"
+    resources:
+        disk=1
     threads:
         config['bbduk']['threads']
     shell:
@@ -95,6 +99,8 @@ rule trim_bbduk_phix:
         "logs/{prefix}.nophix.log"
     version:
         bbduk_version
+    resources:
+        disk=1
     params:
         phiX_file=config['bbduk']['resource_dir'] \
                          + "/phix174_ill.ref.fa.gz",
@@ -123,6 +129,8 @@ rule trim_bbduk_standards:
         bbduk_version
     params:
         spikes_file = config.get('standards_fasta','standards.fasta')
+    resources:
+        disk=1
     threads:
         config['bbduk']['threads']
     shell:

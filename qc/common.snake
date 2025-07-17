@@ -13,6 +13,8 @@ rule interleave:
     output: "{prefix}interleaved.fastq",
     log: "logs/{prefix}interleaved.fastq.log"
     benchmark: "benchmarks/{prefix}interleaved.time"
+    resources:
+        disk=1
     version: SEQTK_VERSION
     shell: "seqtk mergepe {input} > {output}"
 
@@ -22,6 +24,8 @@ rule drop_singles:
     """
     input: "{prefix}.fastq"
     output: "{prefix}.dropse.fastq"
+    resources:
+        disk=1
     benchmark: "benchmarks/{prefix}.dropse.time"
     version: SEQTK_VERSION
     shell: "seqtk dropse {input} > {output}"

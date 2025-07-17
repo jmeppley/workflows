@@ -34,6 +34,8 @@ rule trimmomatic_trim:
         "benchmarks/{file_root}_trimmomatic_trim.time"
     threads:
         config['trimmomatic']['threads']
+    resources:
+        disk=1
     version:
         tmatic_version
     params:
@@ -93,6 +95,8 @@ rule trimmomatic_clean_adapters:
         config['trimmomatic']['threads']
     version:
         tmatic_version
+    resources:
+        disk=1
     shell:
         """
         trimmomatic PE -threads {threads} \
@@ -107,6 +111,8 @@ rule trimomatic_recombine:
         "{prefix}.trim_adapt.{dir}.paired.fastq",
         "{prefix}.trim_adapt.{dir}.unpaired.fastq"
     output: "{prefix}.trim_adapt.{dir}.fastq"
+    resources:
+        disk=1
     wildcard_constraints:
         prefix=r'.+(?<!paired)',
         dir=r'R[12]',
