@@ -9,7 +9,7 @@ dependencies:
  - coreutils
  - pandas
  - biopython
- - bbmap
+ - bbmap==38.69
  - bfc
  - trimmomatic
  - prodigal
