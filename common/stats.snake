@@ -5,9 +5,13 @@
 #  finds fasta and fastq outputs,
 #  adds stats/hist files to outputs of this workflow
 # (It adds some serious startup time)
-from python.common import get_version, add_stats_outputs
+from snakemake.logging import logger
+import sys
+snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
+sys.path[0]=os.path.join(snakefile_path,'..','python')
 logger.debug("INIT STATS")
-add_stats_outputs(workflow.snakefile, config) 
+from common import get_version, add_stats_outputs
+add_stats_outputs(workflow.main_snakefile, config) 
 
 try:
     hist_version = get_version('histograms.py')
@@ -30,6 +34,8 @@ if enable_hist:
             "logs/{file_root}.{ext}.hist.log"
         benchmark:
             "benchmarks/{file_root}.{ext}.hist.time"
+        resources:
+            disk=1
         version:
             hist_version
         params:
@@ -63,6 +69,8 @@ rule prinseq_any:
         "logs/{file_root}.{ext}.stats.log"
     benchmark:
         "benchmarks/{file_root}.{ext}.stats.time"
+    resources:
+        disk=1
     params:
         input_flag=lambda wildcards:"-fastq" \
          if re.search(r'q',wildcards.ext) else "-fasta",

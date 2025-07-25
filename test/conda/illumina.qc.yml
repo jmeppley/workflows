@@ -4,18 +4,17 @@ channels:
 - jmeppley
 dependencies:
 - python=3
-- snakemake-minimal
+- snakemake-minimal<8
 - pysftp
 - psutil
 - paramiko
 - coreutils
 - pandas
 - biopython
-- flash
 - pear
 - trimmomatic
 - sed
-- bbmap
+- bbmap=38.69
 - prinseq
 - seqtk
 - infernal

@@ -15,6 +15,8 @@ rule sort_rna_default_all:
 rule filter_rrna_tbl:
     input: "{file_root}.vs.rRNA.cmsearch.gff"
     output: "{file_root}.vs.rRNA.cmsearch.{rna_mol}.gff"
+    resources:
+        disk=1
     version: get_version('filter_blast_m8.py')
     shell: "filter_blast_m8.py {input} -f gff --nonoverlapping \
             | grep {wildcards.rna_mol} \
@@ -35,6 +37,8 @@ rule filter_nonrrna_or_rrna:
         "{file_root}.{seq_type}.{ext,fast[aq]}"
     benchmark:
         "benchmarks/{file_root}.{seq_type}.{ext}.time"
+    resources:
+        disk=1
     log:
         "logs/{file_root}.{seq_type}.{ext}.log"
     version:
