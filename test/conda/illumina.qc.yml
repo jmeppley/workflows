@@ -10,11 +10,11 @@ dependencies:
 - paramiko
 - coreutils
 - pandas
-- biopython
+- biopython=1.75
 - pear
 - trimmomatic
 - sed
-- bbmap=38.69
+- bbmap==38.69
 - prinseq
 - seqtk
 - infernal
