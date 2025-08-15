@@ -8,7 +8,7 @@ snakefile_path = os.path.dirname(
 defaults={'cmsearch': {
                    'threads': 3,
                    'models': \
-                      os.path.join(snakefile_path,"annotation",'models'),
+                      os.path.join(snakefile_path,'models'),
                    },
          }
 apply_defaults(config, defaults)
@@ -71,5 +71,3 @@ rule hit_table_to_gff:
          | sort \
          | filter_blast_m8.py -f gff -s score \
          > {output}"
-
-
