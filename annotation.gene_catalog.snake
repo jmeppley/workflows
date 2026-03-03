@@ -177,7 +177,7 @@ rule taxdb_annotations:
         if wildcards.taxdb.lower().startswith('rs') or \
            wildcards.taxdb.lower().startswith('refseq'):
             db_type = gene_catalog.REFSEQ
-        elif wildcards.taxdb.lower().startswith('gtdb'):
+        elif wildcards.taxdb.lower().startswith('gt'):
             db_type = gene_catalog.GTDB
         else:
             db_type = None

@@ -160,9 +160,8 @@ class TaxDBGeneAnnotator():
 
     def annotate_genes_rs_prot(self, hit_table, annotation_table,
                                db_type=REFSEQ):
-        logger.info("Annotating " + db_type + " taxdb with " + \
-                     hit_table + " and " + \
-                     annotation_table)
+        logger.info(f"Annotating {db_type} taxdb with " \
+                    f"{hit_table} and {annotation_table}")
         with open(annotation_table, 'w') as tsv_out:
             tsv_out.write('Gene\t' \
                            + '\t'.join(printed_ranks) \
@@ -185,8 +184,7 @@ class TaxDBGeneAnnotator():
                     ))
 
     def generate_gene_annotations_rs_prot(self, hit_table, db_type=REFSEQ):
-        logger.info("Annotating " + db_type + " taxdb with " + \
-                     hit_table)
+        logger.info(f"Annotating {db_type} taxdb with {hit_table}")
 
         species_index = major_ranks.index('species')
         genus_index = major_ranks.index('genus')
