@@ -5,7 +5,7 @@ Starting point:
    multiple assembled metagenomes (configured in configfile) 
 
 Workflow:
- * collect all faa and fna annotations
+ * collect all faa and ffn or fna annotations
  * pull out just coding sequences from fna files
  * cluster all genes
    - by default use cd-hit-est (nucl) at 95%
@@ -23,6 +23,7 @@ Clustering subworkflows:
 from python.common import parse_stats
 from python.gene_catalog import merge_cluster_coverages
 from urllib.parse import quote_plus, unquote_plus
+from Bio import SeqIO
 
 #########
 # CONFIGURATION
@@ -42,6 +43,10 @@ if "assembly_list" not in config:
 # Change to a simple dict for use in makefile
 assembly_renaming_map = {x['assembly']:x['regex'] \
                          for x in config.get('assembly_renaming', [])}
+RENAMED_DIR = config.get('assembly_renaming_dir', 'renamed.dir')
+# if we need to make ffns from fnas
+FFN_FROM_FNA = config.get('ffn_from_fna', False)
+FFNS_DIR = config.get('ffns_dir', 'ffns.dir')
 # chose clustering method
 clustering_method = config.get('clustering_method', 'cdhitest')
 cluster_suffix = clustering_method
@@ -102,18 +107,20 @@ def get_all_gene_call_files(ext, config,
 
     Uses transitions{} to make a link from the source file to a local alias
     """
-    # hack for sliding in fixed gene calls
-    path_prefix = config.setdefault('gene_path_prefix', '')
     gene_file_root = config.get('gene_file_root', 'contigs.all.annotations')
-    if 'gene_path_prefix' in config and ext=='fna':
-        ext='ffn'
 
     for assembly_path in config['assembly_list']:
-        file_name = os.path.join(path_prefix + assembly_path, 
+        file_name = os.path.join(assembly_path, 
                                  '{}.{}'.format(gene_file_root, ext))
 
         if assembly_path in assembly_renaming_map:
-            file_name = "renamed_dir" + file_name
+            file_name = f"{RENAMED_DIR}{file_name}"
+            
+        if ext == 'ffn' and FFN_FROM_FNA:
+            # if we want to make ffn files from fna and faa
+            if not file_name.startswith("/"):
+                file_name = os.path.abspath(file_name)
+            file_name = f"{FFNS_DIR}{file_name}"
 
         yield (quote_plus(assembly_path), 
                get_unique_local_file(file_name, local_dir))
@@ -130,14 +137,14 @@ def get_assembly_coverage_files(wildcards):
                             'contigs.final.stats.txt')
     if os.path.exists(master_file):
         if assembly_path in assembly_renaming_map:
-            master_file = "renamed_dir" + master_file
+            master_file = f"{RENAMED_DIR}{master_file}"
         yield master_file
     else:
         # look for per-sample coverage files
         for file_name in glob.glob(os.path.join(assembly_path,
                                 'contigs.all.coverages.*.t??')):
             if assembly_path in assembly_renaming_map:
-                file_name = "renamed_dir" + file_name
+                file_name = f"{RENAMED_DIR}{file_name}"
 
             yield file_name
 
@@ -168,17 +175,27 @@ gene_call_files = {e:dict(get_all_gene_call_files(e, config)) for e in collect_e
 rule rename_contigs_and_genes:
     """ Renames contigs and genes in any annotation file that needs it """
     input: "{assembly}/{annotation_file}.{ext}"
-    output: temp("renamed_dir{assembly}/{annotation_file}.{ext}")
+    output: temp(f"{RENAMED_DIR}{{assembly}}/{{annotation_file}}.{{ext}}")
     benchmark: 'benchmarks/rename_annotations{assembly}/{annotation_file}.{ext}.time'
     wildcard_constraints:
         ext='(faa|fna|ffn|txt)'
     params:
-        regex=lambda w: assembly_renaming_map[re.sub('^' + \
-                            config['gene_path_prefix'], '', \
-                            w.assembly)]
+        regex=lambda w: assembly_renaming_map[w.assembly]
     shell: "perl -pe '{params.regex}' \
             < {input} \
             > {output}"
+            
+rule make_ffn_from_fna:
+    input:
+        fna="{file_name}.fna",
+        faa="{file_name}.faa"
+    output: temp(f"{FFNS_DIR}{{file_name}}.ffn")
+    run:
+        genes = {gene.id for gene in SeqIO.parse(input.faa, 'fasta')}
+        with open(str(output), 'wt') as ffn_out:
+            for ngene in SeqIO.parse(input.fna, 'fasta'):
+                if ngene.id in genes:
+                    ffn_out.write(ngene.format('fasta'))
 
 rule collect_gene_calls:
     input: lambda w: gene_call_files[w.ext].values()
