@@ -7,7 +7,7 @@ setup() {
     ENV_FILE=test/conda/${ENV}.yml
     if [ ! -e "$ENV_DIF" -o "$ENV_FILE" -nt "$ENV_DIR" ]; then
         rm -rf $ENV_DIR
-        conda env create -f $ENV_FILE -p $ENV_DIR --force --quiet > test/conda/envs/.create.$ENV 2>&1
+        conda env create -f $ENV_FILE -p $ENV_DIR --quiet > test/conda/envs/.create.$ENV 2>&1
     fi
 
     conda activate $ENV_DIR
@@ -15,6 +15,7 @@ setup() {
 
 
 @test "run nosetests" {
-    run nosetests test/nose
+    mkdir -p test/scratch
+    run nosetests test/nose > test/scratch/nose.log 2>&1
     [ "$status" = 0 ]
 }

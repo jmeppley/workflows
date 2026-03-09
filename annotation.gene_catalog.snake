@@ -263,7 +263,7 @@ rule stats_table:
                 # count by sample
                 #  the nummber of reps
                 sample_annot_counts['n_reps'][sample] += 1
-                if cluster_sizes[rep] > 1:
+                if cluster_sizes.get(rep,1) > 1:
                     #  the number in non-singleton clusters
                     sample_annot_counts['n_reps_gte2'][sample] += 1
                 if rep in rep_annot_nonnulls:

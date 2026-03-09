@@ -1,0 +1,297 @@
+
+### CONFIGURATION
+# naming string
+NAME = config.get('outname', 'ALOHA_3.1')
+
+ASSEMBLY_ROOT_DIR = config.get('assembly_root_dir', 'assemblies')
+
+# where to find the reads
+READS_TEMPLATE = config.get( \
+    'reads_template', \
+    ASSEMBLY_ROOT_DIR + '/{sample}/{run}.clean.fastq'
+)
+
+# add /1 /2 suffixes to read names for mapping
+RENAMED_READS_TEMPLATE = config.get( \
+    'reads_template', \
+    ASSEMBLY_ROOT_DIR + '/{sample}/{run}.clean.renamed.fastq'
+)
+
+# where to save report files
+REPORT_FILENAME = config.get( \
+    'report_filename', \
+    'contigs.report' \
+)
+REPORT_TEMPLATE = config.get( \
+    'report_template', \
+    ASSEMBLY_ROOT_DIR + '/{sample}/' + REPORT_FILENAME \
+)
+
+# collect gene abundances by sample (use parquet for efficiency)
+ABUNDANCE_FILE_TEMPLATE = (
+    NAME + "_by_sample.abundances/{sample}.parquet"
+)
+
+# where to put the read mapping outputs (link map_dir to lustre)
+MAP_DIR_ROOT = config.get('map_dir', 'mapped')
+MAP_DIR = os.path.join(MAP_DIR_ROOT, NAME)
+
+# per-sample-run abundances
+ABUND_TEMPLATE = NAME + '_abundances/{sample}.{run}.from_read_counts.parquet'
+
+GENE_CLUSTER_REPS = config.get( \
+    'gene_cluster_reps', \
+    'genes/all_genes.ffn.mmseqs.cluster.setcover.95_rep_seq.fasta' \
+)
+
+from collections import defaultdict
+samples_to_runs = defaultdict(list)
+for sample, run in zip(*glob_wildcards(READS_TEMPLATE)):
+    samples_to_runs[sample].append(run)
+
+wildcard_constraints:
+    sample="(" + "|".join(samples_to_runs.keys()) + ")"
+
+def get_abundance_files(wildcards):
+    """ return either the coverage or abundancews files for all sample/run pairs """
+    return expand(ABUNDANCE_FILE_TEMPLATE, 
+                  sample=samples_to_runs.keys())
+
+rule output:
+    input: get_abundance_files
+
+def get_run_files_for_sample(wildcards):
+    sample = wildcards.sample
+    runs = samples_to_runs[sample]
+    return expand(ABUND_TEMPLATE, sample=[sample,], run=runs)
+
+def get_run_base_counts_dict(report_file):
+    run_base_counts = {}
+    with open(report_file) as lines:
+        line_iter = iter(lines)
+        line = next(line_iter)
+        while not line.strip().startswith('reads:'):
+            line = next(line_iter)
+
+        for line in line_iter:
+            if line.lstrip().startswith("###"):
+                break
+            m = re.search(
+                r'^\s*(\S+)\s+clean\s+bases:\s*(\d+)',
+                line,
+            )
+            if m:
+                run, base_count = m.groups()
+                run_base_counts[run] = int(base_count)
+
+    return run_base_counts
+        
+rule merge_sample_covs:
+    """ for each sample, merge coverages from separate runs """
+    input: 
+        run_files=get_run_files_for_sample,
+        report=REPORT_TEMPLATE
+    output: ABUNDANCE_FILE_TEMPLATE
+    resources:
+        lustre=1,
+        mem="20G",
+    run:
+        run_base_counts = get_run_base_counts_dict(input.report)
+        import polars as pl
+        pl.concat(
+            [
+                pl.scan_parquet(
+                    ABUND_TEMPLATE.format(sample=wildcards.sample, run=run)
+                ).select(
+                    pl.col('Gene'),
+                    pl.col('Abundance') * run_base_counts[run]
+                )
+                for run in run_base_counts.keys()
+            ],
+            how='vertical', 
+            parallel=False,
+        ).group_by(
+            'Gene'
+        ).agg(
+            pl.col('Abundance').sum() / sum(run_base_counts.values())
+        ).collect(            
+        ).write_parquet(
+            str(output)
+        )
+
+def get_run_base_counts(report_file, target_run):
+    run_base_counts_dict = get_run_base_counts_dict(report_file)
+    if target_run is None:
+        return sum(run_base_counts_dict.values())
+    return run_base_counts_dict[target_run]
+
+rule gene_lengths_parquet:
+    """ save gene lengths in parquet for quick loading """
+    input:
+        genes=GENE_CLUSTER_REPS,
+    output: NAME + "_gene_lengths.parquet"
+    run:
+        # get gene lengths    
+        from Bio import SeqIO
+        import polars as pl
+        pl.DataFrame(
+            [
+                {'Gene': g.id, 'Length': len(g),}
+                for g
+                in SeqIO.parse(input.genes, 'fasta')
+            ],
+            schema={'Gene': pl.String, 'Length': pl.UInt32},
+        ).with_columns(
+            pl.when(pl.col('Length')<100) \
+              .then(pl.lit(100)) \
+              .otherwise(pl.col('Length')) \
+              .alias('Effective_length')
+        ).write_parquet(str(output))
+
+rule count_read_hits:
+    """ turn m8 output into per-gene abundances """
+    input: 
+        m8=MAP_DIR + "/{sample}.{run}.db1.last2.m8",
+        gene_lens=NAME + "_gene_lengths.parquet",
+        report=REPORT_TEMPLATE,
+    output: ABUND_TEMPLATE
+    benchmark: ABUND_TEMPLATE + '.time'
+    resources:
+        lustre=1,
+        mem="50GB",
+        runtime="2d",
+    run:
+        import polars as pl
+        from jme.jupy_tools import hit_tables
+
+        # count the read hits to each gene over 95 pct id
+        agg_hits_95_lf = hit_tables.agg_hit_table(
+            str(input.m8), 
+            format=hit_tables.BLAST,
+            use_polars='LAZY'
+        ).filter(
+            pl.col('pctid') >= 95
+        )
+
+        # divide each read count by the number of genes they hit
+        # divide read counts among all the genes each one hits
+        count_lf = agg_hits_95_lf.join(
+            agg_hits_95_lf.group_by(
+                'query'
+            ).agg(
+                (pl.lit(1) / pl.col('hit').count()).alias('query_value'),
+            ),
+            on='query',
+            how='left',
+            validate='m:1',
+        ).group_by(
+            pl.col('hit').alias('Gene')
+        ).agg(
+            pl.col('query_value').sum().alias('Read_count')
+        )   
+
+
+        # get gene lengths (eff. length is 100 if gene shorter than 100)
+        gene_lens_lf = pl.scan_parquet(
+            str(input.gene_lens)
+        ).select(
+            pl.col('Gene'),
+            pl.col('Effective_length'),
+        )
+
+        # how many reads in this sample/run?
+        run_base_counts = get_run_base_counts(input.report, wildcards.run)
+        
+        # multiply read count by 150 to get base count. Divide by tot_base_counts/1e9 to get coverage per billion bases
+        norm_value = 150 * (1e9 / run_base_counts)
+
+        abundance_df = count_lf.join(
+            gene_lens_lf,
+            on='Gene',
+            how='left',
+            validate='1:1'
+        ).select(
+            pl.col('Gene'),
+            pl.col('Read_count'),
+            ((pl.col('Read_count') / pl.col('Effective_length')) * norm_value).alias('Abundance'),
+        ).collect()
+        
+        abundance_df.write_parquet(str(output))
+
+rule rename_reads:
+    """
+    add /1 ad /2 to fwd and rev reads 
+    this assumes all the singletons have been dropped already (which is part of my assembly QC process)
+    """
+    input: READS_TEMPLATE
+    output: temp(RENAMED_READS_TEMPLATE)
+    benchmark: RENAMED_READS_TEMPLATE + '.time'
+    resources:
+        lustre=1,
+        mem="10GB",
+    run:
+        from collections import Counter
+        read_counts = Counter()
+        with open(str(output), 'wt') as out_handle:
+            with open(str(input)) as in_lines:
+                for line in in_lines:
+                    if line.startswith('@'):
+                        read, *remainder = line.split(None, 1)
+                        read_counts[read] += 1
+                        line = f'{read}/{read_counts[read]} {" ".join(remainder)}'
+                    out_handle.write(line)
+
+        count_counts = dict(sorted(Counter(read_counts.values()).items()))
+        with open(str(output) + '.log', 'wt') as log_out:
+            log_out.write(f'FASTQ read name counts value counts: {count_counts}\n')
+
+rule compile_lastdb:
+    """
+    Compile fasta file into lastb
+    This currenlty only works for protein dbs. Would a second rule for nucl
+    work?
+    """
+    input: GENE_CLUSTER_REPS
+    output: MAP_DIR + "/cluster_reps.db{db_strands}.lastdb.prj"
+    benchmark: MAP_DIR + "/cluster_reps.db{db_strands}.lastdb.time"
+    log: MAP_DIR + "/cluster_reps.db{db_strands}.lastdb.log"
+    params:
+        strands = lambda w: f' -S {w.db_strands}'
+    threads:
+        config.get('lastdb_threads',19)
+    resources:
+        lustre=1,
+        mem="500GB",
+        runtime="6d",
+    shell: "lastdb {params.strands} -c -P {threads} -v \
+                {MAP_DIR}/cluster_reps.db{wildcards.db_strands}.lastdb {input} \
+                > {log} 2>&1"
+
+DROP_COMMENTS = "perl -ne 'if (m/^[^#]/) { print; }'"
+rule lastal:
+    input:
+        db=rules.compile_lastdb.output,
+        reads=RENAMED_READS_TEMPLATE,
+    output:
+        MAP_DIR + '/{sample}.{run}.db{db_strands}.last{search_strands}.m8',
+    log:
+        MAP_DIR + '/{sample}.{run}.db{db_strands}.last{search_strands}.m8.log'
+    benchmark:
+        MAP_DIR + '/{sample}.{run}.db{db_strands}.last{search_strands}.m8.time',
+    params:
+        strands=lambda w: f' -s {w.search_strands}',
+        db=MAP_DIR + "/cluster_reps.db{db_strands}.lastdb"
+    threads:
+        config.get('lastal_threads',19)
+    resources:
+        lustre=1,
+        mem="240GB",
+        runtime="2d",
+    shell:
+        """
+        lastal {params.strands} -P {threads} -f BlastTab -Q fastx \
+         {params.db} {input.reads} \
+         | {DROP_COMMENTS} \
+         | filter_blast_m8.py -f blast -F 0 -I 95 \
+         > {output} 2> {log}
+        """

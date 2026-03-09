@@ -3,22 +3,22 @@ channels:
  - bioconda
  - jmeppley
 dependencies:
- - python=3
- - snakemake-minimal
+ - python<3.11
+ - snakemake-minimal<6
  - pysftp
  - psutil
- - paramiko
+ - paramiko < 4
  - samtools
  - last
  - hmmer
  - seqtk
  - prinseq
  - pandas
- - biopython
+ - biopython<=1.86
  - emboss
  - infernal
  - prodigal
- - py-metagenomics
+ - py-metagenomics<1.2
  - batch_launcher
  - dynamic_remote_snake
  - coreutils

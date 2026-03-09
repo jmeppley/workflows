@@ -482,7 +482,7 @@ rule assembly_gene_coverages_from_contigs:
         coverages_per_bil = None
         if len(input.contig_covs) == 0:
             raise Exception("Cannot find coverage file for " +
-                            assembly_path)
+                            unquote_plus(wildcards.assembly))
         contig_col = config.get('contig_col', 'Contig')
         cov_col = config.get('cov_col', 'Q2Q3Cov')
         for cov_file in input.contig_covs:

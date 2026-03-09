@@ -1,134 +1,187 @@
+"""
+Runs singleM on:
+
+ * every fastq file in the assemblies
+ * merged fastq by sample (if there are multiple runs)
+"""
+
 import yaml
-import pandas
+from Bio import SeqIO
+import pandas as pd
 
-# import python modules from workflows repo
-import os, sys
-workflows_dir = os.path.dirname(os.path.dirname(workflow.snakefile))
-sys.path.append(workflows_dir)
+METAPACKAGE = config.get(
+    'singlem_metapackage_loc',
+    '/path/to/dbs/singleM/S4.3.0.GTDB_r220.metapackage_20240523.smpkg.zb'
+)
 
-from scripts import singlem
-include: "../common/download.snake"
+ASSEMBLY_ROOT = config.get(
+    'assembly_root',
+    '/path/to/Aloha_gene_catalog/3.1/assemblies',
+)
+    
+RAW_READS_TEMPLATE = os.path.join(
+    ASSEMBLY_ROOT,
+    "{sample}",
+    '{run}.R{dir}.fastq',
+)
 
-# samples to process should be in the config in either of two formats:
-#  config:
-#   sample_data:
-#     sample_1: 
-#       reads: reads_file_1
-#       contigs: contigs_file_1
-#     sample_2:
-#       reads: reads_file_2
-# or as a woldcard glob:
-#  config:
-#   reads_glob: /path/to/reads/{sample}/reads.fastq
-#   contigs_glob: /path/to/contigs/{sample}/contigs.fasta
-sample_data = singlem.get_sample_data(config)
+# find all the samples/runs using the raw read template
+raw_read_location = {}
+for sample, run, rdir in zip(*glob_wildcards(RAW_READS_TEMPLATE, followlinks=True)):
+    # filter out anything we dont want
+    if re.search(r'renamed$', run):
+        continue
+    if re.search(r'/', sample):
+        continue
+    if re.search(r'/', run):
+        continue
+    if rdir not in ["1", "2"]:
+        continue
+    raw_read_location.setdefault(sample, {}).setdefault(run, {})[rdir] = RAW_READS_TEMPLATE.format(sample=sample, run=run, dir=rdir)
 
-# debug
-logger.debug(yaml.dump(config))
-
-singlem_env_path = config.get('env',
-    "/lus/scratch/jmeppley/assemblies/Aloha_2_0/MAGhunt/singleM/env2")
-singlem_env_prefix = """
-export PREFIX=$CONDA_PREFIX
-export ARCH=x86_64
-source activate {env}""".format(env=singlem_env_path)
-
-
+print(RAW_READS_TEMPLATE, len(raw_read_location))
+    
+## files to make
+# start with the final tax table
+outputs_list = ['all_samples.profile.tsv']
+# run through prok frac for all merged outputs and runs from multi-run samples
+for sample, run_reads in raw_read_location.items():
+    outputs_list.append(f"output/{sample}/merged.prok_frac.tsv")    
+    if len(run_reads) > 1:
+        # also do individual runs if there is more than one
+        outputs_list.extend([f"output/{sample}/{run}.prok_frac.tsv" for run in run_reads])
+        
 rule outputs:
-    input:
-        krona=['{}.singlem.krona.html'.format(s) for s in sample_data],
-        appraisal='assemblies.appraisals.tsv',
-        rarify='otus.rarified.{}.csv'.format(config.get('rarification_level',
-                                                        100))
+    input: outputs_list
 
-rule get_r1:
-    input: lambda w: sample_data[w.sample]['reads']
-    output: "{sample}.R1.fastq"
-    shell: "seqtk seq -1 {input} > {output}"
+## merge all the outputs into one big table
+MERGED_PROFILE_TEMPLATE = "output/{sample}/merged.profile.tsv"
 
-rule singlem_pipe:
-    input: "{sample}.R1.fastq"
-    output: '{sample}.singlem.otu.csv'
-    benchmark: 'benchmarks/{sample}.singlem.otu.time'
-    threads: config.get('threads', {}).get('reads', 5)
-    shell: """
-        {singlem_env_prefix}
-        singlem pipe --sequences {input} --otu_table {output} \
-                     --threads {threads}
-        """
+def scan_profile(sample):
+    import polars as pl
+    return pl.scan_csv(
+        MERGED_PROFILE_TEMPLATE.format(sample=sample),
+        separator='\t'
+    ).drop('sample').rename(
+        {'coverage': sample}
+    )
 
-rule singlem_krona:
-    input: rules.singlem_pipe.output
-    output: "{sample}.singlem.krona.html"
-    benchmark: 'benchmarks/{sample}.singlem.krona.time'
-    shell: """
-        {singlem_env_prefix}
-        singlem summarise --input_otu_table {input} \
-            --krona {output}"""
+def merge_tax_counts():
+    import polars as pl
+    tax_df = None
+    for sample in raw_read_location.keys():
+        sample_df = scan_profile(sample).collect()
+        if tax_df is None:
+            tax_df = sample_df
+        else:
+            tax_df = tax_df.join(
+                sample_df,
+                on='taxonomy',
+                how='full',
+                validate='1:1',
+                coalesce=True,
+            )
+    return tax_df
 
-rule singlem_contigs:
-    input: lambda w: sample_data[w.sample]['contigs']
-    output: "{sample}.contigs.singlem.out.csv"
-    threads: config.get('threads', {}).get('contigs', 5)
-    benchmark: 'benchmarks/{sample}.contigs.singlem.otu.time'
-    shell: """
-        {singlem_env_prefix}
-        singlem pipe --sequences {input} --otu_table {output} \
-                     --threads {threads}            
-        """
-
-rule collect_appraisals:
-    input: ['{}.contigs.appraisal.txt'.format(s) \
-                   for s,d in sample_data.items() if 'contigs' in d]
-    output: 'assemblies.appraisals.tsv'
-    benchmark: 'benchmarks/combine.appraisals.time'
+rule merge_tax_counts:
+    input: expand(MERGED_PROFILE_TEMPLATE, sample=raw_read_location.keys())
+    output: 'all_samples.profile.tsv'
+    benchmark: 'all_samples.profile.time'
     run:
-        print(repr(input))
-        print(dir(input))
-        out_table = None
-        for appraisal_file in input:
-            table = pandas.read_table(appraisal_file, index_col=0)
-            table.drop(['total', 'average'], inplace=True)
-            if out_table is None:
-                out_table = table
-            else:
-                out_table = out_table.append(table)
-        out_table.to_csv(output[0], sep='\t')
+        merge_tax_counts().write_csv(str(output), separator='\t')
+    
+## run singleM singleM_prok_frac on all the samples and runs
 
-
-rule assembly_appraisal:
+rule link_raw_reads:
+    input: lambda w: raw_read_location[w.sample][w.run][w.dir[-1]]
+    output: "reads/{sample}/{run}.{dir}",
+    wildcard_constraints:
+        dir=r'R[12]'
+    benchmark: "reads/{sample}/{run}.{dir}.link.time"
+    shell:
+        "ln -s $(realpath {input}) {output}"
+                        
+rule count_bases:                        
     input:
-        reads=rules.singlem_pipe.output,
-        contigs=rules.singlem_contigs.output
+        r1="reads/{sample}/{run}.R1",
+        r2="reads/{sample}/{run}.R2",
     output:
-        text='{sample}.contigs.appraisal.txt',
-        plot='{sample}.contigs.appraisal.svg',
-    benchmark: 'benchmarks/{sample}.contigs.appraisal.time'
-    shell: """
-        {singlem_env_prefix}
-        singlem appraise --metagenome_otu_tables {input.reads} \
-          --assembly_otu_tables {input.contigs} --plot {output.plot} \
-          > {output.text} 2> {output.plot}.log
-          """
+        base_counts="output/{sample}/{run}.base_counts.tsv",
+    run:
+        tot_bases = sum(
+            len(r)
+            for reads_file in input
+            for r in SeqIO.parse(reads_file, 'fastq')
+        )
 
-rule singlem_cluster:
-    input: rules.singlem_pipe.output
-    output: "{sample}.singlem.cluster.csv"
-    benchmark: 'benchmarks/{sample}.singlem.cluster.time'
-    shell: """
-        {singlem_env_prefix}
-        singlem summarise --input_otu_table {input} \
-            --cluster --clustered_output_otu_table {output}"""
+        base_counts_df = pd.DataFrame(
+            [[wildcards.sample, tot_bases],["merged", tot_bases],],
+            columns=['sample', 'num_bases'],
+        )
 
-rule rarify_otus:
-    input:
-        otus=['{}.singlem.cluster.csv'.format(s) for s in sample_data],
-    output: "otus.rarified.{level}.csv"
-    benchmark: "benchmarks/rarify.otus.{level}.time"
-    threads: config.get('threads', {}).get('rarify', 5)
-    shell: """
-        {singlem_env_prefix}
-        singlem summarise --input_otu_tables {input.otus} \
-            --rarefied_output_otu_table {output} \
-            --number_to_choose {wildcards.level}
+        base_counts_df.to_csv(
+            str(output),
+            sep='\t',
+            index=False,
+        )
+
+
+rule merge_runs:
+    input: lambda w: [f"reads/{w.sample}/{run}.{w.dir}" for run in raw_read_location[w.sample].keys()]
+    wildcard_constraints:
+        dir=r'R[12]'
+    output: "reads/{sample}/merged.{dir}",
+    benchmark: "reads/{sample}/merged.{dir}.time"
+    params:
+        n_runs=lambda w: len(raw_read_location[w.sample]),
+        outdir="reads/{sample}",
+    shell:
         """
+if (( {params.n_runs} > 1 )); then
+    cat {input} > {output}
+else
+    cd {params.outdir} && ln -s $(basename {input}) merged.{wildcards.dir}
+fi
+        """
+
+rule singlem:
+    input:
+        r1=ancient("reads/{sample}/{run}.R1"),
+        r2=ancient("reads/{sample}/{run}.R2"),
+    output:
+        tsv="output/{sample}/{run}.profile.tsv",
+        krona="output/{sample}/{run}.profile.html",
+        otus="output/{sample}/{run}.otu_table.tsv",
+    threads: config.get('singlem_threads', 10)
+    benchmark: "output/{sample}/{run}.singlem.time"
+    log: "output/{sample}/{run}.log"
+    shell:
+        """
+singlem pipe --threads {threads} \
+    --metapackage {METAPACKAGE} \
+    -1 {input.r1} -2 {input.r2} \
+    -p {output.tsv} \
+    --taxonomic-profile-krona {output.krona} \
+    --otu-table {output.otus} \
+ > {log} 2>&1
+        """
+
+rule singlem_frac:
+    input:
+        base_counts="output/{sample}/{run}.base_counts.tsv",
+        profile="output/{sample}/{run}.profile.tsv",
+    output:
+        tot_frac="output/{sample}/{run}.prok_frac.tsv",
+        tax_frac="output/{sample}/{run}.prok_frac_per_taxon.tsv",
+    benchmark: "output/{sample}/{run}.singlem.prok_frac.time"
+    log: "output/{sample}/{run}.prok_frac.log"
+    shell:
+        """
+singlem microbial_fraction \
+    --metapackage {METAPACKAGE} \
+    -p {input.profile} \
+    --input-metagenome-sizes {input.base_counts} \
+    --output-tsv {output.tot_frac} \
+    --output-per-taxon-read-fractions {output.tax_frac} \
+ > {log} 2>&1
+        """        
