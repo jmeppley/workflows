@@ -4,28 +4,28 @@ channels:
  - brwnj
  - jmeppley
 dependencies:
- - python=3
+ - python=3.7
  - pip
- - snakemake-minimal
+ - snakemake-minimal<6
  - pysftp
  - psutil
  - paramiko
  - pandas
- - biopython
- - bbmap
- - bfc
- - trimmomatic
+ - biopython=1.76
+ - bbmap=38.75
+ - bfc=r181
+ - trimmomatic=0.39
  - fastp
- - bwa 
- - samtools
- - infernal
- - prodigal
+ - bwa=0.7.17
+ - samtools=1.10
+ - infernal=1.1.2
+ - prodigal=2.6.3
  - prinseq
- - seqtk
+ - seqtk=1.3
  - sed
  - spades
- - megahit
- - last
+ - megahit=1.2.9
+ - last=1021
  - py-metagenomics
  - batch_launcher
  - dynamic_remote_snake

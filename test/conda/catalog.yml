@@ -4,32 +4,31 @@ channels:
  - jmeppley
 dependencies:
  - python=3
- - snakemake-minimal
+ - snakemake-minimal < 6.0
  - pysftp
  - psutil
- - paramiko
+ - paramiko < 4
  - coreutils
  - pandas
- - biopython
+ - biopython=1.81
  - bbmap
  - bfc
  - trimmomatic
  - bwa 
- - samtools
+ - samtools=1.17
  - infernal
  - prodigal
  - prinseq
- - seqtk
+ - seqtk=1.4
  - sed
  - spades
  - megahit
- - last
+ - last=982
  - samtools
  - hmmer
  - cd-hit
  - vsearch
  - mcl
- - mmseqs2
- - py-metagenomics
+ - mmseqs2=14.7
+ - py-metagenomics <= 1.1.2
  - dynamic_remote_snake
-

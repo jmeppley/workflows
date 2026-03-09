@@ -5,7 +5,8 @@ setup() {
     ENV_DIR=`pwd`/test/conda/envs/$ENV
     ENV_FILE=test/conda/${ENV}.yml
     if [ "$ENV_FILE" -nt "$ENV_DIR" ]; then
-        conda env create -f $ENV_FILE -p $ENV_DIR --force --quiet > test/conda/envs/.create.$ENV 2>&1
+        rm -rf $ENV_DIR
+        conda env create -f $ENV_FILE -p $ENV_DIR --quiet > test/conda/envs/.create.$ENV 2>&1
     fi
     # suppress warnings
     conda activate $ENV_DIR 2>/dev/null || true
@@ -29,6 +30,7 @@ setup() {
     mkdir -p test/scratch/catalog/cdhit
     mkdir -p test/scratch/catalog/cdhit-est
     mkdir -p test/scratch/catalog/mmseqs2
+    mkdir -p test/scratch/catalog/mmseqs2faa
     mkdir -p test/scratch/catalog/mcl
     mkdir -p test/scratch/catalog/mcl-ffn
     mkdir -p test/scratch/catalog/vsearch
@@ -85,6 +87,15 @@ setup() {
     [ "${lines[0]}" == "Nothing to be done." ]
 }
 
+@test "Compile and annotate gene catalog: mmseqs2 faa" {
+    cd test/scratch/catalog/mmseqs2faa
+    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=mmseqs2 cluster_type=faa -p -k -j 20 --notemp > gene_catalog.log 2>&1"
+    [ "$status" -eq 0 ]
+    run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=mmseqs2 cluster_type=faa -p -k -j 20 -n 2>&1 | grep Nothing"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" == "Nothing to be done." ]
+}
+
 @test "Compile and annotate gene catalog: vsearch" {
     cd test/scratch/catalog/vsearch
     run bash -c "snakemake -s ../../../../annotation.gene_catalog.snake --configfile ../../../data/configs/gene_catalog.yaml --config clustering_method=vsearch -p -k -j 20 --notemp > gene_catalog.log 2>&1"
@@ -120,4 +131,3 @@ setup() {
     [ "$status" -eq 0 ]
     [ "${lines[0]}" == "Nothing to be done." ]
 }
-

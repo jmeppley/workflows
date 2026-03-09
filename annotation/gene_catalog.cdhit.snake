@@ -13,11 +13,13 @@ apply_defaults(config, defaults)
 cluster_suffix = config['cdhit']['output_str']
 config['cluster_type'] = 'faa'
 
+CLUSTER_REPS = f"all_genes.faa.{cluster_suffix}"
+
 rule cluster_faa:
     input: "all_genes.faa"
     output:
-        faa="all_genes.faa.{}".format(cluster_suffix),
-        clst="all_genes.faa.{}.clstr".format(cluster_suffix)
+        faa=CLUSTER_REPS,
+        clst=CLUSTER_REPS + ".clstr"
     benchmark: 'benchmarks/all_genes.faa.{}.time' \
                         .format(cluster_suffix)
     threads: config['cdhit']['threads']

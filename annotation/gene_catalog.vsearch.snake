@@ -12,6 +12,7 @@ defaults = {
 
 apply_defaults(config, defaults)
 cluster_suffix = config['vsearch']['output_str']
+CLUSTER_REPS = f"all_genes.ffn.{cluster_suffix}"
 
 rule cluster_ffn:
     input: "all_genes.ffn"

@@ -209,6 +209,14 @@ class TaxDBGeneAnnotator:
                 + "\tfunction\tmin pct ID\thit count"
                 + "\ttop hit\ttop pct ID\ttop score\ttop desc\n"
             )
+        logger.info(f"Annotating {db_type} taxdb with " \
+                    f"{hit_table} and {annotation_table}")
+        with open(annotation_table, 'w') as tsv_out:
+            tsv_out.write('Gene\t' \
+                           + '\t'.join(printed_ranks) \
+                           + '\tfunction\tmin pct ID\thit count' \
+                           + '\ttop hit\ttop pct ID\ttop score\ttop desc\n')
+
             for info in self.generate_gene_annotations_rs_prot(hit_table,
                                                                db_type):
                 (
@@ -239,14 +247,13 @@ class TaxDBGeneAnnotator:
                 )
 
     def generate_gene_annotations_rs_prot(self, hit_table, db_type=REFSEQ):
-        logger.info("Annotating " + db_type + " taxdb with " + hit_table)
+        logger.info(f"Annotating {db_type} taxdb with {hit_table}")
 
-        species_index = major_ranks.index("species")
-        genus_index = major_ranks.index("genus")
-        phylum_index = major_ranks.index("phylum")
+        species_index = major_ranks.index('species')
+        genus_index = major_ranks.index('genus')
+        phylum_index = major_ranks.index('phylum')
 
-        total_genes = 0
-        total_hits = 0
+
         with blastm8.InputFile(hit_table) as blast_m8:
             for gene, hits in blastm8.filterM8Stream(
                 blast_m8, self.m8_params, return_lines=False
@@ -255,10 +262,12 @@ class TaxDBGeneAnnotator:
                 total_hits += len(hits)
                 total_genes += 1
                 min_pctid = min([h.pctid for h in hits])
+                
                 lca = get_lca(hits, self.hit_translator.translateHit)
                 lca_rank = approximate_rank(lca)
                 lca_ranked = {"domain":
                               lca.getAncestorClosestToRank("domain").name}
+
                 if lca_rank in major_ranks:
                     for r in range(phylum_index, species_index - 1, -1):
                         lca_ranked[major_ranks[r]] = \
@@ -268,8 +277,8 @@ class TaxDBGeneAnnotator:
                         if r <= major_ranks.index(lca_rank):
                             break
 
-                # get a good functional annotation form the best hit(s)
-                #  (that aren't hypothetical)
+                # get a good functional annotation from the best hit(s)
+                #  (that isn't/aren't hypothetical)
                 if db_type is not None:
                     fns_by_score = {}
                     for hit in hits:
@@ -420,40 +429,51 @@ def parse_bio_clusters(bio_json, out_tab):
                 TAB.write("{}\t{}\n".format(rep, "\t".join(other_genes)))
 
 
-def parse_mmseq_clusters(mm_tab, out_tab):
+def parse_mmseq_clusters(mm_tab, out_tab, debug=False):
     """ reformat mmseqs cluster table to our style
         input: every line maps rep to member
-        output: every non-single cluster listed starting w/rep
+        output: every non-single cluster listed starting w/rep                                      
     """
-    with open(out_tab, "wt") as TAB:
-        with open(mm_tab) as MM:
-            prev_rep = None
+    if debug:
+        counts = Counter()
+    with open(out_tab, 'wt') as TAB:                                                                
+        with open(mm_tab) as MM:                                                                    
+            prev_rep = None                                                                         
             gene_count = 0
             cluster_count = 0
-            for line in MM:
-                rep, gene = line.strip().split("\t")
-                if rep != prev_rep:
+            for line in MM: 
+                if debug:
+                    counts['inlines'] += 1
+                rep, gene = line.strip().split('\t')                                                
+                if rep != prev_rep:      
+                    if debug:
+                        counts['new_reps'] += 1
                     if rep != gene:
                         raise Exception(
                             "expected first gene to be same "
-                            " as rep. {} != {}".format(rep, gene)
+                            f" as rep. {rep} != {gene}"
                         )
-                    gene_count = 1
+                    gene_count = 0                                                              
                     prev_rep = rep
-                    continue
-                gene_count += 1
-                if gene_count == 2:
-                    # start writing, by ending previous line
+                    # end prev cluster by ending previous line                                        
                     if cluster_count != 0:
-                        TAB.write("\n")
+                        if debug:
+                            counts['clusters_written'] += 1
+                        TAB.write('\n')
                     cluster_count += 1
-                    # ... and writing the rep
-                    TAB.write(rep)
                 # ... add this gene
-                TAB.write("\t" + gene)
-            # end final cluster
-            TAB.write("\n")
-
+                gene_count += 1
+                if gene_count > 1:
+                    TAB.write('\t')
+                TAB.write(gene)
+                if debug:
+                    counts['genes_written'] += 1
+            # end final cluster                                                                     
+            if debug:
+                counts['clusters_written'] += 1
+            TAB.write('\n')     
+    if debug:
+        print(counts, cluster_count)
 
 def parse_cdhit_clusters(clstr_file, cluster_file):
     """ reformat cdhit's .clstr file into simple table """

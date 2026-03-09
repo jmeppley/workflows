@@ -2,11 +2,11 @@ channels:
  - conda-forge
  - bioconda
  - jmeppley
+ - default
 dependencies:
  - python<3.11
- - nose
+ - snakemake-minimal<9
  - pandas
+ - singlem=0.18.1
  - biopython
- - snakemake-minimal
- - py-metagenomics
- - biopython=1.76
+ - polars

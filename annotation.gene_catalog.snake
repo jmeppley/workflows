@@ -3,7 +3,7 @@ Python Makefile to create an anntotated gene catalog
 
 Starting point is either:
     1) existing gene catalog: faa file of protein gene sequences (already clustered)
-    2) multiple assembled metagenomes (identified via the configfile) 
+    2) multiple assembled metagenomes (identified via the configfile)
 
 Workflow:
 
@@ -37,10 +37,12 @@ import yaml
 import pandas
 from Bio import SeqIO
 from python import gene_catalog
-from python.common import get_version, apply_defaults, get_file_name, TRUTH 
+from python.common import get_version, apply_defaults, get_file_name, TRUTH
+
 from python.annotate import get_db_dot_fmt_strings, \
                             get_tax_files, \
                             get_path_file
+from python.annotate import get_db_dot_fmt_strings
 
 #########
 # CONFIGURATION
@@ -134,17 +136,24 @@ if run_cross_tab:
                db_dot_fmt=gene_family_db_dot_fmts,))
 # gene catalog stats
 output_files.update(
-    expand("stats/{prefix}.{suffix}.{ext}", 
+    expand("stats/{prefix}.{suffix}.{ext}",
            ext=['stats','hist'],
            suffix=['faa'],
            prefix=prefix))
 # final annotations
 output_files.add(prefix + ".annotations.tab")
 
+# if were pulling together assemblies, collect stats
+if GENE_CATALOG_KEY not in config:
+    # This is defined in build.gene_catalog.snake included above
+    output_files.add(prefix + ".reports.tsv")
+    # This combines the clustering and annotations and is defined below
+    output_files.add(prefix + ".stats.tsv")
+
 # debugging
 logger.debug("Snakefile config:\n" + yaml.dump(config))
 
-# The first target defines the files to be created 
+# The first target defines the files to be created
 #  (Counterintuitively, these are listed as the "input" of the rule
 rule gene_annotation_all:
     input:
@@ -164,6 +173,8 @@ rule taxdb_annotations:
         tax=lambda w: get_tax_files(config, w.taxdb),
     output: '{}.annotations.{{taxdb}}'.format(prefix)
     benchmark: 'benchmarks/{}.annotations.{{taxdb}}'.format(prefix)
+    resources:
+        disk=1
     params:
         db=lambda w: config['dbs'][w.taxdb]['path']
     run:
@@ -171,11 +182,11 @@ rule taxdb_annotations:
         if wildcards.taxdb.lower().startswith('rs') or \
            wildcards.taxdb.lower().startswith('refseq'):
             db_type = gene_catalog.REFSEQ
-        elif wildcards.taxdb.lower().startswith('gtdb'):
+        elif wildcards.taxdb.lower().startswith('gt'):
             db_type = gene_catalog.GTDB
         else:
             db_type = None
-        a.annotate_genes_rs_prot(get_file_name(input.hits), 
+        a.annotate_genes_rs_prot(get_file_name(input.hits),
                                  get_file_name(output),
                                  db_type=db_type,
                                 )
@@ -187,6 +198,8 @@ rule kegg_annotations:
         ids=config['dbs']['KEGG']['path'] + ".ids",
         kos=get_path_file(config, 'KEGG')
     output: '{}.annotations.KEGG'.format(prefix)
+    resources:
+        disk=1
     benchmark: 'benchmarks/{}.annotations.KEGG'.format(prefix)
     params:
         db=config['dbs']['KEGG']['path']
@@ -198,6 +211,73 @@ def collapse_duplicates(table, col='Gene', sep=','):
     """ aggregate on given column by simply concatenating around the given
     separator """
     return table.groupby(col).agg(lambda S: sep.join(str(v) for v in S))
+
+rule stats_table:
+    """ Collect for each sample:
+     * number of genes from each sample in the final clusters
+     * number of genes from each sample annotated in the final clusters
+        (count for all annotation types)
+    """
+    input:
+        coverages=prefix + ".sample.coverage.tsv",
+        clusters=prefix + ".clusters",
+        annots=prefix + ".annotations.tab",
+    output: prefix + ".stats.tsv"
+    resources:
+        disk=1
+    run:
+        # load the cluster rep annotations
+        annot_df = pandas.read_csv(str(input.annots), sep='\t', index_col=0, header=0)
+
+        # load the clustering to get cluster sizes
+        cluster_sizes = {}
+        with open(str(input.clusters)) as cluster_lines:
+            for line in cluster_lines:
+                cluster = [g.strip() for g in line.split()]
+                rep = cluster[0]
+                cluster_sizes[rep] = len(cluster)
+
+        # select the annot columns to check (some taxonomic ones and the gene
+        # dbs)
+        annot_cols = [
+            'hit count', 'domain',
+            'class', 'genus'
+            ]
+        for dbname in config['dbs']:
+            if config['dbs'][dbname].get('type', '').lower().startswith('tax'):
+                continue
+            annot_cols.append(dbname)
+
+        from collections import defaultdict, Counter
+        sample_annot_counts = defaultdict(Counter)
+
+        # get the set of non-null annotation cols for each rep
+        rep_annot_nonnulls = {
+            rep: set(a for a,v in zip(annot_cols, values) if pandas.notna(v))
+            for rep, *values in annot_df[annot_cols].reset_index().values
+        }
+
+        # go through the sample/rep coverage table and count for each sample
+        #  - how many reps have coverage
+        #  - how many reps with coverage are in a non-singleton cluster
+        #  - how many reps with coverage are annotated (in each of annot_cols)
+
+        with open(str(input.coverages)) as lines:
+            for line in lines:
+                sample, rep, coverage = line.split()
+
+                # count by sample
+                #  the nummber of reps
+                sample_annot_counts['n_reps'][sample] += 1
+                if cluster_sizes.get(rep,1) > 1:
+                    #  the number in non-singleton clusters
+                    sample_annot_counts['n_reps_gte2'][sample] += 1
+                if rep in rep_annot_nonnulls:
+                    for col in rep_annot_nonnulls[rep]:
+                        # the number with non null annotations
+                        sample_annot_counts[col][sample] += 1
+
+        pandas.DataFrame(sample_annot_counts).to_csv(str(output), sep='\t')
 
 rule final_table:
     """

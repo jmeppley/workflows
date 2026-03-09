@@ -8,13 +8,15 @@ defaults = {
         'options': '-I 2',
         'filters': {'pctid': .95, 'minbit': .5},
         'output_str': 'mcl.I2',
-        'use_last8': True,
+        'use_last8': False,
         'last_opts': "",
     },
 }
 apply_defaults(config, defaults)
 config['mcl']['use_last8'] = config['mcl']['use_last8'] in TRUTH
 cluster_suffix = config['mcl']['output_str']
+
+CLUSTER_REPS = f'all_genes.{cluster_type}.{cluster_suffix}'
 
 wildcard_constraints:
     cluster_suffix=cluster_suffix

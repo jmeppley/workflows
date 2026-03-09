@@ -133,7 +133,7 @@ rule sample_contig_coverage_table:
         "{contigs}.fasta",
         "mapping/{sample}.reads.vs.{contigs}.read_counts",
     output:
-        temp("{contigs}.coverages.{sample}.tsv"),
+        "{contigs}.coverages.{sample}.tsv",
     benchmark:
         "benchmarks/contig.stats.{sample}.{contigs}.time"
     run:

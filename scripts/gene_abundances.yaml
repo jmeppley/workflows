@@ -1,0 +1,12 @@
+channels:
+ - conda-forge
+ - bioconda
+ - jmeppley
+ - default
+dependencies:
+ - snakemake-minimal<8
+ - last=1548
+ - polars=1.16
+ - py-metagenomics
+ - jupy_tools
+ - biopython=1.84
