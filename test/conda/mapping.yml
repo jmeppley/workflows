@@ -3,9 +3,10 @@ channels:
     - bioconda
     - jmeppley
 dependencies:
-    - snakemake-minimal
+    - snakemake-minimal<6
     - pysftp
     - bwa
+    - paramiko < 4
     - kallisto
     - py-metagenomics
     - dynamic_remote_snake

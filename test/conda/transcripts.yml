@@ -4,12 +4,13 @@ channels:
  - jmeppley
 dependencies:
  - python=3
- - snakemake-minimal
+ - snakemake-minimal<6
  - pysftp
+ - paramiko<4
  - coreutils
  - pandas
- - biopython
- - bbmap
+ - biopython=1.76
+ - bbmap=38.75
  - bfc
  - trimmomatic
  - prodigal

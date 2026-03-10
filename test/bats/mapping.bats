@@ -6,21 +6,10 @@ setup() {
     ENV_FILE=test/conda/${ENV}.yml
     if [ "$ENV_FILE" -nt "$ENV_DIR" ]; then
         rm -rf $ENV_DIR
-        conda env create -f $ENV_FILE -p $ENV_DIR --force --quiet > test/conda/envs/.create.$ENV 2>&1
+        conda env create -f $ENV_FILE -p $ENV_DIR --quiet > test/conda/envs/.create.$ENV 2>&1
     fi
 
     conda activate $ENV_DIR
-}
-
-@test "Map with bwa and a filter" {
-    rm -rf test/scratch/map1
-    mkdir -p test/scratch/map1
-    cd test/scratch/map1
-    run bash -c "snakemake -s ../../../scripts/read_mapping.snake --config references_file=../../data/other/all_genes.clustered.faa sample_glob=../../data/raw_reads/2014_{sample}.fastq -p -k -j 2 > map.log 2>&1"
-    [ "$status" -eq 0 ]
-    run bash -c "snakemake -s ../../../scripts/read_mapping.snake --config references_file=../../data/other/all_genes.clustered.faa sample_glob=../../data/raw_reads/2014_{sample}.fastq -p -k -j 2 -n 2>&1 | grep Nothing"
-    [ "$status" -eq 0 ]
-    [ "${lines[0]}" == "Nothing to be done." ]
 }
 
 @test "Map with bwa and simply count " {

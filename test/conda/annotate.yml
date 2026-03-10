@@ -19,7 +19,8 @@ dependencies:
  - emboss
  - infernal
  - prodigal
- - py-metagenomics<1.2
+ - py-metagenomics
  - batch_launcher
+ - setuptools==81
  - dynamic_remote_snake
  - coreutils

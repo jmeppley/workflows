@@ -15,7 +15,7 @@ dbs:
         path: ../../data/seqdbs/RefSeq/proteins.faa.ldb/lastdb
         format: lastp
     RefSeq8:
-        path: ../../data/seqdbs/RefSeq/proteins.faa.ldb8/lastdb
+        path: ../../data/seqdbs/RefSeq/proteins.faa.ldb/lastdb
         format: lastp
     RefSeqD:
         path: ../../data/seqdbs/RefSeq/proteins.faa

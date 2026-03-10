@@ -18,7 +18,11 @@ default_threads=config.setdefault('threads',{}).get('default', 3)
 #
 # End configuration
 ##########
-include: "lastal.snake"
+for db, db_config in config['dbs'].items():
+    if db_config.get('format', '').startswith('last'):
+        include: "lastal.snake"
+    if db_config.get('format', '').startswith('diam'):
+        include: "diamond.snake"
 include: "hmmer.snake"
 
 def get_hit_filter(wildcards):

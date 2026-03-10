@@ -4,6 +4,8 @@
 *.ldb8/
 *.ldb/
 *.headers
+*SU.fasta.bwa/
+.ipynb_checkpoints/
 test/scratch
 test/conda/envs
 test/data/seqdbs/GTDB/lastdb*

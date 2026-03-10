@@ -20,7 +20,7 @@ dependencies:
 - seqtk
 - infernal
 - last
-- py-metagenomics<1.2
+- py-metagenomics
 - batch_launcher
 - coreutils
 - dynamic_remote_snake
