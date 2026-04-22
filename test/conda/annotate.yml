@@ -4,10 +4,8 @@ channels:
  - jmeppley
 dependencies:
  - python=3
- - snakemake-minimal<=5.18.1
- - pysftp
+ - snakemake-minimal<=8
  - psutil
- - paramiko
  - samtools
  - last
  - diamond
@@ -15,11 +13,10 @@ dependencies:
  - seqtk
  - prinseq
  - pandas
- - biopython
+ - biopython=1.75
  - emboss
  - infernal
  - prodigal
  - py-metagenomics
  - batch_launcher
- - dynamic_remote_snake
  - coreutils

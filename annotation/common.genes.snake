@@ -34,8 +34,6 @@ rule compile_counts:
         "benchmarks/compile_counts.{prefix}.{taxdb}.{taxalg}.{rank}.{db}.{dbfmt}"
     log:
         "logs/compile_counts.{prefix}.{taxdb}.{taxalg}.{rank}.{db}.{dbfmt}"
-    version:
-        get_version('compile_hit_counts.py')
     resources:
         disk=1
     params:

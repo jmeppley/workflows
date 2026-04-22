@@ -44,8 +44,6 @@ rule lastal:
         "benchmarks/lastal.{file_root}.vs.{db}.{alg}.time"
     log:
         "logs/lastal.{file_root}.vs.{db}.{alg}.log"
-    version:
-        get_version('lastal')
     threads:
         lambda wildcards: config.get('lastal',{}).get('threads',10)
     resources:

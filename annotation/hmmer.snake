@@ -14,8 +14,6 @@ rule hmmer:
         "benchmarks/hmmer.{file_root}.vs.{db}.time"
     log:
         "logs/hmmer.{file_root}.vs.{db}.log"
-    version:
-        get_version('hmmsearch','-h',lines=[1,])
     threads:
         lambda wildcards: config['hmmer'].get('threads',default_threads)
     params:
@@ -46,8 +44,6 @@ rule hmmer_fragdb:
         "benchmarks/hmmer.{file_root}.vs.{db}.dbatch.time"
     log:
         "logs/hmmer.{file_root}.vs.{db}.dbatch.log"
-    version:
-        get_version('sort',lines=[1,])
     shell:
         "cat {input} | {DROP_COMMENTS} | sort -k 1,1 > {output}"
 
@@ -66,8 +62,6 @@ rule hmmer_dbfrag:
         "benchmarks/hmmer.{file_root}.vs.{db}.{N}.time"
     log:
         "logs/hmmer.{file_root}.vs.{db}.{N}.log"
-    version:
-        get_version('hmmsearch','-h',lines=[1,])
     threads:
         config['hmmer'].get('threads',default_threads)
     shell:

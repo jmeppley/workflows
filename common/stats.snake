@@ -10,20 +10,10 @@ import sys
 snakefile_path=os.path.dirname(os.path.abspath(workflow.snakefile))
 sys.path[0]=os.path.join(snakefile_path,'..','python')
 logger.debug("INIT STATS")
-from common import get_version, add_stats_outputs
+from common import add_stats_outputs
 add_stats_outputs(workflow.main_snakefile, config) 
 
-try:
-    hist_version = get_version('histograms.py')
-    try:
-        logger.debug("Histogram version: {}".format(hist_version))
-    except:
-        pass
-    enable_hist = True
-except:
-    enable_hist = False
-
-if enable_hist:
+if config.get('enable_hist', True):
     rule histogram_simple:
         """ produce a histogram of sequence lengths """
         input:
@@ -36,8 +26,6 @@ if enable_hist:
             "benchmarks/{file_root}.{ext}.hist.time"
         resources:
             disk=1
-        version:
-            hist_version
         params:
             cat=lambda wildcards:"gunzip -c" \
              if re.search(r'\.gz$',wildcards.ext) else "cat"
@@ -78,8 +66,6 @@ rule prinseq_any:
          if re.search(r'\bfaa\b',wildcards.ext) else "",
         cat=lambda wildcards:"gunzip -c" \
          if re.search(r'\.gz$',wildcards.ext) else "cat"
-    version:
-        get_version('prinseq-lite.pl','-version')
     shell:
         """
         LINES=$({params.cat} {input} | wc -l)

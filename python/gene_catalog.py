@@ -15,10 +15,13 @@ from edl import taxon as edltaxon, util, hits as edlhits, blastm8, kegg
 
 try:
     from python.common import parse_stats
+except:
+    from common import parse_stats
+
+try:
     from snakemake import logger
 except:
     # if running as a script
-    from common import parse_stats
     import logging
 
     logging.basicConfig(level=logging.INFO)
@@ -194,14 +197,7 @@ class TaxDBGeneAnnotator:
                                hit_table,
                                annotation_table,
                                db_type=REFSEQ):
-        logger.info(
-            "Annotating "
-            + db_type
-            + " taxdb with "
-            + hit_table
-            + " and "
-            + annotation_table
-        )
+        logger.info(f'Annotating {db_type} taxdb with {hit_table} and {annotation_table}')
         with open(annotation_table, "w") as tsv_out:
             tsv_out.write(
                 "Gene\t"
@@ -239,7 +235,7 @@ class TaxDBGeneAnnotator:
                 )
 
     def generate_gene_annotations_rs_prot(self, hit_table, db_type=REFSEQ):
-        logger.info("Annotating " + db_type + " taxdb with " + hit_table)
+        logger.info(f"Annotating {db_type} taxdb with {hit_table}")
 
         species_index = major_ranks.index("species")
         genus_index = major_ranks.index("genus")

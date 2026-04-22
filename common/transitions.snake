@@ -14,17 +14,13 @@ Another use if for when the input file is in another part of the file system. We
 We can also concat multiple files into one here by giving list of files
 """
 logger.debug("BUILDING TRANSITIONS")
-from jme.dynamic_remote_snake.remote import remote_wrapper, get_dl_snakefile
-from jme.stagecache.util import URL_REXP
 
 # To prevent trying to copy or link from a file to itself
 #  remove redundant transistions here (prefilter URLs so we don't trip os.path)
-#  also pass through remote wrapper to pick up remote files
 logger.debug(config.setdefault('transitions', {}))
-transitions = {s:remote_wrapper(t, config) \
-                   for s,t in config['transitions'].items() \
-                   if URL_REXP.search(s) is not None \
-                   or os.path.abspath(s) != os.path.abspath(t)}
+transitions = {s:t \
+               for s,t in config['transitions'].items() \
+               if os.path.abspath(s) != os.path.abspath(t)}
 
 logger.debug(transitions)
 config['transitions'] = transitions
@@ -49,11 +45,6 @@ def get_link_or_cat_command(wildcards):
 pattern = "(" + "|".join(transitions.keys()) + ")"
 wildcard_constraints:
     transition_file_name=pattern
-
-logger.debug("Dynamic Remote Snakefile: " + get_dl_snakefile())
-
-include: get_dl_snakefile()
-#include: '/home/jmeppley/work/dynamic_remote_snake/download.snake'
 
 # transition rule will only match one of the configured files
 localrules: transition_link_or_cat
